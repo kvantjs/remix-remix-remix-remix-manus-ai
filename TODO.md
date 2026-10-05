@@ -1,8 +1,12 @@
 
-## [x] Timeline profissional de execução ao vivo no chat
+## [x] Timeline com foco em uma etapa por vez
 
-- Durante cada execução, o chat mostra uma fase inicial, o estado Thinking animado, contador de tempo e cards finos para compreensão do pedido, raciocínio, etapas do plano, chamadas de ferramentas, autorizações e síntese final.
-- Os eventos SSE `status`, `step`, `tool_start`, `tool_finish`, `approval_required` e `complete` atualizam a timeline sem esperar a resposta final.
-- O estado de cada etapa usa sinais visuais distintos para em andamento, concluída e aguardando autorização, com microanimações sutis e suporte a `prefers-reduced-motion`.
-- Após a conclusão, a timeline permanece registrada dentro da mensagem do agente, junto do resumo e das chamadas MCP; o computador da nuvem continua recebendo o estado ao vivo existente.
-- A experiência foi validada no Preview público com uma pesquisa Google real: a UI exibiu Thinking, `browser.search`, a etapa de anti-bot e a síntese final enquanto o painel do computador mostrava a navegação.
+- Durante a execução, somente a etapa ativa fica expandida; cada novo evento substitui o foco visual anterior em vez de abrir todos os cards simultaneamente.
+- Depois da conclusão, a timeline fica compacta por padrão e oferece um controle discreto para expandir o histórico completo quando necessário.
+
+## [x] Painel do navegador sem tela branca
+
+- O painel prioriza a captura JPEG real retornada pelo Chromium/Playwright, com indicação visual de captura ao vivo.
+- Enquanto a primeira captura ou o iframe proxy carregam, o painel mostra um estado profissional de navegador conectado, nunca uma área branca vazia.
+- Ações de busca e inspeção atualizam URL, título e screenshot do navegador; falhas de carregamento da imagem retornam ao proxy sem quebrar o painel.
+- Validação feita pela interface pública com pesquisa real: a captura do Chromium apareceu no painel e a timeline exibiu uma única etapa ativa.

@@ -1061,6 +1061,32 @@ function ExecutionTimeline({
   elapsedSeconds?: number;
   completed?: boolean;
 }) {
+  const [showHistory, setShowHistory] = useState(false);
+  const focusedStep = [...steps].reverse().find((step) => step.status === 'running') || steps.at(-1);
+  const visibleSteps = completed && showHistory ? steps : (focusedStep ? [focusedStep] : []);
+  const finishedCount = steps.filter((step) => step.status !== 'running').length;
+
+  const renderStep = (step: ExecutionStep) => {
+    const isRunning = step.status === 'running';
+    const isWarning = step.status === 'warning';
+    return (
+      <div key={step.id} className={`relative flex gap-3 rounded-xl px-2 py-2 transition-all duration-500 ${isRunning ? 'bg-white/[0.035]' : ''}`}>
+        <span className={`relative z-10 mt-0.5 flex size-[19px] shrink-0 items-center justify-center rounded-full border ${isWarning ? 'border-amber-300/40 bg-amber-300/10' : isRunning ? 'border-blue-300/50 bg-blue-300/10' : 'border-emerald-300/30 bg-emerald-300/10'}`}>
+          {isWarning ? <ShieldWarning size={10} className="text-amber-300" /> : isRunning ? <span className="size-1.5 rounded-full bg-blue-300 execution-dot" /> : <Check size={10} className="text-emerald-300" />}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className={`truncate text-[11px] font-medium ${isWarning ? 'text-amber-200/85' : isRunning ? 'text-white/85' : 'text-white/65'}`}>{step.label}</span>
+            {isRunning && <span className="shrink-0 text-[9px] uppercase tracking-[0.16em] text-blue-300/70">agora</span>}
+            {step.timestamp && <span className="ml-auto shrink-0 text-[9px] font-mono text-white/25">{step.timestamp}</span>}
+          </div>
+          <p className={`mt-0.5 text-[10px] leading-relaxed ${isRunning ? 'text-white/55' : 'text-white/35'}`}>{step.detail}</p>
+          {isRunning && <div className="execution-sheen mt-2 h-px w-full overflow-hidden rounded-full bg-blue-400/10" />}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className={`execution-timeline bg-[#202020] border border-white/[0.07] rounded-2xl p-4 ${completed ? 'mt-1' : ''}`}>
       <div className="flex items-start justify-between gap-3 mb-4">
@@ -1073,7 +1099,7 @@ function ExecutionTimeline({
             {!completed && <span className="text-white/30 font-normal">· trabalhando ao vivo</span>}
           </div>
           <p className="mt-1 pl-7 text-[11px] leading-relaxed text-white/45 truncate">
-            {completed ? 'O agente registrou as fases, chamadas e resultados desta execução.' : (activeStep || 'Preparando a próxima ação...')}
+            {completed ? 'As etapas foram registradas; o histórico permanece recolhido.' : (activeStep || 'Preparando a próxima ação...')}
           </p>
         </div>
         {!completed && <span className="shrink-0 text-[10px] font-mono text-white/35 tabular-nums">{elapsedSeconds || 0}s</span>}
@@ -1081,33 +1107,25 @@ function ExecutionTimeline({
 
       <div className="relative space-y-1.5">
         <div className="absolute left-[9px] top-2 bottom-3 w-px bg-gradient-to-b from-blue-400/30 via-white/10 to-transparent" />
-        {steps.length === 0 && (
+        {visibleSteps.length === 0 && (
           <div className="flex items-center gap-3 py-2 text-[11px] text-white/40">
             <span className="relative z-10 size-[19px] rounded-full border border-blue-400/25 bg-[#202020] execution-dot" />
             <span>Preparando o primeiro passo...</span>
           </div>
         )}
-        {steps.map((step) => {
-          const isRunning = step.status === 'running';
-          const isWarning = step.status === 'warning';
-          return (
-            <div key={step.id} className={`relative flex gap-3 rounded-xl px-2 py-2 transition-all duration-500 ${isRunning ? 'bg-white/[0.035]' : 'hover:bg-white/[0.02]'}`}>
-              <span className={`relative z-10 mt-0.5 flex size-[19px] shrink-0 items-center justify-center rounded-full border ${isWarning ? 'border-amber-300/40 bg-amber-300/10' : isRunning ? 'border-blue-300/50 bg-blue-300/10' : 'border-emerald-300/30 bg-emerald-300/10'}`}>
-                {isWarning ? <ShieldWarning size={10} className="text-amber-300" /> : isRunning ? <span className="size-1.5 rounded-full bg-blue-300 execution-dot" /> : <Check size={10} className="text-emerald-300" />}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className={`truncate text-[11px] font-medium ${isWarning ? 'text-amber-200/85' : isRunning ? 'text-white/85' : 'text-white/65'}`}>{step.label}</span>
-                  {isRunning && <span className="shrink-0 text-[9px] uppercase tracking-[0.16em] text-blue-300/70">agora</span>}
-                  {step.timestamp && <span className="ml-auto shrink-0 text-[9px] font-mono text-white/25">{step.timestamp}</span>}
-                </div>
-                <p className={`mt-0.5 text-[10px] leading-relaxed ${isRunning ? 'text-white/55' : 'text-white/35'}`}>{step.detail}</p>
-                {isRunning && <div className="execution-sheen mt-2 h-px w-full overflow-hidden rounded-full bg-blue-400/10" />}
-              </div>
-            </div>
-          );
-        })}
+        {visibleSteps.map(renderStep)}
       </div>
+
+      {completed && steps.length > 1 && (
+        <button
+          type="button"
+          onClick={() => setShowHistory((value) => !value)}
+          className="mt-3 flex w-full items-center justify-between border-t border-white/[0.06] pt-3 text-[10px] text-white/40 transition-colors hover:text-white/70"
+        >
+          <span>{showHistory ? 'Ocultar histórico de etapas' : `Mostrar ${finishedCount} etapas concluídas`}</span>
+          <CaretRight size={12} className={`transition-transform ${showHistory ? 'rotate-90' : ''}`} />
+        </button>
+      )}
     </div>
   );
 }

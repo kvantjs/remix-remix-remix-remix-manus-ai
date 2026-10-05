@@ -7,7 +7,8 @@ import {
   ArrowRight, 
   RotateCw, 
   Lock, 
-  Loader2 
+  Loader2,
+  Globe
 } from 'lucide-react';
 import { ToolCallTrace } from '../types/project';
 import { DynamicRuntimeRunner } from './DynamicRuntimeRunner';
@@ -190,6 +191,8 @@ export function KvantComputer({
   const [pageTitle, setPageTitle] = useState<string>('Hacker News');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isExternalWeb, setIsExternalWeb] = useState<boolean>(true);
+  const [liveScreenshot, setLiveScreenshot] = useState<string | null>(null);
+  const [iframeLoaded, setIframeLoaded] = useState<boolean>(false);
 
   // History stack for navigation & scrubber
   const [navHistory, setNavHistory] = useState<NavHistoryItem[]>([
@@ -288,6 +291,8 @@ export function KvantComputer({
     setIsLoading(true);
 
     if (actionType === 'navigate') {
+      setLiveScreenshot(null);
+      setIframeLoaded(false);
       const cleanTarget = resolveWebUrl(targetVal);
       let displayHostname = 'site';
       try {
@@ -468,6 +473,10 @@ export function KvantComputer({
       const lastTool = toolCalls[toolCalls.length - 1];
       if (!lastTool) return;
 
+      if (lastTool.screenData?.screenshot) {
+        setLiveScreenshot(lastTool.screenData.screenshot);
+      }
+
       const toolKey = `${lastTool.id}_${lastTool.status}`;
       if (lastProcessedToolRef.current === toolKey) return;
       lastProcessedToolRef.current = toolKey;
@@ -503,9 +512,15 @@ export function KvantComputer({
       } else if (lastTool.toolName.includes('type')) {
         const text = lastTool.arguments?.text || 'texto';
         runAgentLiveActionAnimation('type', text);
+      } else if (lastTool.toolName.includes('search') || lastTool.toolName.includes('inspect')) {
+        const rawUrl = lastTool.screenData?.url || lastTool.arguments?.url || currentUrl;
+        setCurrentUrl(rawUrl);
+        setPageTitle(lastTool.screenData?.title || new URL(rawUrl).hostname);
+        setIsExternalWeb(true);
+        setIsLoading(false);
       }
     }
-  }, [toolCalls]);
+  }, [toolCalls, currentUrl]);
 
   const handleBack = () => {
     if (historyIndex > 0) {
@@ -656,14 +671,46 @@ export function KvantComputer({
           {/* Complete website rendered via proxy or dynamic runtime */}
           {isExternalWeb || !customCode ? (
             <div className="relative w-full h-full flex-1">
-              <iframe
-                ref={iframeRef}
-                src={proxySrc}
-                title="Computador na Nuvem"
-                className="w-full h-full border-0 absolute inset-0 bg-white pointer-events-none"
-                sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
-                onLoad={() => setIsLoading(false)}
-              />
+              {liveScreenshot ? (
+                <div className="absolute inset-0 bg-[#f7f7f7] flex items-center justify-center overflow-hidden">
+                  <img
+                    src={liveScreenshot}
+                    alt={`Captura ao vivo de ${pageTitle || currentUrl}`}
+                    className="h-full w-full object-contain pointer-events-none"
+                    onError={() => setLiveScreenshot(null)}
+                  />
+                  <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full border border-black/10 bg-white/85 px-2 py-1 text-[9px] font-medium text-slate-700 shadow-sm backdrop-blur-sm">
+                    <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Captura ao vivo do Chromium
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <iframe
+                    ref={iframeRef}
+                    src={proxySrc}
+                    title="Computador na Nuvem"
+                    className="w-full h-full border-0 absolute inset-0 bg-white pointer-events-none"
+                    sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
+                    onLoad={() => {
+                      setIframeLoaded(true);
+                      setIsLoading(false);
+                    }}
+                  />
+                  {!iframeLoaded && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#f4f6f8] p-6">
+                      <div className="max-w-sm rounded-2xl border border-slate-200 bg-white/90 px-5 py-4 text-center shadow-xl backdrop-blur-sm">
+                        <div className="mx-auto mb-3 flex size-9 items-center justify-center rounded-full bg-slate-900 text-white">
+                          <Globe size={16} />
+                        </div>
+                        <p className="text-xs font-semibold text-slate-800">Navegador do agente conectado</p>
+                        <p className="mt-1 text-[10px] leading-relaxed text-slate-500">Preparando a captura visual de <span className="font-mono text-slate-600">{pageTitle || currentUrl}</span>.</p>
+                        <div className="mx-auto mt-3 h-1 w-32 overflow-hidden rounded-full bg-slate-200"><div className="h-full w-1/2 rounded-full bg-cyan-500 execution-sheen" /></div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           ) : (
             <div className="w-full h-full flex-1 relative overflow-auto bg-[#090907] text-[#f8f8f6] pointer-events-none">
