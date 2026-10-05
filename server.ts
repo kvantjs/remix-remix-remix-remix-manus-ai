@@ -9,6 +9,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
 import { existsSync, createReadStream } from 'fs';
+import { createServer as createHttpServer } from 'http';
 import { chromium, type Browser, type Page } from 'playwright';
 import { AGENT_TOOL_DECLARATIONS, AgentToolExecutor, ensureSandboxDir } from './src/server/agent-tools.js';
 import { jobsManager } from './src/server/jobs-manager.js';
@@ -452,7 +453,7 @@ AS 7 LEIS INVIOLÁVEIS DO AGENTE DE CRIAÇÃO:
 
 8. PROIBIÇÃO ABSOLUTA DE EMOJIS (USE EXCLUSIVAMENTE ÍCONES VETORIAIS)
 - PROIBIDO o uso de qualquer emoji em qualquer parte: nas respostas do chat, no raciocínio (thought), nos logs, nos botões, nos títulos ou no código da aplicação.
-- NUNCA use emojis (como 💡, 🚀, 📄, 💳, ⚡, 🔥, ✨, etc.).
+- NUNCA use emojis (como 💡, 🚀, 📄, 💳, ��, 🔥, ✨, etc.).
 - Toda iconografia DEVE ser feita exclusivamente com componentes vetoriais das bibliotecas '@phosphor-icons/react' ou 'lucide-react' (ou SVG puro).
 
 9. ACESSO REAL AO COMPUTADOR NA NUVEM 100% OPERACIONAL (SUPERUSER CLOUD ACCESS)
@@ -4596,10 +4597,17 @@ async function startServer() {
     console.error('[Kvant Server] Database migration failed:', redactSecrets(error?.message || String(error)));
   }
 
+  const httpServer = createHttpServer(app);
+
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        // Attach Vite's HMR WebSocket to the same HTTP server used by Express.
+        // Without this, the preview loads but @vite/client cannot complete its handshake.
+        hmr: { server: httpServer },
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -4610,7 +4618,7 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  httpServer.listen(PORT, '0.0.0.0', () => {
     console.log(`[Kvant Server] Running on http://localhost:${PORT}`);
   });
 }
