@@ -2313,7 +2313,7 @@ class PlaywrightBrowserManager {
       try {
         console.log('[Playwright] Launching real headless Chromium instance...');
         this.browser = await chromium.launch({
-          headless: true,
+          headless: process.env.BROWSER_HEADLESS !== 'false',
           args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -2325,7 +2325,7 @@ class PlaywrightBrowserManager {
         });
         const context = await this.browser.newContext({
           viewport: { width: 1280, height: 800 },
-          userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 CoreSparkAgentBrowser/1.0'
+          locale: 'pt-BR'
         });
         this.page = await context.newPage();
         console.log('[Playwright] Chromium page initialized.');
@@ -2825,11 +2825,15 @@ async function runRealTool(toolName: string, args: Record<string, any>): Promise
   // Browser Search via APIs públicas; acessa a fonte superior somente quando aplicável
   if (toolName === 'browser.search' || toolName === 'web.search' || toolName === 'search' || toolName === 'computer.search') {
     const query = args.query || args.q || 'documentação técnica';
-    const searchRes = await executeBrowserSearch(query);
+    const directDomain = String(query).trim().match(/^(?:https?:\/\/)?(?:www\.)?[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.[a-z]{2,}(?:\/[^\s]*)?$/i);
+    const directUrl = directDomain ? (String(query).trim().startsWith('http') ? String(query).trim() : `https://${String(query).trim()}`) : null;
+    const searchRes = directUrl
+      ? { query, resultsCount: 1, providers: ['direct_navigation'], results: [{ title: new URL(directUrl).hostname, snippet: 'Navegação direta solicitada pelo usuário; nenhum mecanismo de busca foi consultado.', url: directUrl }] }
+      : await executeBrowserSearch(query);
     const topSnippets = searchRes.results.map(r => `• ${r.title}\n  URL: ${r.url}\n  ${r.snippet}`).join('\n\n');
 
     // Automatically access and load the top resulting real webpage
-    const topDestUrl = searchRes.results.find(r => r.url && !r.url.includes('wikipedia.org/w/index.php?search='))?.url || searchRes.results[0]?.url;
+    const topDestUrl = searchRes.results[0]?.url;
     let accessedPageData: any = null;
     if (topDestUrl && (topDestUrl.startsWith('http://') || topDestUrl.startsWith('https://'))) {
       try {
@@ -2837,11 +2841,6 @@ async function runRealTool(toolName: string, args: Record<string, any>): Promise
       } catch (err: any) {
         console.warn(`[Browser Search] Failed to navigate to ${topDestUrl}:`, err.message);
       }
-    }
-
-    if (!accessedPageData) {
-      const searchUrl = `https://pt.wikipedia.org/w/index.php?search=${encodeURIComponent(query)}`;
-      accessedPageData = await playwrightBrowser.navigate(searchUrl);
     }
 
     const finalUrl = accessedPageData?.url || topDestUrl || `https://pt.wikipedia.org/w/index.php?search=${encodeURIComponent(query)}`;
