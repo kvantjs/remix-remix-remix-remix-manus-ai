@@ -87,23 +87,6 @@ interface ExecutionStep {
   timestamp?: string;
 }
 
-const RANDOM_QUESTION_POOL = [
-  'Qual ideia simples eu poderia transformar em um produto digital?',
-  'Pesquise uma tendência recente de tecnologia e explique por que ela importa.',
-  'Crie um plano de estudos de 7 dias para aprender uma habilidade nova.',
-  'Como posso organizar melhor meu projeto atual?',
-  'Compare duas abordagens para resolver um problema de forma clara.',
-  'Sugira uma experiência visual memorável para uma página inicial.',
-  'Quais perguntas devo fazer antes de começar uma nova aplicação?',
-  'Explique um conceito complexo usando uma analogia do dia a dia.'
-];
-
-function pickRandomQuestions() {
-  return [...RANDOM_QUESTION_POOL]
-    .sort(() => Math.random() - 0.5)
-    .slice(0, 3);
-}
-
 interface ChatAreaProps {
   onFileUpdate?: (files: Array<{ path: string; code: string; lang?: string }>) => void;
   externalPrompt?: string | null;
@@ -195,7 +178,6 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [currentStep, setCurrentStep] = useState('Analisando solicitação...');
   const [executionSteps, setExecutionSteps] = useState<ExecutionStep[]>([]);
-  const [randomQuestions, setRandomQuestions] = useState(() => pickRandomQuestions());
   const executionStepsRef = useRef<ExecutionStep[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -703,14 +685,6 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
             />
           )}
 
-          {messages.length === 1 && !isThinking && (
-            <RandomQuestionBox
-              questions={randomQuestions}
-              onSelect={handleSendMessage}
-              onRefresh={() => setRandomQuestions(pickRandomQuestions())}
-            />
-          )}
-
           <div ref={messagesEndRef} />
         </div>
         <div className="h-28 shrink-0" />
@@ -760,55 +734,6 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
         </button>
       )}
     </div>
-  );
-}
-
-function RandomQuestionBox({
-  questions,
-  onSelect,
-  onRefresh
-}: {
-  questions: string[];
-  onSelect: (question: string) => void;
-  onRefresh: () => void;
-}) {
-  return (
-    <section className="w-full max-w-[820px] rounded-2xl border border-white/10 bg-white/[0.025] p-4 shadow-[0_16px_50px_rgba(0,0,0,0.12)] animate-in fade-in slide-in-from-bottom-2 duration-500">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <div className="flex size-7 items-center justify-center rounded-lg bg-blue-500/10 text-blue-300 ring-1 ring-blue-400/20">
-            <Question size={15} weight="bold" />
-          </div>
-          <div>
-            <p className="text-xs font-semibold text-white/80">Perguntas para explorar</p>
-            <p className="text-[10px] text-white/35">Escolha uma ideia ou peça outra seleção.</p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={onRefresh}
-          className="rounded-lg px-2.5 py-1.5 text-[10px] font-medium text-white/45 transition-colors hover:bg-white/5 hover:text-white/80"
-        >
-          Sortear outras
-        </button>
-      </div>
-
-      <div className="grid gap-2 md:grid-cols-3">
-        {questions.map((question) => (
-          <button
-            type="button"
-            key={question}
-            onClick={() => onSelect(question)}
-            className="group flex min-h-20 flex-col justify-between rounded-xl border border-white/8 bg-[#202020]/70 p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-400/30 hover:bg-blue-500/[0.08]"
-          >
-            <span className="text-[11px] leading-relaxed text-white/60 transition-colors group-hover:text-white/85">{question}</span>
-            <span className="mt-3 flex items-center gap-1 text-[10px] font-medium text-blue-300/65 group-hover:text-blue-200">
-              Explorar <ArrowRight size={11} className="transition-transform group-hover:translate-x-0.5" />
-            </span>
-          </button>
-        ))}
-      </div>
-    </section>
   );
 }
 
