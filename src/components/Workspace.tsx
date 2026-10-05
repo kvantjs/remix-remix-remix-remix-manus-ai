@@ -41,7 +41,7 @@ import {
 } from "@/components/reui/code-block/code-block";
 
 export type TopLevelTab = 'computer' | 'home_code' | 'website' | 'workspace' | 'terminal_tab';
-export type WorkspaceSubTab = 'preview' | 'code' | 'terminal' | 'settings';
+export type WorkspaceSubTab = 'preview' | 'code' | 'terminal' | 'automations' | 'settings';
 
 interface WorkspaceProps {
   onClose: () => void;
@@ -327,6 +327,12 @@ export function Workspace({
                 label="Terminal" 
               />
               <NavButton 
+                active={workspaceSubTab === 'automations'} 
+                onClick={() => setWorkspaceSubTab('automations')}
+                icon={<Calendar size={13} />} 
+                label="Execuções" 
+              />
+              <NavButton 
                 active={workspaceSubTab === 'settings'} 
                 onClick={() => setWorkspaceSubTab('settings')}
                 icon={<Gear size={13} />} 
@@ -336,13 +342,11 @@ export function Workspace({
             
             <div className="flex items-center gap-2">
                <button 
-                onClick={() => {
-                  alert('Projeto sincronizado com sucesso no cluster Kvant!');
-                }}
+                onClick={() => setWorkspaceSubTab('automations')}
                 className="bg-[#dcdcdc] text-black px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 hover:bg-[#c0c0c0] transition-colors shadow-xs cursor-pointer"
                >
                   <ArrowUp size={13} />
-                  Publicar
+                  Executar tarefa
                </button>
             </div>
           </div>
@@ -370,6 +374,7 @@ export function Workspace({
             {workspaceSubTab === 'terminal' && (
               <TerminalView activeCode={activeCodeContent} />
             )}
+            {workspaceSubTab === 'automations' && <AutomationsView />}
             {workspaceSubTab === 'settings' && <SettingsView />}
           </div>
         </div>
@@ -559,6 +564,88 @@ function FileTreeNode({ node, level, activeFile, onFileChange }: any) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function AutomationsView() {
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState('');
+
+  const refresh = async () => {
+    const response = await fetch('/api/jobs');
+    if (!response.ok) throw new Error('Não foi possível carregar as execuções.');
+    const payload = await response.json();
+    setJobs(payload.jobs || []);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    refresh().catch((error) => {
+      setMessage(error?.message || 'Falha ao carregar execuções.');
+      setLoading(false);
+    });
+    const timer = window.setInterval(() => refresh().catch(() => undefined), 5000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const createExecution = async () => {
+    setMessage('Criando execução…');
+    const response = await fetch('/api/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'Tarefa manual do Workspace', type: 'workspace_task' })
+    });
+    if (!response.ok) {
+      setMessage('Não foi possível criar a execução.');
+      return;
+    }
+    setMessage('Execução criada e persistida.');
+    await refresh();
+  };
+
+  const cancelExecution = async (id: string) => {
+    await fetch(`/api/jobs/${encodeURIComponent(id)}/cancel`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: 'Cancelado no Workspace' })
+    });
+    await refresh();
+  };
+
+  return (
+    <div className="h-full overflow-y-auto custom-scrollbar bg-[#141414] p-6">
+      <div className="max-w-3xl mx-auto">
+        <div className="flex items-start justify-between gap-4 mb-6">
+          <div>
+            <h2 className="text-lg font-semibold text-white">Execuções e automações</h2>
+            <p className="text-xs text-white/45 mt-1">Jobs do agente persistidos e recuperáveis entre reinícios.</p>
+          </div>
+          <button onClick={createExecution} className="px-3 py-2 rounded-lg bg-white text-black text-xs font-medium hover:bg-white/80">Nova execução</button>
+        </div>
+        {message && <div className="mb-4 text-xs text-white/50">{message}</div>}
+        {loading ? <div className="text-xs text-white/40">Carregando execuções…</div> : jobs.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-white/10 p-8 text-center text-xs text-white/40">Nenhuma execução registrada.</div>
+        ) : (
+          <div className="space-y-2">
+            {jobs.map((job) => (
+              <div key={job.id} className="rounded-xl border border-white/7 bg-[#1c1c1c] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm text-white truncate">{job.title}</div>
+                    <div className="text-[11px] text-white/35 mt-1 font-mono">{job.type} · {job.id}</div>
+                  </div>
+                  <span className={`text-[11px] ${job.status === 'succeeded' ? 'text-emerald-400' : job.status === 'failed' ? 'text-red-400' : job.status === 'cancelled' ? 'text-white/35' : 'text-amber-300'}`}>{job.status}</span>
+                </div>
+                <div className="mt-3 flex items-center justify-between text-[11px] text-white/45">
+                  <span>{job.currentStep}</span>
+                  {!['succeeded', 'failed', 'cancelled'].includes(job.status) && <button onClick={() => cancelExecution(job.id)} className="text-red-300 hover:text-red-200">Cancelar</button>}
+                </div>
+                <div className="mt-2 h-1 rounded-full bg-white/5 overflow-hidden"><div className="h-full bg-blue-400 transition-all" style={{ width: `${job.progressPercent || 0}%` }} /></div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

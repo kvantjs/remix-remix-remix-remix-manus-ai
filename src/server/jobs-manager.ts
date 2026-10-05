@@ -1,6 +1,7 @@
 import { redactSecrets } from './security.js';
 import fs from 'fs';
 import path from 'path';
+import { databaseAvailable, query } from './database.js';
 
 export type JobStatus = 
   | 'queued' 
@@ -73,8 +74,45 @@ class JobsManager {
         return copy;
       });
       fs.writeFileSync(this.stateFile, JSON.stringify(serializable, null, 2) + '\n', 'utf8');
+      void this.persistDatabase(serializable);
     } catch (error) {
       console.warn('[JobsManager] Não foi possível persistir os jobs:', error);
+    }
+  }
+
+  private async persistDatabase(jobs: Array<Partial<AgentJob>>) {
+    if (!databaseAvailable()) return;
+    for (const job of jobs) {
+      if (!job.id || !job.title || !job.type || !job.status || !job.createdAt) continue;
+      try {
+        const payload = JSON.stringify(job);
+        const updatedAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        const createdAt = new Date(job.createdAt).toISOString().slice(0, 19).replace('T', ' ');
+        await query(
+          `INSERT INTO job_records (job_id, title, type, status, payload_json, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE title = VALUES(title), type = VALUES(type), status = VALUES(status), payload_json = VALUES(payload_json), updated_at = VALUES(updated_at)`,
+          [job.id, job.title, job.type, job.status, payload, createdAt, updatedAt]
+        );
+      } catch (error) {
+        console.warn('[JobsManager] Falha ao sincronizar job com o banco:', error);
+      }
+    }
+  }
+
+  async hydrateFromDatabase() {
+    if (!databaseAvailable()) return;
+    try {
+      const rows: any[] = await query('SELECT payload_json AS payload FROM job_records ORDER BY updated_at DESC LIMIT 200');
+      for (const row of rows) {
+        if (!row.payload) continue;
+        const job = typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload;
+        if (!job?.id || this.jobs.has(job.id)) continue;
+        job.abortController = new AbortController();
+        this.jobs.set(job.id, job as AgentJob);
+      }
+    } catch (error) {
+      console.warn('[JobsManager] Falha ao recuperar jobs do banco:', error);
     }
   }
 

@@ -3985,6 +3985,7 @@ async function startServer() {
   try {
     const migration = await ensureDatabaseSchema();
     console.log(`[Kvant Server] Database: ${migration.available ? 'connected and migrated' : 'not available in this runtime'}`);
+    await jobsManager.hydrateFromDatabase();
   } catch (error: any) {
     console.error('[Kvant Server] Database migration failed:', redactSecrets(error?.message || String(error)));
   }
