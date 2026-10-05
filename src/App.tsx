@@ -19,6 +19,7 @@ export default function App() {
   // Agent execution state for Computador do Kvant
   const [toolCalls, setToolCalls] = useState<ToolCallTrace[]>([]);
   const [isWorking, setIsWorking] = useState(false);
+  const [workingTime, setWorkingTime] = useState('0s');
   const [statusText, setStatusText] = useState('Computador do Agente 100% Operacional');
   const [contextText, setContextText] = useState(
     'Instância Linux x86_64 ativa. Agente autônomo com navegador headless, shell bash e tool calling em tempo real.'
@@ -41,8 +42,12 @@ export default function App() {
     statusText?: string;
     contextText?: string;
     toolCalls?: ToolCallTrace[];
+    workingTime?: string;
   }) => {
     setIsWorking(prev => prev !== state.isWorking ? state.isWorking : prev);
+    if (state.workingTime) {
+      setWorkingTime(prev => prev !== state.workingTime ? state.workingTime! : prev);
+    }
     if (state.statusText) {
       setStatusText(prev => prev !== state.statusText ? state.statusText! : prev);
     }
@@ -98,6 +103,7 @@ export default function App() {
             onSendPrompt={handleSendPrompt}
             toolCalls={toolCalls}
             isWorking={isWorking}
+            workingTime={workingTime}
             statusText={statusText}
             contextText={contextText}
             initialTab={workspaceTab}

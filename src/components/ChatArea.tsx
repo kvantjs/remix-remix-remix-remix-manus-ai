@@ -1029,7 +1029,7 @@ function MessageItem({
 
 function ThinkingState({ elapsedSeconds, step, steps }: { elapsedSeconds: number; step: string; steps: ExecutionStep[] }) {
   return (
-    <div className="space-y-4 animate-in fade-in duration-300">
+    <div className="w-full max-w-[820px] space-y-4 animate-in fade-in duration-300">
        <div className="flex items-center gap-2.5">
         <img 
           src="https://imgdb.io/i/6lwOlmk.png" 
@@ -1043,7 +1043,7 @@ function ThinkingState({ elapsedSeconds, step, steps }: { elapsedSeconds: number
           </span>
         </div>
       </div>
-      <div className="pl-8 bg-transparent">
+      <div className="w-full pl-8 bg-transparent">
         <ExecutionTimeline steps={steps} activeStep={step} elapsedSeconds={elapsedSeconds} />
       </div>
     </div>
@@ -1084,7 +1084,7 @@ function ExecutionTimeline({
   const visibleSteps = steps.slice(0, visibleCount);
   const focusedStep = [...steps].reverse().find((step) => step.status === 'running') || steps.at(-1);
   const activeLabel = searchVariant ? 'Searching the web' : codingVariant ? 'Running tools' : 'Thinking';
-  const doneLabel = searchVariant ? 'Searched the web' : codingVariant ? `Ran ${Math.max(1, steps.length)} tools` : `Thought for ${elapsedSeconds || 0} seconds`;
+  const doneLabel = searchVariant ? 'Searched the web' : codingVariant ? `Ran ${Math.max(1, steps.length)} tools` : 'Thought process settled';
 
   const renderStep = (step: ExecutionStep, index: number) => {
     const isRunning = step.status === 'running';
@@ -1100,7 +1100,7 @@ function ExecutionTimeline({
   };
 
   return (
-    <div className={`execution-timeline flex w-full max-w-[380px] flex-col rounded-2xl bg-[#202020] p-3.5 ${completed ? 'mt-1' : ''}`} style={{ minHeight: working || expanded ? 148 : undefined, transition: 'min-height 400ms cubic-bezier(0.23,1,0.32,1)' }}>
+    <div className={`execution-timeline flex w-full max-w-[780px] flex-col bg-transparent p-0 ${completed ? 'mt-1' : ''}`} style={{ minHeight: working || expanded ? 148 : undefined, transition: 'min-height 400ms cubic-bezier(0.23,1,0.32,1)' }}>
       <div className="flex items-center gap-2">
         <button type="button" aria-expanded={expanded} onClick={() => setManualExpanded((current) => !(current ?? autoExpanded))} className="-mx-1.5 flex w-fit items-center gap-2 rounded-lg px-1.5 py-1 text-left transition-colors hover:bg-white/[0.05]">
           <span className={`flex size-4 shrink-0 items-center justify-center transition-colors ${working ? 'text-white/60' : 'text-white/30'}`}><Sparkle size={14} weight="fill" /></span>
@@ -1109,7 +1109,6 @@ function ExecutionTimeline({
           </span>
           <CaretDown size={13} className={`text-white/30 transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`} />
         </button>
-        {working && <span className="ml-auto text-[10px] font-mono tabular-nums text-white/30">{elapsedSeconds || 0}s</span>}
       </div>
       <p className="pl-6 text-[10px] text-white/35">{working ? (focusedStep?.detail || focusedStep?.label || activeStep || 'Preparing the next step...') : 'The trace settled and remains expandable.'}</p>
 

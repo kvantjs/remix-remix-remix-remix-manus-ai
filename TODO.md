@@ -1,8 +1,4 @@
 
-## [x] Controle manual do navegador do agente
+## [x] Separação entre pensamento e tempo de trabalho
 
-O cabeçalho do computador agora oferece “Assumir controle”. Ao ativar, o iframe proxy recebe eventos de ponteiro, o cursor do agente é ocultado, aparece uma indicação de controle manual e o usuário pode navegar/interagir diretamente; o mesmo botão devolve o controle ao agente. O Preview foi validado alternando os dois estados pela interface.
-
-## [x] Remoção do componente escuro duplicado da timeline
-
-O wrapper externo do ThinkingState deixou de receber o atributo de fundo de componente, mantendo apenas o card da timeline e eliminando a faixa escura residual acima/abaixo da animação. Lint e build passaram.
+A timeline de Thinking não exibe mais segundos de trabalho nem chama esse valor de pensamento. Ela ocupa até 780px de largura, permanece sem fundo e sem card externo, e conserva apenas o trace visual. O tempo real de execução é propagado ao computador do agente e aparece no status final como “Tarefa concluída · Trabalhou por Ns”. O estado inicial não exibe o valor fictício de 0s.

@@ -49,6 +49,7 @@ interface WorkspaceProps {
   onSendPrompt?: (prompt: string) => void;
   toolCalls?: ToolCallTrace[];
   isWorking?: boolean;
+  workingTime?: string;
   statusText?: string;
   contextText?: string;
   initialTab?: string;
@@ -66,6 +67,7 @@ export function Workspace({
   onSendPrompt,
   toolCalls,
   isWorking = false,
+  workingTime,
   statusText,
   contextText,
   initialTab
@@ -271,6 +273,7 @@ export function Workspace({
           <KvantComputer 
             toolCalls={toolCalls}
             isWorking={isWorking}
+            workingTime={workingTime}
             statusText={statusText}
             contextText={contextText}
             customFiles={customFiles}

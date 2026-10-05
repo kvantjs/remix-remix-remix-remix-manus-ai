@@ -18,6 +18,7 @@ import { DynamicRuntimeRunner } from './DynamicRuntimeRunner';
 interface KvantComputerProps {
   toolCalls?: ToolCallTrace[];
   isWorking?: boolean;
+  workingTime?: string;
   statusText?: string;
   contextText?: string;
   customFiles?: Record<string, string>;
@@ -185,6 +186,7 @@ interface NavHistoryItem {
 export function KvantComputer({
   toolCalls,
   isWorking = false,
+  workingTime,
   statusText = 'Computador do Agente Ativo',
   contextText,
   customFiles
@@ -930,7 +932,7 @@ export function KvantComputer({
             ) : (
               <div className="flex items-center gap-1.5 text-[#22c55e]">
                 <Check size={13} strokeWidth={2.5} />
-                <span>Tarefa concluída</span>
+                <span>Tarefa concluída{workingTime && workingTime !== '0s' ? ` · Trabalhou por ${workingTime}` : ''}</span>
               </div>
             )}
           </div>
