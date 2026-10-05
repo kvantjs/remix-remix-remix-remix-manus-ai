@@ -12,6 +12,7 @@ import { chromium, type Browser, type Page } from 'playwright';
 import { AGENT_TOOL_DECLARATIONS, AgentToolExecutor, ensureSandboxDir } from './src/server/agent-tools.js';
 import { jobsManager } from './src/server/jobs-manager.js';
 import { resolveSafeSandboxPath, redactSecrets, isSafeUrl, SANDBOX_WORKSPACE_ROOT } from './src/server/security.js';
+import { getPlatformOverview, loadPlatformConfig, savePlatformConfig } from './src/server/platform-state.js';
 
 const execAsync = promisify(exec);
 
@@ -27,6 +28,40 @@ app.use(express.json({ limit: '10mb' }));
 
 app.get('/health', (_req, res) => {
   res.status(200).json({ ok: true, service: 'remix-manus-ai' });
+});
+
+app.get('/api/platform/config', async (_req, res) => {
+  try {
+    res.json(await loadPlatformConfig());
+  } catch (error: any) {
+    res.status(500).json({ error: redactSecrets(error?.message || String(error)) });
+  }
+});
+
+app.put('/api/platform/config', async (req, res) => {
+  try {
+    const config = await savePlatformConfig(req.body || {});
+    res.json({ ok: true, revision: config.revision, config });
+  } catch (error: any) {
+    res.status(400).json({ error: redactSecrets(error?.message || String(error)) });
+  }
+});
+
+app.get('/api/platform/infra/overview', async (_req, res) => {
+  try {
+    res.json(await getPlatformOverview());
+  } catch (error: any) {
+    res.status(500).json({ error: redactSecrets(error?.message || String(error)) });
+  }
+});
+
+app.get('/api/platform/routes', async (_req, res) => {
+  try {
+    const routes = await fs.readFile(path.resolve(process.cwd(), 'public/manus-routes.json'), 'utf8');
+    res.type('application/json').send(routes);
+  } catch (error: any) {
+    res.status(404).json({ error: redactSecrets(error?.message || String(error)) });
+  }
 });
 
 // Initialize Google GenAI

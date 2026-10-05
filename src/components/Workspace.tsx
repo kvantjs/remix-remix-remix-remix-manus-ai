@@ -565,12 +565,50 @@ function FileTreeNode({ node, level, activeFile, onFileChange }: any) {
 
 function SettingsView() {
   const [activeSubTab, setActiveSubTab] = useState('Geral');
+  const [config, setConfig] = useState<any>(null);
+  const [overview, setOverview] = useState<any>(null);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
 
   const menuItems = [
     { label: 'Geral', icon: <Gear size={14} /> },
     { label: 'Domínios', icon: <Globe size={14} /> },
     { label: 'Segredos', icon: <Lock size={14} /> },
   ];
+
+  const refresh = async () => {
+    const [configResponse, overviewResponse] = await Promise.all([
+      fetch('/api/platform/config'),
+      fetch('/api/platform/infra/overview')
+    ]);
+    if (configResponse.ok) setConfig(await configResponse.json());
+    if (overviewResponse.ok) setOverview(await overviewResponse.json());
+  };
+
+  useEffect(() => {
+    refresh().catch(() => setMessage('Não foi possível carregar o estado do projeto.'));
+  }, []);
+
+  const updateConfig = async (patch: Record<string, unknown>) => {
+    setSaving(true);
+    setMessage('Salvando…');
+    try {
+      const response = await fetch('/api/platform/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch)
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Falha ao salvar');
+      setConfig(payload.config);
+      setMessage(`Salvo na revisão ${payload.revision}.`);
+      await refresh();
+    } catch (error: any) {
+      setMessage(error?.message || 'Falha ao salvar.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="h-full flex bg-[#141414]">
@@ -593,41 +631,89 @@ function SettingsView() {
           <h2 className="text-lg font-semibold mb-6 text-[#dcdcdc]">{activeSubTab}</h2>
           
           {activeSubTab === 'Geral' && (
-            <div className="space-y-6">
-               <div className="bg-[#202020] border border-[#333333] rounded-xl p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                     <div className="size-9 bg-[#242424] rounded-lg border border-white/5 flex items-center justify-center">
-                        <FileCode size={18} className="text-[#b6b6b6]" />
-                     </div>
-                     <div>
-                        <div className="flex items-center gap-2">
-                           <span className="font-medium text-sm text-[#dcdcdc]">Kvant Project</span>
-                           <PencilSimple size={12} className="text-white/40 cursor-pointer" />
-                        </div>
-                     </div>
+            <div className="space-y-5 max-w-2xl">
+              <div className="bg-[#202020] border border-[#333333] rounded-xl p-4">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="size-9 bg-[#242424] rounded-lg border border-white/5 flex items-center justify-center">
+                    <FileCode size={18} className="text-[#b6b6b6]" />
                   </div>
-               </div>
+                  <div>
+                    <div className="font-medium text-sm text-[#dcdcdc]">Configuração do projeto</div>
+                    <div className="text-[11px] text-white/40">Estado persistido no control plane local</div>
+                  </div>
+                </div>
+                <label className="block text-[11px] text-white/50 mb-1">Nome</label>
+                <input
+                  className="w-full bg-[#151515] border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-400/60"
+                  value={config?.project?.name || ''}
+                  onChange={(event) => setConfig((current: any) => ({ ...current, project: { ...current?.project, name: event.target.value } }))}
+                />
+                <label className="block text-[11px] text-white/50 mb-1 mt-3">Descrição</label>
+                <textarea
+                  className="w-full min-h-20 bg-[#151515] border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-400/60 resize-y"
+                  value={config?.project?.description || ''}
+                  onChange={(event) => setConfig((current: any) => ({ ...current, project: { ...current?.project, description: event.target.value } }))}
+                />
+                <button
+                  disabled={saving || !config}
+                  onClick={() => updateConfig({ project: config.project })}
+                  className="mt-3 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 disabled:opacity-40 text-xs text-white transition-colors"
+                >Salvar projeto</button>
+              </div>
+              <div className="bg-[#202020] border border-[#333333] rounded-xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <div className="text-sm font-semibold text-white">Capacidades</div>
+                    <div className="text-[11px] text-white/40">Ative apenas recursos que a aplicação realmente usa.</div>
+                  </div>
+                  <button onClick={() => refresh()} className="text-white/50 hover:text-white"><ArrowsCounterClockwise size={15} /></button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(config?.features || {}).map(([key, value]) => (
+                    <button
+                      key={key}
+                      disabled={saving}
+                      onClick={() => updateConfig({ features: { [key]: !value } })}
+                      className="flex items-center justify-between rounded-lg border border-white/5 bg-[#181818] px-3 py-2 text-left hover:border-white/15 disabled:opacity-50"
+                    >
+                      <span className="text-xs text-white/70">{key}</span>
+                      <span className={`text-[10px] ${value ? 'text-emerald-400' : 'text-white/30'}`}>{value ? 'ativo' : 'inativo'}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {message && <div className="text-[11px] text-white/50">{message}</div>}
             </div>
           )}
 
           {activeSubTab === 'Domínios' && (
-            <div className="space-y-4">
-              <div className="bg-[#1a1a1a] border border-white/5 rounded-xl p-4 flex items-center justify-between">
-                <div>
-                  <span className="text-sm font-semibold text-white block">Domínio do Workspace</span>
-                  <span className="text-xs text-white/40 font-mono">kvant-app.space</span>
+            <div className="space-y-4 max-w-2xl">
+              <div className="bg-[#1a1a1a] border border-white/5 rounded-xl p-4">
+                <span className="text-sm font-semibold text-white block">Preview atual</span>
+                <span className="text-xs text-white/40 font-mono break-all">{window.location.origin}</span>
+                <div className="mt-3 flex items-center gap-2 text-xs text-emerald-400"><span className="size-1.5 rounded-full bg-emerald-400" />Runtime conectado na porta {config?.runtime?.port || 3000}</div>
+              </div>
+              <div className="bg-[#1a1a1a] border border-white/5 rounded-xl p-4">
+                <div className="text-sm font-semibold text-white mb-2">Infraestrutura</div>
+                <div className="grid grid-cols-2 gap-2 text-xs text-white/50">
+                  <span>Host: <b className="text-white/80">{overview?.runtime?.hostname || '—'}</b></span>
+                  <span>Node: <b className="text-white/80">{overview?.runtime?.nodeVersion || '—'}</b></span>
+                  <span>Uptime: <b className="text-white/80">{overview?.runtime?.uptimeSeconds || 0}s</b></span>
+                  <span>Memória RSS: <b className="text-white/80">{overview?.runtime?.memory?.rssMb || 0} MB</b></span>
                 </div>
-                <span className="text-xs text-green-400 bg-green-500/10 px-2 py-0.5 rounded border border-green-500/20">Ativo</span>
               </div>
             </div>
           )}
 
           {activeSubTab === 'Segredos' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-[#202020] rounded-lg border border-white/5 font-mono text-xs text-[#afafaf]">
-                <span>GEMINI_API_KEY</span>
-                <span className="text-white/30">••••••••••••••••</span>
-              </div>
+            <div className="space-y-3 max-w-2xl">
+              <div className="text-[11px] text-white/40 mb-3">Os valores nunca são retornados pela API; apenas o estado de configuração é exibido.</div>
+              {(overview?.secrets || []).map((secret: any) => (
+                <div key={secret.key} className="flex items-center justify-between p-3 bg-[#202020] rounded-lg border border-white/5 font-mono text-xs">
+                  <span className="text-[#afafaf]">{secret.key}</span>
+                  <span className={secret.configured ? 'text-emerald-400' : 'text-amber-400'}>{secret.configured ? 'configurado' : 'ausente'}</span>
+                </div>
+              ))}
             </div>
           )}
        </div>
