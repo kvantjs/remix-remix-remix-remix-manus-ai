@@ -1,12 +1,4 @@
 
-## [x] Timeline com foco em uma etapa por vez
+## [x] Thinking trace alinhado à referência fornecida
 
-- Durante a execução, somente a etapa ativa fica expandida; cada novo evento substitui o foco visual anterior em vez de abrir todos os cards simultaneamente.
-- Depois da conclusão, a timeline fica compacta por padrão e oferece um controle discreto para expandir o histórico completo quando necessário.
-
-## [x] Painel do navegador sem tela branca
-
-- O painel prioriza a captura JPEG real retornada pelo Chromium/Playwright, com indicação visual de captura ao vivo.
-- Enquanto a primeira captura ou o iframe proxy carregam, o painel mostra um estado profissional de navegador conectado, nunca uma área branca vazia.
-- Ações de busca e inspeção atualizam URL, título e screenshot do navegador; falhas de carregamento da imagem retornam ao proxy sem quebrar o painel.
-- Validação feita pela interface pública com pesquisa real: a captura do Chromium apareceu no painel e a timeline exibiu uma única etapa ativa.
+A timeline agora usa uma sequência temporizada de cinco estágios, com conteúdo surgindo progressivamente, spinner na linha ativa, checks suavizados nas linhas concluídas, shimmer no cabeçalho durante o trabalho e transições fade-up/fade-in com atraso entre linhas. A expansão automática ocorre somente durante a execução; quando a sequência estabiliza, o trace fica recolhido e continua expansível pelo cabeçalho. O rótulo se adapta entre Thinking, Searching the web e Running tools conforme o tipo de execução, e o modo de busca mostra a consulta junto do trace. A implementação foi validada no Preview com uma pesquisa real e uma autorização humana, incluindo o estado final compacto “Mostrar etapas concluídas”.

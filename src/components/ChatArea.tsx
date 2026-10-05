@@ -1061,71 +1061,77 @@ function ExecutionTimeline({
   elapsedSeconds?: number;
   completed?: boolean;
 }) {
-  const [showHistory, setShowHistory] = useState(false);
-  const focusedStep = [...steps].reverse().find((step) => step.status === 'running') || steps.at(-1);
-  const visibleSteps = completed && showHistory ? steps : (focusedStep ? [focusedStep] : []);
-  const finishedCount = steps.filter((step) => step.status !== 'running').length;
+  const sequence = [800, 600, 1800, 2600, 1600];
+  const [stage, setStage] = useState(completed ? sequence.length - 1 : 0);
+  const [manualExpanded, setManualExpanded] = useState<boolean | null>(null);
 
-  const renderStep = (step: ExecutionStep) => {
+  useEffect(() => {
+    if (completed) {
+      setStage(sequence.length - 1);
+      return;
+    }
+    if (stage >= sequence.length - 1) return;
+    const timer = window.setTimeout(() => setStage((current) => current + 1), sequence[stage]);
+    return () => window.clearTimeout(timer);
+  }, [completed, stage]);
+
+  const searchVariant = steps.some((step) => /search|pesquis|google/i.test(`${step.label} ${step.detail}`));
+  const codingVariant = steps.some((step) => /edit|c[oó]digo|npm|terminal|arquivo/i.test(`${step.label} ${step.detail}`));
+  const working = !completed && stage < sequence.length - 1;
+  const autoExpanded = !completed && stage >= 1 && stage < sequence.length - 1;
+  const expanded = manualExpanded ?? autoExpanded;
+  const visibleCount = stage < 2 ? 0 : stage === 2 ? Math.min(2, steps.length) : steps.length;
+  const visibleSteps = steps.slice(0, visibleCount);
+  const focusedStep = [...steps].reverse().find((step) => step.status === 'running') || steps.at(-1);
+  const activeLabel = searchVariant ? 'Searching the web' : codingVariant ? 'Running tools' : 'Thinking';
+  const doneLabel = searchVariant ? 'Searched the web' : codingVariant ? `Ran ${Math.max(1, steps.length)} tools` : `Thought for ${elapsedSeconds || 0} seconds`;
+
+  const renderStep = (step: ExecutionStep, index: number) => {
     const isRunning = step.status === 'running';
     const isWarning = step.status === 'warning';
     return (
-      <div key={step.id} className={`relative flex gap-3 rounded-xl px-2 py-2 transition-all duration-500 ${isRunning ? 'bg-white/[0.035]' : ''}`}>
-        <span className={`relative z-10 mt-0.5 flex size-[19px] shrink-0 items-center justify-center rounded-full border ${isWarning ? 'border-amber-300/40 bg-amber-300/10' : isRunning ? 'border-blue-300/50 bg-blue-300/10' : 'border-emerald-300/30 bg-emerald-300/10'}`}>
-          {isWarning ? <ShieldWarning size={10} className="text-amber-300" /> : isRunning ? <span className="size-1.5 rounded-full bg-blue-300 execution-dot" /> : <Check size={10} className="text-emerald-300" />}
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className={`truncate text-[11px] font-medium ${isWarning ? 'text-amber-200/85' : isRunning ? 'text-white/85' : 'text-white/65'}`}>{step.label}</span>
-            {isRunning && <span className="shrink-0 text-[9px] uppercase tracking-[0.16em] text-blue-300/70">agora</span>}
-            {step.timestamp && <span className="ml-auto shrink-0 text-[9px] font-mono text-white/25">{step.timestamp}</span>}
-          </div>
-          <p className={`mt-0.5 text-[10px] leading-relaxed ${isRunning ? 'text-white/55' : 'text-white/35'}`}>{step.detail}</p>
-          {isRunning && <div className="execution-sheen mt-2 h-px w-full overflow-hidden rounded-full bg-blue-400/10" />}
-        </div>
+      <div key={step.id} className={`relative flex min-h-7 w-full items-center gap-2 rounded-md px-1.5 py-0.5 text-left transition-colors duration-200 ${isRunning ? 'bg-white/[0.035]' : 'hover:bg-white/[0.025]'}`} style={{ animation: `thinking-fade-up 320ms cubic-bezier(0.23,1,0.32,1) ${index * 120}ms both` }}>
+        {searchVariant ? <Globe size={13} className={`${isWarning ? 'text-amber-300' : 'text-cyan-300'} shrink-0`} /> : isWarning ? <ShieldWarning size={13} className="shrink-0 text-amber-300" /> : isRunning ? <span className="size-3 shrink-0 rounded-full border-[1.5px] border-white/20 border-t-blue-300 thinking-spinner" /> : <Check size={13} className="shrink-0 text-white/35" />}
+        <span className={`min-w-0 truncate text-[11px] ${searchVariant ? 'text-white/75' : 'text-white/70'} ${codingVariant ? 'font-mono' : 'font-medium'}`}>{step.label}</span>
+        {step.detail && <span className="min-w-0 truncate text-[10px] text-white/35">{step.detail}</span>}
+        {step.timestamp && <span className="ml-auto shrink-0 text-[9px] font-mono text-white/20">{step.timestamp}</span>}
       </div>
     );
   };
 
   return (
-    <div className={`execution-timeline bg-[#202020] border border-white/[0.07] rounded-2xl p-4 ${completed ? 'mt-1' : ''}`}>
-      <div className="flex items-start justify-between gap-3 mb-4">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 text-[11px] font-semibold text-white/80">
-            <span className={`relative flex size-5 items-center justify-center rounded-full border ${completed ? 'border-emerald-400/30 bg-emerald-400/10' : 'border-blue-400/30 bg-blue-400/10'}`}>
-              {completed ? <Check size={11} className="text-emerald-300" /> : <Sparkle size={11} weight="fill" className="text-blue-300 execution-spark" />}
-            </span>
-            <span>{completed ? 'Linha do tempo da execução' : 'Thinking'}</span>
-            {!completed && <span className="text-white/30 font-normal">· trabalhando ao vivo</span>}
-          </div>
-          <p className="mt-1 pl-7 text-[11px] leading-relaxed text-white/45 truncate">
-            {completed ? 'As etapas foram registradas; o histórico permanece recolhido.' : (activeStep || 'Preparando a próxima ação...')}
-          </p>
-        </div>
-        {!completed && <span className="shrink-0 text-[10px] font-mono text-white/35 tabular-nums">{elapsedSeconds || 0}s</span>}
-      </div>
-
-      <div className="relative space-y-1.5">
-        <div className="absolute left-[9px] top-2 bottom-3 w-px bg-gradient-to-b from-blue-400/30 via-white/10 to-transparent" />
-        {visibleSteps.length === 0 && (
-          <div className="flex items-center gap-3 py-2 text-[11px] text-white/40">
-            <span className="relative z-10 size-[19px] rounded-full border border-blue-400/25 bg-[#202020] execution-dot" />
-            <span>Preparando o primeiro passo...</span>
-          </div>
-        )}
-        {visibleSteps.map(renderStep)}
-      </div>
-
-      {completed && steps.length > 1 && (
-        <button
-          type="button"
-          onClick={() => setShowHistory((value) => !value)}
-          className="mt-3 flex w-full items-center justify-between border-t border-white/[0.06] pt-3 text-[10px] text-white/40 transition-colors hover:text-white/70"
-        >
-          <span>{showHistory ? 'Ocultar histórico de etapas' : `Mostrar ${finishedCount} etapas concluídas`}</span>
-          <CaretRight size={12} className={`transition-transform ${showHistory ? 'rotate-90' : ''}`} />
+    <div className={`execution-timeline flex w-full max-w-[380px] flex-col rounded-2xl bg-[#202020] p-3.5 ${completed ? 'mt-1' : ''}`} style={{ minHeight: working || expanded ? 148 : undefined, transition: 'min-height 400ms cubic-bezier(0.23,1,0.32,1)' }}>
+      <div className="flex items-center gap-2">
+        <button type="button" aria-expanded={expanded} onClick={() => setManualExpanded((current) => !(current ?? autoExpanded))} className="-mx-1.5 flex w-fit items-center gap-2 rounded-lg px-1.5 py-1 text-left transition-colors hover:bg-white/[0.05]">
+          <span className={`flex size-4 shrink-0 items-center justify-center transition-colors ${working ? 'text-white/60' : 'text-white/30'}`}><Sparkle size={14} weight="fill" /></span>
+          <span role="status" className="text-[13px] font-medium">
+            {working ? <span className="thinking-shimmer">{activeLabel}</span> : <span className="text-white/55">{doneLabel}</span>}
+          </span>
+          <CaretDown size={13} className={`text-white/30 transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`} />
         </button>
-      )}
+        {working && <span className="ml-auto text-[10px] font-mono tabular-nums text-white/30">{elapsedSeconds || 0}s</span>}
+      </div>
+      <p className="pl-6 text-[10px] text-white/35">{working ? (focusedStep?.detail || focusedStep?.label || activeStep || 'Preparing the next step...') : 'The trace settled and remains expandable.'}</p>
+
+      <div className="grid transition-[grid-template-rows,opacity] duration-400" style={{ gridTemplateRows: expanded ? '1fr' : '0fr', opacity: expanded ? 1 : 0, transitionTimingFunction: 'cubic-bezier(0.23,1,0.32,1)' }}>
+        <div className="overflow-hidden">
+          <div className="relative mt-1 ml-[5px] pl-4">
+            <span aria-hidden className="absolute left-[3px] top-0 bottom-0 w-px bg-white/10" />
+            <div className="relative flex flex-col gap-1 py-1">
+              {searchVariant && focusedStep && (
+                <div className="flex min-h-7 items-center gap-2 px-1.5 text-[11px] text-white/55" style={{ animation: 'thinking-fade-in 300ms ease-out both' }}>
+                  <Globe size={13} className="shrink-0 text-white/35" />
+                  <span className="truncate">{focusedStep.detail.match(/pesquisando “?([^”"]+)/i)?.[1] || focusedStep.detail}</span>
+                </div>
+              )}
+              {visibleSteps.map(renderStep)}
+              {visibleSteps.length === 0 && <div className="min-h-7 px-1.5 text-[11px] text-white/35">Preparing the first step...</div>}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {completed && steps.length > 1 && <span className="mt-2 pl-6 text-[10px] text-white/25">{steps.length} etapas registradas · clique no cabeçalho para expandir</span>}
     </div>
   );
 }

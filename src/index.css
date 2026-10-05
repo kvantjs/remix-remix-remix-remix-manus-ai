@@ -262,6 +262,25 @@ body {
   100% { transform: translateX(110%); opacity: 0; }
 }
 
+@keyframes thinking-shimmer {
+  0% { background-position: 180% 0; }
+  100% { background-position: -20% 0; }
+}
+
+@keyframes thinking-fade-up {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes thinking-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes thinking-spin {
+  to { transform: rotate(360deg); }
+}
+
 .execution-spark { animation: execution-spark 1.8s ease-in-out infinite; }
 .execution-dot { animation: execution-dot 1.7s ease-in-out infinite; }
 .execution-sheen { position: relative; }
@@ -274,8 +293,21 @@ body {
   animation: execution-sheen 1.9s ease-in-out infinite;
 }
 
+.thinking-shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,.34) 35%, rgba(255,255,255,.95) 50%, rgba(255,255,255,.34) 65%);
+  background-size: 200% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: thinking-shimmer 1.4s linear infinite;
+}
+
+.thinking-spinner { animation: thinking-spin 700ms linear infinite; }
+
 @media (prefers-reduced-motion: reduce) {
   .execution-spark,
   .execution-dot,
-  .execution-sheen::after { animation: none; }
+  .execution-sheen::after,
+  .thinking-shimmer,
+  .thinking-spinner { animation: none; }
 }
