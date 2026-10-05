@@ -12,7 +12,7 @@ const execAsync = util.promisify(exec);
 export const AGENT_TOOL_DECLARATIONS = [
   {
     name: 'web_search',
-    description: 'Realiza buscas na internet por informações públicas, notícias, artigos técnicos e dados atuais, retornando títulos, URLs reais e trechos verificáveis.',
+    description: 'Realiza busca federada por APIs públicas gratuitas (Wikimedia, Stack Exchange e OpenAlex), sem abrir navegador ou fazer scraping HTML, retornando títulos, URLs reais e trechos verificáveis.',
     parameters: {
       type: 'OBJECT',
       properties: {
@@ -278,108 +278,77 @@ export class AgentToolExecutor {
     try {
       switch (name) {
         case 'web_search': {
-          const query = String(args.query || '').trim();
-          if (!query) throw new Error('Parâmetro query é obrigatório.');
+          const queryText = String(args.query || '').trim();
+          if (!queryText) throw new Error('Parâmetro query é obrigatório.');
           const limit = Math.min(10, Math.max(1, Number(args.maxResults) || 5));
+          const sources: Array<{ title: string; url: string; snippet: string; provider: string }> = [];
 
-          const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
-          const response = await fetch(searchUrl, {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-              'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'
-            },
-            signal: AbortSignal.timeout(10000)
-          });
+          // Wikimedia API: pública, gratuita, sem HTML scraping e sem navegador.
+          try {
+            const wikiUrl = `https://pt.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(queryText)}&srlimit=${limit}&utf8=1&format=json&origin=*`;
+            const wikiResponse = await fetch(wikiUrl, {
+              headers: { 'Accept': 'application/json', 'User-Agent': 'KvantResearchAgent/1.0 (public-api-client)' },
+              signal: AbortSignal.timeout(8000)
+            });
+            if (wikiResponse.ok) {
+              const wikiData: any = await wikiResponse.json();
+              for (const item of (wikiData.query?.search || []).slice(0, limit)) {
+                const title = String(item.title || '').trim();
+                if (!title) continue;
+                sources.push({
+                  title,
+                  url: `https://pt.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, '_'))}`,
+                  snippet: String(item.snippet || '').replace(/<[^>]+>/g, '').replace(/&quot;/g, '"').replace(/&amp;/g, '&').slice(0, 300),
+                  provider: 'Wikimedia'
+                });
+              }
+            }
+          } catch (error) {
+            console.warn('[Public Search] Wikimedia API indisponível:', (error as Error).message);
+          }
 
-          const results: Array<{ title: string; url: string; snippet: string; date?: string }> = [];
-
-          if (response.ok) {
-            const html = await response.text();
-            const resultBlocks = html.split(/class="result__body"/g).slice(1);
-
-            for (const block of resultBlocks) {
-              if (results.length >= limit) break;
-              const linkMatch = block.match(/href="([^"]+)"[^>]*class="result__url"[^>]*>([^<]+)<\/a>/i) ||
-                                block.match(/<a[^>]+class="result__snippet[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i) ||
-                                block.match(/<a[^>]+class="result__url"[^>]*href="([^"]+)"[^>]*>/i);
-              const titleMatch = block.match(/<a[^>]+class="result__a"[^>]*>([\s\S]*?)<\/a>/i);
-              const snippetMatch = block.match(/<a[^>]+class="result__snippet"[^>]*>([\s\S]*?)<\/a>/i) ||
-                                   block.match(/class="result__snippet"[^>]*>([\s\S]*?)<\/div>/i);
-
-              if (titleMatch) {
-                const title = titleMatch[1].replace(/<[^>]+>/g, '').trim();
-                let url = linkMatch ? linkMatch[1] : '';
-                if (url.startsWith('/l/?uddg=')) {
-                  try {
-                    url = decodeURIComponent(url.split('uddg=')[1].split('&')[0]);
-                  } catch {}
-                }
-                const snippet = snippetMatch ? snippetMatch[1].replace(/<[^>]+>/g, '').trim() : '';
-
-                if (title && (url.startsWith('http://') || url.startsWith('https://'))) {
-                  results.push({
-                    title,
-                    url,
-                    snippet: snippet.slice(0, 300)
-                  });
+          // Stack Exchange API: gratuita e apropriada para dúvidas técnicas.
+          if (sources.length < limit && /\b(code|código|program|javascript|typescript|python|react|api|software|erro|bug|linux|sql)\b/i.test(queryText)) {
+            try {
+              const stackUrl = `https://api.stackexchange.com/2.3/search/advanced?order=desc&sort=relevance&q=${encodeURIComponent(queryText)}&site=stackoverflow&pagesize=${Math.min(limit, 5)}&filter=default`;
+              const stackResponse = await fetch(stackUrl, {
+                headers: { 'Accept': 'application/json', 'User-Agent': 'KvantResearchAgent/1.0 (public-api-client)' },
+                signal: AbortSignal.timeout(8000)
+              });
+              if (stackResponse.ok) {
+                const stackData: any = await stackResponse.json();
+                for (const item of (stackData.items || [])) {
+                  if (sources.length >= limit) break;
+                  sources.push({ title: String(item.title || 'Stack Overflow'), url: String(item.link || ''), snippet: `Pergunta técnica no Stack Overflow; respostas e votação disponíveis na fonte.`, provider: 'Stack Exchange API' });
                 }
               }
+            } catch (error) {
+              console.warn('[Public Search] Stack Exchange API indisponível:', (error as Error).message);
             }
           }
 
-          // Fallback Wikipedia / DuckDuckGo instant API if HTML parsing yields few results
-          if (results.length === 0) {
+          // OpenAlex: gratuita para literatura científica e metadados acadêmicos.
+          if (sources.length < limit && /\b(paper|artigo|pesquisa|estudo|científico|cientifica|academic|research|doi)\b/i.test(queryText)) {
             try {
-              const apiUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
-              const apiRes = await fetch(apiUrl, { signal: AbortSignal.timeout(5000) });
-              if (apiRes.ok) {
-                const data: any = await apiRes.json();
-                if (data.Heading && data.AbstractText) {
-                  results.push({
-                    title: data.Heading,
-                    url: data.AbstractURL || `https://duckduckgo.com/?q=${encodeURIComponent(query)}`,
-                    snippet: data.AbstractText
-                  });
-                }
-                if (Array.isArray(data.RelatedTopics)) {
-                  for (const topic of data.RelatedTopics.slice(0, limit)) {
-                    if (topic.Text && topic.FirstURL) {
-                      results.push({
-                        title: topic.Text.slice(0, 70) + '...',
-                        url: topic.FirstURL,
-                        snippet: topic.Text
-                      });
-                    }
-                  }
+              const openAlexUrl = `https://api.openalex.org/works?search=${encodeURIComponent(queryText)}&per-page=${Math.min(limit, 5)}`;
+              const openAlexResponse = await fetch(openAlexUrl, { headers: { 'Accept': 'application/json', 'User-Agent': 'KvantResearchAgent/1.0 (mailto:research@localhost)' }, signal: AbortSignal.timeout(8000) });
+              if (openAlexResponse.ok) {
+                const openAlexData: any = await openAlexResponse.json();
+                for (const item of (openAlexData.results || [])) {
+                  if (sources.length >= limit) break;
+                  sources.push({ title: String(item.title || 'OpenAlex work'), url: String(item.doi || item.primary_location?.landing_page_url || `https://openalex.org/${item.id?.split('/').pop() || ''}`), snippet: `Registro acadêmico OpenAlex${item.publication_year ? ` (${item.publication_year})` : ''}.`, provider: 'OpenAlex' });
                 }
               }
-            } catch {}
+            } catch (error) {
+              console.warn('[Public Search] OpenAlex indisponível:', (error as Error).message);
+            }
           }
 
-          // Automatically navigate to and access the top real webpage found so the browser loads it
-          let topPageData: any = null;
-          const topUrl = results.find(r => r.url && !r.url.includes('duckduckgo.com'))?.url || results[0]?.url;
-          if (topUrl && this.browserManager) {
-            try {
-              topPageData = await this.browserManager.navigate(topUrl);
-            } catch {}
-          }
-
+          const uniqueSources = sources.filter((item, index, list) => item.url && list.findIndex((other) => other.url === item.url) === index).slice(0, limit);
           return {
             success: true,
-            result: {
-              query,
-              totalFound: results.length,
-              topAccessedUrl: topUrl,
-              url: topPageData?.url || topUrl,
-              title: topPageData?.title || results[0]?.title || query,
-              screenshot: topPageData?.screenshot,
-              sources: results
-            },
-            actionDescription: topUrl 
-              ? `Pesquisa na web por "${query}" e acesso direto à página "${topPageData?.title || topUrl}"`
-              : `Pesquisa na web por "${query}" (${results.length} fontes encontradas)`
+            result: { query: queryText, totalFound: uniqueSources.length, providers: [...new Set(uniqueSources.map((item) => item.provider))], sources: uniqueSources, browserUsed: false },
+            actionDescription: `Pesquisa federada por APIs públicas sem navegador ou scraping HTML (${uniqueSources.length} fontes)`
           };
         }
 

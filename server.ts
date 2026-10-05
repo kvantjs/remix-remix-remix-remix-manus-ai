@@ -2399,7 +2399,7 @@ class PlaywrightBrowserManager {
       if (url.includes('.') && !url.includes(' ')) {
         url = 'https://' + url;
       } else {
-        url = `https://duckduckgo.com/html/?q=${encodeURIComponent(url)}`;
+        url = `https://pt.wikipedia.org/w/index.php?search=${encodeURIComponent(url)}`;
       }
     }
 
@@ -2606,7 +2606,7 @@ async function executeHttpNavigate(rawUrl: string) {
     if (url.includes('.') && !url.includes(' ')) {
       url = 'https://' + url;
     } else {
-      url = `https://duckduckgo.com/html/?q=${encodeURIComponent(url)}`;
+      url = `https://pt.wikipedia.org/w/index.php?search=${encodeURIComponent(url)}`;
     }
   }
 
@@ -2692,73 +2692,27 @@ async function executeHttpNavigate(rawUrl: string) {
   }
 }
 
-// 4. Real Web Search Helper
+// 4. Public API Web Search Helper (no browser, no HTML scraping)
 async function executeBrowserSearch(query: string) {
+  const results: Array<{ title: string; snippet: string; url: string; provider?: string }> = [];
   try {
-    const ddgUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
-    const fetchRes = await fetch(ddgUrl, { signal: AbortSignal.timeout(6000) });
-    const ddgData: any = await fetchRes.json();
-
-    const results: Array<{ title: string; snippet: string; url: string }> = [];
-
-    if (ddgData.AbstractText) {
-      results.push({
-        title: ddgData.Heading || query,
-        snippet: ddgData.AbstractText,
-        url: ddgData.AbstractURL || 'https://duckduckgo.com/?q=' + encodeURIComponent(query)
-      });
-    }
-
-    if (Array.isArray(ddgData.RelatedTopics)) {
-      for (const topic of ddgData.RelatedTopics.slice(0, 5)) {
-        if (topic.Text && topic.FirstURL) {
-          results.push({
-            title: topic.Text.split(' - ')[0] || topic.Text.slice(0, 50),
-            snippet: topic.Text,
-            url: topic.FirstURL
-          });
-        }
+    const wikiUrl = `https://pt.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&srlimit=8&utf8=1&format=json&origin=*`;
+    const response = await fetch(wikiUrl, { headers: { Accept: 'application/json', 'User-Agent': 'KvantResearchAgent/1.0 (public-api-client)' }, signal: AbortSignal.timeout(8000) });
+    if (response.ok) {
+      const data: any = await response.json();
+      for (const item of (data.query?.search || []).slice(0, 8)) {
+        const title = String(item.title || '').trim();
+        if (!title) continue;
+        results.push({ title, snippet: String(item.snippet || '').replace(/<[^>]+>/g, '').slice(0, 300), url: `https://pt.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, '_'))}`, provider: 'Wikimedia' });
       }
     }
-
-    if (results.length === 0) {
-      results.push(
-        {
-          title: `Resultados na Web para "${query}"`,
-          snippet: `Busca ao vivo realizada pelo Computador na Nuvem do Kvant para a consulta "${query}".`,
-          url: `https://duckduckgo.com/?q=${encodeURIComponent(query)}`
-        },
-        {
-          title: `Buscar no GitHub: ${query}`,
-          snippet: `Repositórios, códigos e documentações open source sobre ${query}.`,
-          url: `https://github.com/search?q=${encodeURIComponent(query)}`
-        },
-        {
-          title: `Documentação MDN Web Docs: ${query}`,
-          snippet: `Guias e especificações técnicas sobre tecnologias web.`,
-          url: `https://developer.mozilla.org/en-US/search?q=${encodeURIComponent(query)}`
-        }
-      );
-    }
-
-    return {
-      query,
-      resultsCount: results.length,
-      results
-    };
   } catch (err: any) {
-    return {
-      query,
-      resultsCount: 1,
-      results: [
-        {
-          title: `Resultados para "${query}"`,
-          snippet: `Pesquisa direta via navegador cloud: https://duckduckgo.com/?q=${encodeURIComponent(query)}`,
-          url: `https://duckduckgo.com/?q=${encodeURIComponent(query)}`
-        }
-      ]
-    };
+    console.warn('[Public Search] Wikimedia API indisponível:', err.message);
   }
+  if (results.length === 0) {
+    results.push({ title: `Pesquisa Wikimedia: ${query}`, snippet: 'Nenhum resultado estruturado foi retornado pelas APIs públicas.', url: `https://pt.wikipedia.org/w/index.php?search=${encodeURIComponent(query)}`, provider: 'Wikimedia' });
+  }
+  return { query, resultsCount: results.length, providers: [...new Set(results.map((r) => r.provider))], results };
 }
 
 // 5. Unified Real Tool Execution Engine for the Agent (With Playwright Automation)
@@ -2868,14 +2822,14 @@ async function runRealTool(toolName: string, args: Record<string, any>): Promise
     };
   }
 
-  // Browser Search (via Playwright & DuckDuckGo) -> Searches and immediately accesses the top result
+  // Browser Search via APIs públicas; acessa a fonte superior somente quando aplicável
   if (toolName === 'browser.search' || toolName === 'web.search' || toolName === 'search' || toolName === 'computer.search') {
     const query = args.query || args.q || 'documentação técnica';
     const searchRes = await executeBrowserSearch(query);
     const topSnippets = searchRes.results.map(r => `• ${r.title}\n  URL: ${r.url}\n  ${r.snippet}`).join('\n\n');
 
     // Automatically access and load the top resulting real webpage
-    const topDestUrl = searchRes.results.find(r => r.url && !r.url.includes('duckduckgo.com'))?.url || searchRes.results[0]?.url;
+    const topDestUrl = searchRes.results.find(r => r.url && !r.url.includes('wikipedia.org/w/index.php?search='))?.url || searchRes.results[0]?.url;
     let accessedPageData: any = null;
     if (topDestUrl && (topDestUrl.startsWith('http://') || topDestUrl.startsWith('https://'))) {
       try {
@@ -2886,11 +2840,11 @@ async function runRealTool(toolName: string, args: Record<string, any>): Promise
     }
 
     if (!accessedPageData) {
-      const searchUrl = `https://duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+      const searchUrl = `https://pt.wikipedia.org/w/index.php?search=${encodeURIComponent(query)}`;
       accessedPageData = await playwrightBrowser.navigate(searchUrl);
     }
 
-    const finalUrl = accessedPageData?.url || topDestUrl || `https://duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+    const finalUrl = accessedPageData?.url || topDestUrl || `https://pt.wikipedia.org/w/index.php?search=${encodeURIComponent(query)}`;
     const finalTitle = accessedPageData?.title || searchRes.results[0]?.title || `Pesquisa: ${query}`;
 
     return {
@@ -3226,7 +3180,7 @@ app.get('/api/browser/proxy', async (req, res) => {
             <p>A página foi acessada na nuvem. Você pode interagir com sites abertos ou navegar para destinos compatíveis com proxy web ao vivo.</p>
             <div style="margin-top: 20px;">
               <a href="/api/browser/proxy?url=https://news.ycombinator.com" class="btn">Hacker News</a>
-              <a href="/api/browser/proxy?url=https://duckduckgo.com/html/?q=agent+ai" class="btn">DuckDuckGo</a>
+              <a href="/api/browser/proxy?url=https://pt.wikipedia.org/w/index.php?search=agent+ai" class="btn">Wikimedia</a>
               <a href="/api/browser/proxy?url=https://en.wikipedia.org/wiki/Artificial_intelligence" class="btn">Wikipedia AI</a>
             </div>
           </div>
@@ -3319,7 +3273,7 @@ app.post('/api/computer/browser/screenshot', async (_req, res) => {
 app.post('/api/computer/browser/search', async (req, res) => {
   const { query } = req.body;
   if (!query) return res.status(400).json({ error: 'Termo de busca é obrigatório' });
-  const searchUrl = `https://duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+  const searchUrl = `https://pt.wikipedia.org/w/index.php?search=${encodeURIComponent(query)}`;
   const result = await playwrightBrowser.navigate(searchUrl);
   return res.json(result);
 });
@@ -3553,7 +3507,6 @@ const KNOWN_WEB_PORTALS: Record<string, string> = {
   netflix: 'https://www.netflix.com',
   spotify: 'https://open.spotify.com',
   twitch: 'https://www.twitch.tv',
-  duckduckgo: 'https://duckduckgo.com',
   bing: 'https://www.bing.com',
   yahoo: 'https://www.yahoo.com',
   tabnews: 'https://www.tabnews.com.br',
@@ -3611,7 +3564,7 @@ function extractUserDestinationUrl(message: string): { targetUrl: string | null;
   const lower = cleanMsg.toLowerCase();
   if (searchMatch && !lower.includes('endereço') && !lower.includes('endereco') && !lower.includes('acesse') && !lower.includes('abra o site')) {
     const rawQuery = searchMatch[1].trim();
-    return { targetUrl: `https://duckduckgo.com/html/?q=${encodeURIComponent(rawQuery)}`, isExplicitSearch: true, searchQuery: rawQuery };
+    return { targetUrl: `https://pt.wikipedia.org/w/index.php?search=${encodeURIComponent(rawQuery)}`, isExplicitSearch: true, searchQuery: rawQuery };
   }
 
   // 3. Strip command phrases and conversational boilerplate
@@ -3658,7 +3611,7 @@ function extractUserDestinationUrl(message: string): { targetUrl: string | null;
 
   // 8. If multiple words remain (e.g. "notícias de tecnologia"), turn into a direct search
   return { 
-    targetUrl: `https://duckduckgo.com/html/?q=${encodeURIComponent(stripped)}`, 
+    targetUrl: `https://pt.wikipedia.org/w/index.php?search=${encodeURIComponent(stripped)}`, 
     isExplicitSearch: true, 
     searchQuery: stripped 
   };
