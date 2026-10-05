@@ -4,6 +4,7 @@ import { exec } from 'child_process';
 import util from 'util';
 import { resolveSafeSandboxPath, redactSecrets, isSafeUrl, SANDBOX_WORKSPACE_ROOT } from './security.js';
 import { jobsManager, AgentJob, JobApprovalRequest } from './jobs-manager.js';
+import { challengeMessage } from './browser-challenge.js';
 
 const execAsync = util.promisify(exec);
 
@@ -685,21 +686,29 @@ export class AgentToolExecutor {
 
           const result = await this.browserManager.navigate(url);
           return {
-            success: true,
+            success: !result.challenge,
             result: {
               url: result.url,
               title: result.title,
               status: result.status,
               durationMs: result.durationMs,
               screenshot: result.screenshot,
-              interactiveElementsCount: result.interactiveElements?.length || 0
+              interactiveElementsCount: result.interactiveElements?.length || 0,
+              challenge: result.challenge,
+              requiresUserAction: result.requiresUserAction
             },
-            actionDescription: `Navegador Chromium acessou "${result.title || result.url}" (${result.durationMs}ms)`
+            actionDescription: result.challenge ? `Automação interrompida: ${result.challenge.reason}` : `Navegador Chromium acessou "${result.title || result.url}" (${result.durationMs}ms)`,
+            requiresApproval: Boolean(result.challenge),
+            approvalDetails: result.challenge ? { actionName: 'browser_handoff', details: result.challenge, riskLevel: 'medium', reason: 'O site apresentou um desafio anti-bot; a continuação exige intervenção humana autorizada.', requestedAt: new Date().toISOString() } : undefined
           };
         }
 
         case 'browser_inspect': {
           const page = await this.browserManager.ensurePage();
+          const challenge = this.browserManager.getChallenge?.();
+          if (challenge) {
+            return { success: false, result: { url: page.url(), title: await page.title(), challenge, requiresUserAction: true }, error: challengeMessage(challenge), actionDescription: `Inspeção interrompida: ${challenge.reason}`, requiresApproval: true, approvalDetails: { actionName: 'browser_handoff', details: challenge, riskLevel: 'medium', reason: 'Intervenção humana autorizada necessária.', requestedAt: new Date().toISOString() } };
+          }
           const title = await page.title();
           const url = page.url();
           const domData = await this.browserManager.extractDomData(page);
@@ -719,6 +728,8 @@ export class AgentToolExecutor {
         case 'browser_click': {
           const target = String(args.selectorOrText || '').trim();
           if (!target) throw new Error('Seletor ou texto do elemento é obrigatório.');
+          const existingChallenge = this.browserManager.getChallenge?.();
+          if (existingChallenge) return { success: false, result: { challenge: existingChallenge, requiresUserAction: true }, error: challengeMessage(existingChallenge), actionDescription: `Clique bloqueado: ${existingChallenge.reason}`, requiresApproval: true, approvalDetails: { actionName: 'browser_handoff', details: existingChallenge, riskLevel: 'medium', reason: 'Intervenção humana autorizada necessária.', requestedAt: new Date().toISOString() } };
 
           const page = await this.browserManager.ensurePage();
           let clicked = false;
@@ -742,6 +753,8 @@ export class AgentToolExecutor {
           const newTitle = await page.title();
           const newUrl = page.url();
           const screenshotBuf = await page.screenshot({ type: 'jpeg', quality: 75 }).catch(() => null);
+          const challenge = await this.browserManager.checkCurrentChallenge?.();
+          if (challenge) return { success: false, result: { newUrl, newTitle, challenge, requiresUserAction: true }, error: challengeMessage(challenge), actionDescription: `Clique interrompido: ${challenge.reason}`, requiresApproval: true, approvalDetails: { actionName: 'browser_handoff', details: challenge, riskLevel: 'medium', reason: 'Intervenção humana autorizada necessária.', requestedAt: new Date().toISOString() } };
 
           return {
             success: true,
@@ -761,6 +774,8 @@ export class AgentToolExecutor {
           const pressEnter = Boolean(args.pressEnter ?? true);
 
           const page = await this.browserManager.ensurePage();
+          const existingChallenge = this.browserManager.getChallenge?.();
+          if (existingChallenge) return { success: false, result: { challenge: existingChallenge, requiresUserAction: true }, error: challengeMessage(existingChallenge), actionDescription: `Digitação bloqueada: ${existingChallenge.reason}`, requiresApproval: true, approvalDetails: { actionName: 'browser_handoff', details: existingChallenge, riskLevel: 'medium', reason: 'Intervenção humana autorizada necessária.', requestedAt: new Date().toISOString() } };
           await page.fill(selector, text, { timeout: 5000 });
           if (pressEnter) {
             await page.press(selector, 'Enter');
@@ -769,6 +784,8 @@ export class AgentToolExecutor {
 
           const currentTitle = await page.title();
           const currentUrl = page.url();
+          const challenge = await this.browserManager.checkCurrentChallenge?.();
+          if (challenge) return { success: false, result: { currentUrl, currentTitle, challenge, requiresUserAction: true }, error: challengeMessage(challenge), actionDescription: `Digitação interrompida: ${challenge.reason}`, requiresApproval: true, approvalDetails: { actionName: 'browser_handoff', details: challenge, riskLevel: 'medium', reason: 'Intervenção humana autorizada necessária.', requestedAt: new Date().toISOString() } };
 
           return {
             success: true,

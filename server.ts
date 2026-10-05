@@ -20,6 +20,7 @@ import { createDownloadUrl, createUpload, listObjects, softDeleteObject } from '
 import { createProject, createSnapshot, deleteProjectFile, diffProjectFile, getProject, listProjectFiles, listProjects, projectStatus, projectVersions, readProjectFile, restoreProjectFiles, syncProjectToGitHub, writeProjectFile } from './src/server/projects.js';
 import { buildIntentInstruction, classifyAgentIntent, conversationFallback, filterToolDeclarations, isToolAllowed, type AgentIntent } from './src/server/intent-router.js';
 import { auditProjectAction, ensureProjectOwner, getProjectRole, hasProjectRole, listProjectAudit, listProjectMembers, removeProjectMember, upsertProjectMember, type ProjectRole } from './src/server/project-access.js';
+import { challengeMessage, detectBrowserChallenge, type BrowserChallenge } from './src/server/browser-challenge.js';
 
 const execAsync = promisify(exec);
 
@@ -2272,6 +2273,28 @@ class PlaywrightBrowserManager {
   private browser: Browser | null = null;
   private page: Page | null = null;
   private isLaunching = false;
+  private challenge: BrowserChallenge | null = null;
+
+  getChallenge() {
+    return this.challenge;
+  }
+
+  clearChallenge() {
+    this.challenge = null;
+  }
+
+  async checkCurrentChallenge() {
+    const page = await this.ensurePage();
+    const domData = await this.extractDomData(page);
+    return this.inspectChallenge(page, domData.bodyText);
+  }
+
+  private async inspectChallenge(page: Page, bodyText = '') {
+    const title = await page.title().catch(() => '');
+    const detected = detectBrowserChallenge({ url: page.url(), title, bodyText });
+    if (detected) this.challenge = detected;
+    return detected;
+  }
 
   async ensurePage(): Promise<Page> {
     if (this.page && !this.page.isClosed()) {
@@ -2396,6 +2419,7 @@ class PlaywrightBrowserManager {
 
       // Extract interactive elements from DOM
       const domData = await this.extractDomData(page);
+      const challenge = await this.inspectChallenge(page, domData.bodyText);
 
       return {
         url: page.url(),
@@ -2407,7 +2431,10 @@ class PlaywrightBrowserManager {
         textContent: domData.bodyText,
         interactiveElements: domData.interactive,
         links: domData.interactive.filter((i: any) => i.type === 'link').map((i: any) => ({ text: i.text, href: i.href })),
-        headers: {}
+        headers: {},
+        challenge,
+        automationBlocked: Boolean(challenge),
+        requiresUserAction: Boolean(challenge)
       };
     } catch (err: any) {
       console.warn('[Playwright] Navigation fallback used:', err.message);
@@ -2423,6 +2450,7 @@ class PlaywrightBrowserManager {
   async click(selectorOrText: string) {
     try {
       const page = await this.ensurePage();
+      if (this.challenge) return { success: false, error: challengeMessage(this.challenge), challenge: this.challenge, requiresUserAction: true };
       const target = selectorOrText.trim();
       
       if (target.startsWith('#') || target.startsWith('.') || target.includes('[') || target.includes('>')) {
@@ -2436,6 +2464,8 @@ class PlaywrightBrowserManager {
       const screenshotBuf = await page.screenshot({ type: 'jpeg', quality: 75 });
       const screenshot = 'data:image/jpeg;base64,' + screenshotBuf.toString('base64');
       const domData = await this.extractDomData(page);
+      const challenge = await this.inspectChallenge(page, domData.bodyText);
+      if (challenge) return { success: false, error: challengeMessage(challenge), challenge, requiresUserAction: true, url: page.url(), title, screenshot, textContent: domData.bodyText };
 
       return {
         success: true,
@@ -2457,6 +2487,7 @@ class PlaywrightBrowserManager {
   async fill(selector: string, text: string, pressEnter = false) {
     try {
       const page = await this.ensurePage();
+      if (this.challenge) return { success: false, error: challengeMessage(this.challenge), challenge: this.challenge, requiresUserAction: true };
       await page.fill(selector, text, { timeout: 8000 });
       if (pressEnter) {
         await page.keyboard.press('Enter');
@@ -2466,6 +2497,8 @@ class PlaywrightBrowserManager {
       const screenshotBuf = await page.screenshot({ type: 'jpeg', quality: 75 });
       const screenshot = 'data:image/jpeg;base64,' + screenshotBuf.toString('base64');
       const domData = await this.extractDomData(page);
+      const challenge = await this.inspectChallenge(page, domData.bodyText);
+      if (challenge) return { success: false, error: challengeMessage(challenge), challenge, requiresUserAction: true, url: page.url(), title, screenshot, textContent: domData.bodyText };
 
       return {
         success: true,
@@ -2487,6 +2520,7 @@ class PlaywrightBrowserManager {
   async clickCoordinates(x: number, y: number) {
     try {
       const page = await this.ensurePage();
+      if (this.challenge) return { success: false, error: challengeMessage(this.challenge), challenge: this.challenge, requiresUserAction: true };
       await page.mouse.click(x, y);
       await page.waitForTimeout(600);
       await page.waitForLoadState('domcontentloaded', { timeout: 6000 }).catch(() => {});
@@ -2515,6 +2549,7 @@ class PlaywrightBrowserManager {
   async scroll(deltaY: number) {
     try {
       const page = await this.ensurePage();
+      if (this.challenge) return { success: false, error: challengeMessage(this.challenge), challenge: this.challenge, requiresUserAction: true };
       await page.mouse.wheel(0, deltaY);
       await page.waitForTimeout(400);
       const screenshotBuf = await page.screenshot({ type: 'jpeg', quality: 75 }).catch(() => null);
@@ -3234,6 +3269,16 @@ app.post('/api/computer/browser/navigate', async (req, res) => {
   if (!url) return res.status(400).json({ error: 'URL é obrigatória' });
   const result = await playwrightBrowser.navigate(url);
   return res.json(result);
+});
+
+app.get('/api/computer/browser/challenge', (_req, res) => {
+  return res.json({ challenge: playwrightBrowser.getChallenge(), policy: 'stop_and_request_handoff' });
+});
+
+app.post('/api/computer/browser/resume-after-human', (req, res) => {
+  if (req.body?.humanConfirmed !== true) return res.status(400).json({ error: 'humanConfirmed=true é obrigatório após a intervenção autorizada.' });
+  playwrightBrowser.clearChallenge();
+  return res.json({ resumed: true, note: 'O bloqueio local foi limpo. O agente não contorna o desafio; uma nova navegação poderá detectá-lo novamente.' });
 });
 
 app.post('/api/computer/browser/click', async (req, res) => {
