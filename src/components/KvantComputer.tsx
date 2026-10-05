@@ -65,7 +65,7 @@ const KNOWN_WEB_PORTALS: Record<string, string> = {
   netflix: 'https://www.netflix.com',
   spotify: 'https://open.spotify.com',
   twitch: 'https://www.twitch.tv',
-  duckduckgo: 'https://duckduckgo.com',
+  wikimedia: 'https://pt.wikipedia.org',
   bing: 'https://www.bing.com',
   yahoo: 'https://www.yahoo.com',
   tabnews: 'https://www.tabnews.com.br',
@@ -122,7 +122,12 @@ export function resolveWebUrl(raw: string): string {
   const searchMatch = clean.match(/(?:pesquis(?:e|ar)|busqu(?:e|ar)|procur(?:e|ar)|search for|search|procure na web por|pesquise por)\s+["']?([^"'\n\r]+)["']?/i);
   const lower = clean.toLowerCase();
   if (searchMatch && !lower.includes('endereço') && !lower.includes('endereco') && !lower.includes('acesse') && !lower.includes('abra o site')) {
-    return `https://duckduckgo.com/html/?q=${encodeURIComponent(searchMatch[1].trim())}`;
+    const searchTerm = searchMatch[1].trim().toLowerCase();
+    const requestedPortal = Object.entries(KNOWN_WEB_PORTALS)
+      .sort(([a], [b]) => b.length - a.length)
+      .find(([brand]) => new RegExp(`(?:^|\\s)${brand.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}(?:$|\\s|[.,!?])`, 'i').test(searchTerm));
+    if (requestedPortal) return requestedPortal[1];
+    return `https://pt.wikipedia.org/w/index.php?search=${encodeURIComponent(searchMatch[1].trim())}`;
   }
 
   // 3. Strip command prefixes and boilerplate
@@ -168,7 +173,7 @@ export function resolveWebUrl(raw: string): string {
   }
 
   // 8. If multiple words remain, search for that exact term
-  return `https://duckduckgo.com/html/?q=${encodeURIComponent(clean)}`;
+  return `https://pt.wikipedia.org/w/index.php?search=${encodeURIComponent(clean)}`;
 }
 
 interface NavHistoryItem {
@@ -440,8 +445,8 @@ export function KvantComputer({
   useEffect(() => {
     if (contextText && contextText !== lastContextTextRef.current) {
       lastContextTextRef.current = contextText;
-      const isWebQuery = /https?:\/\/|www\.|\.com|\.org|\.net|\.br|\.io|\.ai|\.app|\.dev|google|globo|youtube|reddit|github|wikipedia|duckduckgo|site|pesquis|endereço|endereco|acesse|navegue|abra|visite|url|web|internet/i.test(contextText);
-      if (isWebQuery || !customCode) {
+      const isExplicitNavigation = /https?:\/\/|www\.|(?:acesse|acessar|abra|abrir|navegue|navegar|visite|visitar|pesquis(?:e|ar)|busqu(?:e|ar)|procure|search|open|go\s+to)\b/i.test(contextText);
+      if (isExplicitNavigation) {
         const dest = resolveWebUrl(contextText);
         setCurrentUrl(dest);
         setIsExternalWeb(true);
