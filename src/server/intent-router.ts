@@ -71,7 +71,8 @@ export function classifyAgentIntent(message: string): AgentIntent {
     'crie um app', 'criar um app', 'crie uma aplicação', 'criar uma aplicação', 'desenvolva um app',
     'desenvolver uma aplicação', 'faça um site', 'fazer um site', 'crie um site', 'construa um site',
     'construir uma aplicação', 'programe', 'programar', 'implemente', 'implementar', 'escreva o código',
-    'edite o código', 'modifique o arquivo', 'corrija o código', 'dashboard', 'landing page', 'react', 'typescript'
+    'edite o código', 'modifique o arquivo', 'corrija o código', 'dashboard', 'landing page', 'react', 'typescript',
+    '[contexto', 'contexto definido', 'contexto selecionado'
   ]);
   if (appCreation) {
     return { mode: 'app_creation', confidence: 'high', reason: 'Pedido contém intenção explícita de criar ou modificar software.', allowedTools: APP_TOOLS };
@@ -89,7 +90,8 @@ export function classifyAgentIntent(message: string): AgentIntent {
     'computador na nuvem', 'computador do agente', 'máquina virtual', 'terminal bash', 'execute no terminal',
     'rode no terminal', 'comando shell', 'shell linux', 'navegador do agente', 'browser do agente',
     'clique em', 'preencha o formulário', 'digite no site', 'abra no navegador', 'acesse o site',
-    'leia o arquivo', 'liste os arquivos', 'grave o arquivo', 'escreva no arquivo', 'sistema de arquivos'
+    'leia o arquivo', 'liste os arquivos', 'grave o arquivo', 'escreva no arquivo', 'sistema de arquivos',
+    'npx', 'playwright install', 'playwright', 'bash', 'terminal', 'instalar'
   ]);
   if (cloudComputer) {
     return { mode: 'cloud_computer', confidence: 'high', reason: 'Pedido autoriza uma operação no computador ou navegador da nuvem.', allowedTools: COMPUTER_TOOLS };
@@ -128,7 +130,7 @@ export function filterToolDeclarations(intent: AgentIntent, declarations: any[])
 
 export function buildIntentInstruction(intent: AgentIntent) {
   const tools = intent.allowedTools.length ? intent.allowedTools.join(', ') : 'nenhuma';
-  return `\n\nROTEADOR RIGOROSO DE INTENÇÃO — MODO ATIVO: ${intent.mode.toUpperCase()}\nMotivo: ${intent.reason}\nFerramentas autorizadas neste turno: ${tools}.\nREGRAS INVIOLÁVEIS:\n1. Não confunda conversa com autorização operacional. Em CONVERSATION, responda em linguagem natural e não chame ferramentas, navegador, terminal ou filesystem.\n2. Em WEB_RESEARCH, use o Google pelo navegador Playwright real em etapas de navegação, inspeção, rolagem e abertura de resultados; não execute shell, edite arquivos ou preencha formulários sem novo pedido explícito.\n3. Em CLOUD_COMPUTER, execute somente ações no computador/navegador descritas pelo usuário; não transforme uma pergunta em criação de software.\n4. Em APP_CREATION, trate a mensagem como engenharia de software; leia arquivos atuais antes de editar, escreva código apenas nos arquivos necessários e valide o resultado. Não navegue na web por iniciativa própria.\n5. Em EXPLICIT_TOOL_CALL, chame somente a ferramenta nomeada; se o pedido estiver incompleto, peça esclarecimento em vez de escolher outra ferramenta.\n6. Em PROJECT_OPERATION, trate arquivos, snapshots, diffs e versões como operações de projeto; não publique, restaure ou faça push sem confirmação explícita do usuário.\n7. Nunca alegue que uma ferramenta foi executada se ela não aparecer em toolCalls com resultado real.\n8. Se a intenção mudar no meio da tarefa, pare e peça confirmação antes de trocar de modo.\n`;
+  return `\n\nROTEADOR RIGOROSO DE INTENÇÃO — MODO ATIVO: ${intent.mode.toUpperCase()}\nMotivo: ${intent.reason}\nFerramentas autorizadas neste turno: ${tools}.\nREGRAS INVIOLÁVEIS:\n1. Não confunda conversa com autorização operacional. Em CONVERSATION, responda em linguagem natural e não chame ferramentas, navegador, terminal ou filesystem.\n2. Em WEB_RESEARCH, utilize web_search ou browser_search para obter resultados, LEIA o conteúdo da página acessada, PENSE e ANALISE criticamente as informações coletadas e elabore uma resposta rica, completa e sintetizada. Se necessário, acesse links adicionais com web_fetch ou browser_navigate para aprofundar seu conhecimento antes de concluir.\n3. Em CLOUD_COMPUTER, execute somente ações no computador/navegador descritas pelo usuário; não transforme uma pergunta em criação de software.\n4. Em APP_CREATION, trate a mensagem como engenharia de software; leia arquivos atuais antes de editar, escreva código apenas nos arquivos necessários e valide o resultado. Não navegue na web por iniciativa própria.\n5. Em EXPLICIT_TOOL_CALL, chame somente a ferramenta nomeada; se o pedido estiver incompleto, peça esclarecimento em vez de escolher outra ferramenta.\n6. Em PROJECT_OPERATION, trate arquivos, snapshots, diffs e versões como operações de projeto; não publique, restaure ou faça push sem confirmação explícita do usuário.\n7. Nunca alegue que uma ferramenta foi executada se ela não aparecer em toolCalls com resultado real.\n8. Se a intenção mudar no meio da tarefa, pare e peça confirmação antes de trocar de modo.\n`;
 }
 
 export function conversationFallback(message = '', history: Array<{ role?: string; content?: string }> = []) {

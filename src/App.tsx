@@ -6,15 +6,35 @@
 import { Sidebar } from './components/Sidebar';
 import { ChatArea } from './components/ChatArea';
 import { Workspace } from './components/Workspace';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { ToolCallTrace } from './types/project';
 
 export default function App() {
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('manus-theme') as 'light' | 'dark') || 'dark';
+    }
+    return 'dark';
+  });
+
+  useEffect(() => {
+    document.documentElement.className = theme;
+  }, [theme]);
+
+  const toggleTheme = useCallback(() => {
+    setTheme(prev => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('manus-theme', next);
+      return next;
+    });
+  }, []);
+
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(true);
   const [customFiles, setCustomFiles] = useState<Record<string, string>>({});
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
 
   const [workspaceTab, setWorkspaceTab] = useState<'computer' | 'workspace'>('computer');
+
 
   // Agent execution state for Computador do Kvant
   const [toolCalls, setToolCalls] = useState<ToolCallTrace[]>([]);
@@ -85,8 +105,8 @@ export default function App() {
   }, []);
 
   return (
-    <div className="dark flex h-screen w-full bg-[#141414] text-[#dcdcdc] overflow-hidden font-sans selection:bg-blue-500/20">
-      <Sidebar />
+    <div className={`${theme} flex h-screen w-full bg-bg-canvas-main text-text-content-primary overflow-hidden font-sans selection:bg-blue-500/20`}>
+      <Sidebar theme={theme} toggleTheme={toggleTheme} />
       <main className="flex-1 flex overflow-hidden relative">
         <ChatArea 
           onFileUpdate={handleFileUpdate} 

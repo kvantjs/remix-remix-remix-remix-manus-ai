@@ -12,10 +12,12 @@ import {
   ChatCircleText,
   Globe,
   Gear,
-  X
+  X,
+  Sun,
+  Moon
 } from '@phosphor-icons/react';
 
-export function Sidebar() {
+export function Sidebar({ theme, toggleTheme }: { theme: 'light' | 'dark'; toggleTheme: () => void }) {
   return (
     <aside className="w-64 bg-bg-surface-panel border-r border-border-divider-subtle flex flex-col h-full shrink-0">
       {/* Header */}
@@ -28,9 +30,9 @@ export function Sidebar() {
           />
           <span className="font-semibold text-sm tracking-tight text-text-content-primary">kvant</span>
         </div>
-        <div className="flex gap-2 text-white/40">
-          <MagnifyingGlass size={16} className="cursor-pointer hover:text-white transition-colors" />
-          <Desktop size={16} className="cursor-pointer hover:text-white transition-colors" />
+        <div className="flex gap-2 text-text-content-secondary/40">
+          <MagnifyingGlass size={16} className="cursor-pointer hover:text-text-content-primary transition-colors" />
+          <Desktop size={16} className="cursor-pointer hover:text-text-content-primary transition-colors" />
         </div>
       </div>
 
@@ -93,7 +95,7 @@ export function Sidebar() {
                <Sparkle size={14} className="text-blue-400/80" />
                <span className="text-xs font-medium text-text-content-primary/80">Kvant (Versão de Desenvolvimento)</span>
             </div>
-            <X size={14} className="text-white/20 cursor-pointer hover:text-white" />
+            <X size={14} className="text-text-content-secondary/20 cursor-pointer hover:text-text-content-primary" />
           </div>
           <button className="mt-3 w-full bg-interactive-cta-bg text-bg-canvas-main py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 hover:opacity-90 transition-opacity">
             Ver o que há de novo
@@ -102,14 +104,24 @@ export function Sidebar() {
         </div>
 
         {/* User Profile */}
-        <div className="flex items-center justify-between group cursor-pointer p-1 rounded-lg hover:bg-white/5 transition-colors">
+        <div className="flex items-center justify-between group cursor-pointer p-1 rounded-lg hover:bg-bg-action-hover transition-colors">
           <div className="flex items-center gap-2">
-            <div className="size-7 bg-teal-600 rounded-full flex items-center justify-center text-[10px] font-bold">L</div>
-            <span className="text-xs font-medium text-white/80">levergucci XPTO</span>
+            <div className="size-7 bg-teal-600 rounded-full flex items-center justify-center text-[10px] font-bold text-white">L</div>
+            <span className="text-xs font-medium text-text-content-primary">levergucci XPTO</span>
           </div>
-          <div className="flex gap-1 text-white/40">
-            <Globe size={14} className="hover:text-white" />
-            <Gear size={14} className="hover:text-white" />
+          <div className="flex items-center gap-1.5 text-text-content-secondary">
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleTheme();
+              }}
+              title={theme === 'dark' ? 'Alternar para Modo Claro' : 'Alternar para Modo Escuro'}
+              className="p-1 hover:bg-bg-action-hover hover:text-text-content-primary rounded transition-all cursor-pointer flex items-center justify-center"
+            >
+              {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+            </button>
+            <Globe size={15} className="hover:text-text-content-primary transition-colors" />
+            <Gear size={15} className="hover:text-text-content-primary transition-colors" />
           </div>
         </div>
       </div>

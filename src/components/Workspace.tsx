@@ -121,10 +121,10 @@ export function Workspace({
   };
 
   return (
-    <div className={`${isMaximized ? 'w-full absolute inset-0 z-30' : 'w-[54%] min-w-[440px]'} border-l border-[#252525] bg-[#1c1c1c] flex flex-col h-full animate-in duration-200 select-none`}>
+    <div className={`${isMaximized ? 'w-full absolute inset-0 z-30' : 'w-[54%] min-w-[440px]'} border-l border-border-divider-subtle bg-bg-surface-panel flex flex-col h-full animate-in duration-200 select-none`}>
       
       {/* Top Application Tab Bar: Computador de l... | Home.tsx */}
-      <div className="h-10 flex items-center px-3 bg-[#171717] border-b border-[#252525] shrink-0 relative select-none">
+      <div className="h-10 flex items-center px-3 bg-bg-canvas-main/40 border-b border-border-divider-subtle shrink-0 relative select-none">
         
         {/* Tabs list of the application */}
         <div className="flex items-center gap-1 overflow-x-auto custom-scrollbar">
@@ -139,18 +139,18 @@ export function Workspace({
                 }}
                 className={`h-7 px-2.5 rounded-t-md text-xs font-normal transition-all flex items-center gap-2 group relative border-t border-x cursor-pointer ${
                   isActive 
-                    ? 'bg-[#222222] text-white border-[#333333]/50 shadow-xs' 
-                    : 'text-[#888888] hover:text-[#cccccc] hover:bg-white/[0.03] border-transparent'
+                    ? 'bg-bg-surface-panel text-text-content-primary border-border-divider-subtle shadow-xs' 
+                    : 'text-text-content-secondary hover:text-text-content-primary hover:bg-bg-action-hover border-transparent'
                 }`}
               >
                 {tab.id === 'computer' && (
-                  <Desktop size={13} weight={isActive ? "fill" : "regular"} className={isActive ? "text-zinc-200" : "text-[#777777]"} />
+                  <Desktop size={13} weight={isActive ? "fill" : "regular"} className={isActive ? "text-text-content-primary" : "text-text-content-secondary"} />
                 )}
                 {tab.id === 'home_code' && (
                   <FileCode size={13} weight="fill" className="text-[#3b82f6]" />
                 )}
                 {tab.id === 'website' && (
-                  <Browsers size={13} className={isActive ? "text-zinc-200" : "text-[#777777]"} />
+                  <Browsers size={13} className={isActive ? "text-text-content-primary" : "text-text-content-secondary"} />
                 )}
                 {tab.id === 'workspace' && (
                   <FileCode size={13} className="text-cyan-400" />
@@ -164,7 +164,7 @@ export function Workspace({
                 {tab.closable && (
                   <X 
                     size={11}
-                    className="ml-0.5 text-zinc-400 hover:text-white p-0.5 rounded transition-all cursor-pointer"
+                    className="ml-0.5 text-text-content-secondary hover:text-text-content-primary p-0.5 rounded transition-all cursor-pointer"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleCloseTab(tab.id, e);
@@ -176,17 +176,17 @@ export function Workspace({
           })}
 
           {/* Plus and Caret Down buttons to add application tabs */}
-          <div className="flex items-center text-[#777777] hover:text-white px-0.5">
+          <div className="flex items-center text-text-content-secondary hover:text-text-content-primary px-0.5">
             <button 
               onClick={() => setShowNewTabMenu(!showNewTabMenu)}
-              className="p-1 hover:bg-white/5 rounded cursor-pointer transition-colors"
+              className="p-1 hover:bg-bg-action-hover rounded cursor-pointer transition-colors"
               title="Nova aba na aplicação"
             >
               <Plus size={13} />
             </button>
             <button 
               onClick={() => setShowNewTabMenu(!showNewTabMenu)}
-              className="p-0.5 hover:bg-white/5 rounded cursor-pointer transition-colors"
+              className="p-0.5 hover:bg-bg-action-hover rounded cursor-pointer transition-colors"
             >
               <CaretDown size={11} />
             </button>
@@ -195,48 +195,48 @@ export function Workspace({
 
         {/* Dropdown Menu for New Application Tab */}
         {showNewTabMenu && (
-          <div className="absolute top-9 left-28 z-50 w-60 bg-[#222222] border border-white/10 rounded-lg shadow-2xl p-1.5 space-y-1 text-xs text-white/80 animate-in fade-in zoom-in-95 duration-150">
+          <div className="absolute top-9 left-28 z-50 w-60 bg-bg-surface-panel border border-border-divider-subtle rounded-lg shadow-2xl p-1.5 space-y-1 text-xs text-text-content-primary/80 animate-in fade-in zoom-in-95 duration-150">
             <button
               onClick={() => handleAddTab('computer', 'Computador de l...')}
-              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md hover:bg-white/10 text-left transition-colors cursor-pointer"
+              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md hover:bg-bg-action-hover text-left transition-colors cursor-pointer"
             >
               <Desktop size={14} className="text-blue-400" />
               <div>
-                <div className="font-medium text-white">Computador na Nuvem</div>
-                <div className="text-[10px] text-white/40">Ambiente do agente com navegador</div>
+                <div className="font-medium text-text-content-primary">Computador na Nuvem</div>
+                <div className="text-[10px] text-text-content-secondary/45">Ambiente do agente com navegador</div>
               </div>
             </button>
 
             <button
               onClick={() => handleAddTab('home_code', 'Home.tsx')}
-              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md hover:bg-white/10 text-left transition-colors cursor-pointer"
+              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md hover:bg-bg-action-hover text-left transition-colors cursor-pointer"
             >
               <FileCode size={14} className="text-[#3b82f6]" />
               <div>
-                <div className="font-medium text-white">Home.tsx</div>
-                <div className="text-[10px] text-white/40">Editor de código do projeto</div>
+                <div className="font-medium text-text-content-primary">Home.tsx</div>
+                <div className="text-[10px] text-text-content-secondary/45">Editor de código do projeto</div>
               </div>
             </button>
 
             <button
               onClick={() => handleAddTab('workspace', 'Espaço de Trabalho')}
-              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md hover:bg-white/10 text-left transition-colors cursor-pointer"
+              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md hover:bg-bg-action-hover text-left transition-colors cursor-pointer"
             >
               <Code size={14} className="text-cyan-400" />
               <div>
-                <div className="font-medium text-white">Espaço de Trabalho</div>
-                <div className="text-[10px] text-white/40">Preview, terminal e configurações</div>
+                <div className="font-medium text-text-content-primary">Espaço de Trabalho</div>
+                <div className="text-[10px] text-text-content-secondary/45">Preview, terminal e configurações</div>
               </div>
             </button>
 
             <button
               onClick={() => handleAddTab('terminal_tab', 'Terminal Bash')}
-              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md hover:bg-white/10 text-left transition-colors cursor-pointer"
+              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md hover:bg-bg-action-hover text-left transition-colors cursor-pointer"
             >
               <Terminal size={14} className="text-emerald-400" />
               <div>
-                <div className="font-medium text-white">Terminal Bash</div>
-                <div className="text-[10px] text-white/40">Shell do container Linux</div>
+                <div className="font-medium text-text-content-primary">Terminal Bash</div>
+                <div className="text-[10px] text-text-content-secondary/45">Shell do container Linux</div>
               </div>
             </button>
           </div>
@@ -245,18 +245,18 @@ export function Workspace({
         <div className="flex-1" />
 
         {/* Top Right Window Controls: Fullscreen expand and Sidebar dock toggle */}
-        <div className="flex items-center gap-1.5 text-[#888888]">
+        <div className="flex items-center gap-1.5 text-text-content-secondary">
           <button 
             onClick={() => setIsMaximized(!isMaximized)}
             title={isMaximized ? "Restaurar tamanho" : "Tela cheia"} 
-            className="cursor-pointer hover:text-white transition-colors p-1"
+            className="cursor-pointer hover:text-text-content-primary transition-colors p-1"
           >
             <ArrowsOut size={14} />
           </button>
           <button 
             onClick={onClose}
             title="Alternar painel lateral" 
-            className="cursor-pointer hover:text-white transition-colors p-1"
+            className="cursor-pointer hover:text-text-content-primary transition-colors p-1"
           >
             <div className="size-3.5 border border-current rounded-xs flex overflow-hidden">
               <div className="w-1/2 border-r border-current bg-current/20" />
@@ -284,7 +284,7 @@ export function Workspace({
 
       {/* 2. Home.tsx Dedicated Code View */}
       {activeTopTab === 'home_code' && (
-        <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#141414]">
+        <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg-canvas-main">
           <CodeView 
             activeFile={activeFile} 
             onFileChange={setActiveFile} 
@@ -300,17 +300,17 @@ export function Workspace({
 
       {/* 3. Terminal Tab */}
       {activeTopTab === 'terminal_tab' && (
-        <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#141414]">
+        <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg-canvas-main">
           <TerminalView activeCode={activeCodeContent} />
         </div>
       )}
 
       {/* 4. Full Espaço de Trabalho (Sub-tabs: Preview, Código, Terminal, Configurações) */}
       {activeTopTab === 'workspace' && (
-        <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#1c1c1c]">
+        <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg-surface-panel">
           {/* Internal Navigation Bar for Workspace */}
-          <div style={{ backgroundColor: '#1a1a1a' }} className="h-11 flex items-center justify-between px-4 border-b border-white/5 shrink-0 bg-[#1a1a1a]">
-            <div className="flex items-center gap-1 p-0.5 border border-white/5 rounded-lg bg-[#141414]">
+          <div className="h-11 flex items-center justify-between px-4 border-b border-border-divider-subtle shrink-0 bg-bg-surface-panel">
+            <div className="flex items-center gap-1 p-0.5 border border-border-divider-subtle rounded-lg bg-bg-canvas-main">
               <NavButton 
                 active={workspaceSubTab === 'preview'} 
                 onClick={() => setWorkspaceSubTab('preview')}
@@ -352,7 +352,7 @@ export function Workspace({
             <div className="flex items-center gap-2">
                <button 
                 onClick={() => setWorkspaceSubTab('automations')}
-                className="bg-[#dcdcdc] text-black px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 hover:bg-[#c0c0c0] transition-colors shadow-xs cursor-pointer"
+                className="bg-interactive-cta-bg text-bg-canvas-main px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shadow-xs cursor-pointer"
                >
                   <ArrowUp size={13} />
                   Executar tarefa
@@ -412,7 +412,7 @@ const FILE_CONTENTS: Record<string, { lang: string; code: string }> = {
   'Home.tsx': {
     lang: 'typescript',
     code: `import React, { useState } from 'react';
-import { Star, ArrowRight, ShieldCheck, Zap } from 'lucide-react';
+import { Star, ArrowRight, ShieldCheck, Lightning as Zap } from '@phosphor-icons/react';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState('templates');
@@ -494,7 +494,7 @@ function CodeView({ activeFile, onFileChange, customFiles, copied, onCopy }: any
   return (
     <div className="h-full flex">
       {/* File Tree */}
-      <div style={{ backgroundColor: '#1a1a1a' }} className="w-48 border-r border-white/5 flex flex-col shrink-0 overflow-y-auto custom-scrollbar bg-[#1a1a1a]">
+      <div className="w-48 border-r border-border-divider-subtle flex flex-col shrink-0 overflow-y-auto custom-scrollbar bg-bg-surface-panel">
         <div className="p-3 flex flex-col gap-1">
           {files.map(file => (
             <FileTreeNode key={file.name} node={file} level={0} activeFile={activeFile} onFileChange={onFileChange} />
@@ -503,21 +503,21 @@ function CodeView({ activeFile, onFileChange, customFiles, copied, onCopy }: any
       </div>
 
       {/* Editor Surface */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[#141414] overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 bg-bg-canvas-main overflow-hidden">
         <CodeBlock 
           code={currentFileData.code} 
           language={resolvedLang} 
           showLineNumbers
-          className="h-full rounded-none border-0 bg-[#121212] flex flex-col min-h-0"
+          className="h-full rounded-none border-0 bg-bg-canvas-main flex flex-col min-h-0"
         >
-          <CodeBlockHeader className="h-9 bg-[#1a1a1a] border-b border-white/5 px-4 shrink-0 flex items-center">
-            <div className="flex items-center gap-1.5 text-[11px] text-white/40 font-mono">
+          <CodeBlockHeader className="h-9 bg-bg-surface-panel border-b border-border-divider-subtle px-4 shrink-0 flex items-center">
+            <div className="flex items-center gap-1.5 text-[11px] text-text-content-secondary/40 font-mono">
               <span>client</span>
               <span>/</span>
               <span>src</span>
               <span>/</span>
             </div>
-            <CodeBlockTitle className="text-white/90 font-mono text-[11px] font-semibold">
+            <CodeBlockTitle className="text-text-content-primary font-mono text-[11px] font-semibold">
               {activeFile}
             </CodeBlockTitle>
             <CodeBlockLanguage className="ml-2.5 bg-white/5 border border-white/10 text-white/70" />
@@ -689,20 +689,20 @@ function ProjectsView() {
   };
 
   return (
-    <div className="h-full overflow-y-auto custom-scrollbar bg-[#141414] p-6">
+    <div className="h-full overflow-y-auto custom-scrollbar bg-bg-canvas-main p-6">
       <div className="max-w-4xl mx-auto">
         <div className="flex items-start justify-between gap-4 mb-5">
-          <div><h2 className="text-lg font-semibold text-white">Projetos e versões</h2><p className="text-xs text-white/45 mt-1">Registro local com histórico Git e sincronização privada.</p></div>
-          <div className="flex gap-2"><input value={newName} onChange={(event) => setNewName(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && create()} placeholder="Nome do novo projeto" className="w-44 rounded-lg bg-[#202020] border border-white/10 px-3 py-2 text-xs text-white outline-none" /><button onClick={create} className="px-3 py-2 rounded-lg bg-white text-black text-xs font-medium">Criar</button></div>
+          <div><h2 className="text-lg font-semibold text-text-content-primary">Projetos e versões</h2><p className="text-xs text-text-content-secondary mt-1">Registro local com histórico Git e sincronização privada.</p></div>
+          <div className="flex gap-2"><input value={newName} onChange={(event) => setNewName(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && create()} placeholder="Nome do novo projeto" className="w-44 rounded-lg bg-bg-surface-panel border border-border-divider-subtle px-3 py-2 text-xs text-text-content-primary outline-none" /><button onClick={create} className="px-3 py-2 rounded-lg bg-text-content-primary text-bg-canvas-main text-xs font-medium cursor-pointer">Criar</button></div>
         </div>
-        {message && <div className="mb-4 text-xs text-white/50">{message}</div>}
+        {message && <div className="mb-4 text-xs text-text-content-secondary">{message}</div>}
         <div className="grid grid-cols-[220px_1fr] gap-4">
-          <div className="space-y-2">{projects.map((project) => <button key={project.id} onClick={() => selectProject(project.id)} className={`w-full text-left rounded-lg border px-3 py-3 ${selected?.project?.id === project.id ? 'border-blue-400/50 bg-blue-400/10' : 'border-white/7 bg-[#1c1c1c] hover:border-white/15'}`}><div className="text-xs text-white truncate">{project.name}</div><div className="text-[10px] text-white/35 mt-1">{project.branch} · {project.slug}</div></button>)}</div>
-          {selected ? <div className="rounded-xl border border-white/7 bg-[#1c1c1c] p-4">
-            <div className="flex items-start justify-between gap-3"><div><div className="text-sm font-semibold text-white">{selected.project.name}</div><div className="text-[11px] text-white/35 font-mono mt-1 break-all">{selected.project.path}</div><div className="text-[11px] text-emerald-400 mt-2">HEAD {selected.status?.head?.slice(0, 12)} · {selected.status?.branch}</div></div><div className="flex gap-2"><button onClick={snapshot} className="px-2.5 py-1.5 rounded-lg bg-white/10 text-xs text-white hover:bg-white/15">Snapshot</button><button onClick={sync} className="px-2.5 py-1.5 rounded-lg bg-white text-black text-xs hover:bg-white/80">Sync GitHub</button></div></div>
-            <div className="mt-5 text-xs font-semibold text-white/70">Histórico de versões</div>
-            <div className="mt-2 space-y-2">{versions.map((version) => <div key={version.sha} className="border-l-2 border-blue-400/50 pl-3 py-1"><div className="text-xs text-white">{version.message}</div><div className="text-[10px] text-white/35 font-mono mt-1">{version.shortSha} · {version.author} · {new Date(version.date).toLocaleString('pt-BR')}</div></div>)}</div>
-            <div className="mt-6 border-t border-white/7 pt-4">
+          <div className="space-y-2">{projects.map((project) => <button key={project.id} onClick={() => selectProject(project.id)} className={`w-full text-left rounded-lg border px-3 py-3 cursor-pointer ${selected?.project?.id === project.id ? 'border-blue-400/50 bg-blue-400/10' : 'border-border-divider-subtle bg-bg-surface-panel hover:border-text-content-secondary/40'}`}><div className="text-xs text-text-content-primary truncate">{project.name}</div><div className="text-[10px] text-text-content-secondary mt-1">{project.branch} · {project.slug}</div></button>)}</div>
+          {selected ? <div className="rounded-xl border border-border-divider-subtle bg-bg-surface-panel p-4">
+            <div className="flex items-start justify-between gap-3"><div><div className="text-sm font-semibold text-text-content-primary">{selected.project.name}</div><div className="text-[11px] text-text-content-secondary font-mono mt-1 break-all">{selected.project.path}</div><div className="text-[11px] text-emerald-400 mt-2">HEAD {selected.status?.head?.slice(0, 12)} · {selected.status?.branch}</div></div><div className="flex gap-2"><button onClick={snapshot} className="px-2.5 py-1.5 rounded-lg bg-white/10 text-xs text-text-content-primary hover:bg-white/15 cursor-pointer">Snapshot</button><button onClick={sync} className="px-2.5 py-1.5 rounded-lg bg-text-content-primary text-bg-canvas-main text-xs hover:opacity-80 cursor-pointer">Sync GitHub</button></div></div>
+            <div className="mt-5 text-xs font-semibold text-text-content-primary/70">Histórico de versões</div>
+            <div className="mt-2 space-y-2">{versions.map((version) => <div key={version.sha} className="border-l-2 border-blue-400/50 pl-3 py-1"><div className="text-xs text-text-content-primary">{version.message}</div><div className="text-[10px] text-text-content-secondary font-mono mt-1">{version.shortSha} · {version.author} · {new Date(version.date).toLocaleString('pt-BR')}</div></div>)}</div>
+            <div className="mt-6 border-t border-border-divider-subtle pt-4">
               <div className="flex items-center justify-between mb-2"><div className="text-xs font-semibold text-white/70">Arquivos do projeto</div><div className="text-[10px] text-white/35">Somente arquivos fora de .git e node_modules</div></div>
               <div className="grid grid-cols-[180px_1fr] gap-3">
                 <div className="max-h-52 overflow-y-auto space-y-1">{files.filter((file) => file.type === 'file').map((file) => <button key={file.path} onClick={() => openFile(file.path)} className={`w-full text-left rounded px-2 py-1.5 text-[11px] truncate ${selectedFile === file.path ? 'bg-blue-400/15 text-blue-200' : 'text-white/50 hover:bg-white/5'}`}>{file.path}</button>)}</div>

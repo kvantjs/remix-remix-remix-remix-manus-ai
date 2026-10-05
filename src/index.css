@@ -11,12 +11,12 @@
   --font-mono: "Geist Mono", "JetBrains Mono", monospace;
   
   /* Manus AI Base Palette */
-  --color-base-black-deep: #090907;
-  --color-base-black-elevated: #121210;
-  --color-base-charcoal-light: #1D1D1B;
-  --color-base-brown-mute: #34322D;
-  --color-base-gray-medium: #9A9895;
-  --color-base-ivory-white: #F8F8F6;
+  --color-base-black-deep: #0a0a0a;
+  --color-base-black-elevated: #161616;
+  --color-base-charcoal-light: #232323;
+  --color-base-brown-mute: #404040;
+  --color-base-gray-medium: #a1a1aa;
+  --color-base-ivory-white: #ffffff;
 
   /* Semantic Mappings */
   --color-bg-canvas-main: var(--color-base-black-deep);
@@ -28,6 +28,37 @@
   --color-border-control-active: var(--color-base-brown-mute);
   --color-interactive-cta-bg: var(--color-base-ivory-white);
   --color-interactive-accent: var(--color-base-brown-mute);
+  /* Theme variables for ThinkingState & ToolChips & ApprovalCard */
+  --color-ink: #f4f4f5;
+  --color-ink-2: #a1a1aa;
+  --color-ink-3: #71717a;
+  --color-line: #27272a;
+  --color-line-strong: #3f3f46;
+  --color-hover: rgba(255, 255, 255, 0.06);
+  --color-hover-2: rgba(255, 255, 255, 0.1);
+  --color-field: #18181b;
+  --color-surface: #18181b;
+  --color-inset: #09090b;
+  --color-canvas: #0a0a0a;
+  --ink: #f4f4f5;
+  --ink-2: #a1a1aa;
+  --ink-3: #71717a;
+  --line: #27272a;
+  --line-strong: #3f3f46;
+  --hover: rgba(255, 255, 255, 0.06);
+  --hover-2: rgba(255, 255, 255, 0.1);
+  --field: #18181b;
+  --surface: #18181b;
+  --inset: #09090b;
+  --canvas: #0a0a0a;
+  --orange: #f97316;
+  --green: #22c55e;
+  --red: #ef4444;
+  --accent: #3b82f6;
+  --accent-ink: #60a5fa;
+  --accent-tint: rgba(59, 130, 246, 0.15);
+  --green-tint: rgba(34, 197, 94, 0.12);
+  --red-tint: rgba(239, 68, 68, 0.12);
 }
 
 :root {
@@ -75,16 +106,33 @@
   --invert-foreground: var(--color-zinc-50);
 
   /* Application Specific Variables */
-  --app-bg: #090907;
-  --sidebar-bg: #121210;
-  --panel-border: #1D1D1B;
-  --chat-bubble-user-text: #F8F8F6;
-  --chat-input-bg: #121210;
-  --chat-input-border-focus: #34322D;
-  --chat-timestamp: #9A9895;
-  --btn-primary-bg: #F8F8F6;
-  --btn-primary-text: #090907;
-  --btn-icon-hover: #1D1D1B;
+  --app-bg: #0a0a0a;
+  --sidebar-bg: #161616;
+  --panel-border: #232323;
+  --chat-bubble-user-text: #ffffff;
+  --chat-input-bg: #161616;
+  --chat-input-border-focus: #404040;
+  --chat-timestamp: #a1a1aa;
+  --btn-primary-bg: #ffffff;
+  --btn-primary-text: #0a0a0a;
+  --btn-icon-hover: #232323;
+  /* ThinkingState and ToolChips Root CSS Variables */
+  --ink: #f4f4f5;
+  --ink-2: #a1a1aa;
+  --ink-3: #71717a;
+  --line: #27272a;
+  --line-strong: #3f3f46;
+  --hover: rgba(255, 255, 255, 0.06);
+  --hover-2: rgba(255, 255, 255, 0.1);
+  --field: #18181b;
+  --surface: #18181b;
+  --inset: #09090b;
+  --orange: #f97316;
+  --green: #22c55e;
+  --red: #ef4444;
+  --accent: #3b82f6;
+  --green-tint: rgba(34, 197, 94, 0.12);
+  --red-tint: rgba(239, 68, 68, 0.12);
 }
 
 body {
@@ -177,37 +225,37 @@ body {
 }
 
 .dark {
-  --background: #090907;
-  --foreground: #F8F8F6;
-  --card: #121210;
-  --card-foreground: #F8F8F6;
-  --popover: #121210;
-  --popover-foreground: #F8F8F6;
-  --primary: #F8F8F6;
-  --primary-foreground: #090907;
-  --secondary: #1D1D1B;
-  --secondary-foreground: #F8F8F6;
-  --muted: #1D1D1B;
-  --muted-foreground: #9A9895;
-  --accent: #1D1D1B;
-  --accent-foreground: #F8F8F6;
+  --background: #0a0a0a;
+  --foreground: #ffffff;
+  --card: #161616;
+  --card-foreground: #ffffff;
+  --popover: #161616;
+  --popover-foreground: #ffffff;
+  --primary: #ffffff;
+  --primary-foreground: #0a0a0a;
+  --secondary: #232323;
+  --secondary-foreground: #ffffff;
+  --muted: #232323;
+  --muted-foreground: #a1a1aa;
+  --accent: #232323;
+  --accent-foreground: #ffffff;
   --destructive: oklch(0.704 0.191 22.216);
-  --border: #1D1D1B;
-  --input: #1D1D1B;
-  --ring: #34322D;
+  --border: #232323;
+  --input: #232323;
+  --ring: #404040;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --sidebar: #121210;
-  --sidebar-foreground: #F8F8F6;
-  --sidebar-primary: #F8F8F6;
-  --sidebar-primary-foreground: #090907;
-  --sidebar-accent: #1D1D1B;
-  --sidebar-accent-foreground: #F8F8F6;
-  --sidebar-border: #1D1D1B;
-  --sidebar-ring: #34322D;
+  --sidebar: #161616;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #ffffff;
+  --sidebar-primary-foreground: #0a0a0a;
+  --sidebar-accent: #232323;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #232323;
+  --sidebar-ring: #404040;
   --destructive-foreground: var(--color-red-600);
   --success: var(--color-emerald-500);
   --success-foreground: var(--color-emerald-600);
@@ -217,6 +265,116 @@ body {
   --warning-foreground: var(--color-yellow-600);
   --invert: var(--color-zinc-700);
   --invert-foreground: var(--color-zinc-50);
+
+  /* ThinkingState and StreamingText Variables */
+  --ink: #ffffff;
+  --ink-2: #a1a1aa;
+  --ink-3: #52525b;
+  --line: #232323;
+  --line-strong: #3f3f46;
+  --canvas: #0a0a0a;
+  --hover: #232323;
+  --hover-2: #161616;
+
+  /* Application Specific Variables */
+  --app-bg: #0a0a0a;
+  --sidebar-bg: #161616;
+  --panel-border: #232323;
+  --chat-bubble-user-text: #ffffff;
+  --chat-input-bg: #161616;
+  --chat-input-border-focus: #404040;
+  --chat-timestamp: #a1a1aa;
+  --btn-primary-bg: #ffffff;
+  --btn-primary-text: #0a0a0a;
+  --btn-icon-hover: #232323;
+
+  /* Semantic Mappings */
+  --color-bg-canvas-main: #0a0a0a;
+  --color-bg-surface-panel: #161616;
+  --color-bg-action-hover: #232323;
+  --color-text-content-primary: #ffffff;
+  --color-text-content-secondary: #a1a1aa;
+  --color-border-divider-subtle: #232323;
+  --color-border-control-active: #404040;
+  --color-interactive-cta-bg: #ffffff;
+  --color-interactive-accent: #404040;
+}
+
+.light {
+  color-scheme: light;
+  --background: #FAF9F6;
+  --foreground: #1A1A18;
+  --card: #F4F3F0;
+  --card-foreground: #1A1A18;
+  --popover: #F4F3F0;
+  --popover-foreground: #1A1A18;
+  --primary: #1A1A18;
+  --primary-foreground: #FAF9F6;
+  --secondary: #EAE9E5;
+  --secondary-foreground: #1A1A18;
+  --muted: #EAE9E5;
+  --muted-foreground: #7A7875;
+  --accent: #EAE9E5;
+  --accent-foreground: #1A1A18;
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: #EAE9E5;
+  --input: #EAE9E5;
+  --ring: #C0BDB8;
+  --chart-1: oklch(0.439 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.87 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: #F4F3F0;
+  --sidebar-foreground: #1A1A18;
+  --sidebar-primary: #1A1A18;
+  --sidebar-primary-foreground: #FAF9F6;
+  --sidebar-accent: #EAE9E5;
+  --sidebar-accent-foreground: #1A1A18;
+  --sidebar-border: #EAE9E5;
+  --sidebar-ring: #C0BDB8;
+  --destructive-foreground: var(--color-red-600);
+  --success: var(--color-emerald-600);
+  --success-foreground: var(--color-emerald-100);
+  --info: var(--color-violet-600);
+  --info-foreground: var(--color-violet-100);
+  --warning: var(--color-yellow-600);
+  --warning-foreground: var(--color-yellow-100);
+  --invert: var(--color-zinc-100);
+  --invert-foreground: var(--color-zinc-900);
+
+  /* Application Specific Variables */
+  --app-bg: #FAF9F6;
+  --sidebar-bg: #F4F3F0;
+  --panel-border: #EAE9E5;
+  --chat-bubble-user-text: #1A1A18;
+  --chat-input-bg: #F4F3F0;
+  --chat-input-border-focus: #C0BDB8;
+  --chat-timestamp: #7A7875;
+  --btn-primary-bg: #1A1A18;
+  --btn-primary-text: #FAF9F6;
+  --btn-icon-hover: #EAE9E5;
+
+  /* ThinkingState and StreamingText Variables */
+  --ink: #1A1A18;
+  --ink-2: #7A7875;
+  --ink-3: #C0BDB8;
+  --line: #EAE9E5;
+  --line-strong: #E5E4E0;
+  --canvas: #FAF9F6;
+  --hover: #EAE9E5;
+  --hover-2: #F4F3F0;
+
+  /* Semantic Mappings */
+  --color-bg-canvas-main: #FAF9F6;
+  --color-bg-surface-panel: #F4F3F0;
+  --color-bg-action-hover: #EAE9E5;
+  --color-text-content-primary: #1A1A18;
+  --color-text-content-secondary: #7A7875;
+  --color-border-divider-subtle: #EAE9E5;
+  --color-border-control-active: #C0BDB8;
+  --color-interactive-cta-bg: #1A1A18;
+  --color-interactive-accent: #EAE9E5;
 }
 
 @layer base {
@@ -281,6 +439,47 @@ body {
   to { transform: rotate(360deg); }
 }
 
+@keyframes shimmer-text {
+  0% { background-position: 180% 0; }
+  100% { background-position: -20% 0; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes eq-bounce {
+  0%, 100% { transform: scaleY(0.25); }
+  50% { transform: scaleY(1); }
+}
+
+.shadow-raised {
+  box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.5), 0 6px 16px -2px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.shadow-card {
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.35), 0 2px 6px -1px rgba(0, 0, 0, 0.2);
+}
+
+.shadow-hairline {
+  box-shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.rounded-chip {
+  border-radius: 6px;
+}
+
 .execution-spark { animation: execution-spark 1.8s ease-in-out infinite; }
 .execution-dot { animation: execution-dot 1.7s ease-in-out infinite; }
 .execution-sheen { position: relative; }
@@ -304,6 +503,24 @@ body {
 
 .thinking-spinner { animation: thinking-spin 700ms linear infinite; }
 
+.rounded-card { border-radius: 14px; }
+.rounded-control { border-radius: 8px; }
+.primitive-card-pad { padding: 14px 16px 12px; }
+.primitive-card-footer { padding: 10px 14px; border-top: 1px solid var(--line); background-color: rgba(9, 9, 11, 0.4); }
+.primitive-icon-button { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; cursor: pointer; }
+.shadow-btn { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2); }
+.bg-surface { background-color: var(--surface, #18181b); }
+.border-line { border-color: var(--line, #27272a); }
+.border-line-strong { border-color: var(--line-strong, #3f3f46); }
+.text-ink { color: var(--ink, #f4f4f5); }
+.text-ink-2 { color: var(--ink-2, #a1a1aa); }
+.text-ink-3 { color: var(--ink-3, #71717a); }
+.bg-hover { background-color: var(--hover, rgba(255, 255, 255, 0.06)); }
+.bg-field { background-color: var(--field, #18181b); }
+.bg-inset { background-color: var(--inset, #09090b); }
+.text-canvas { color: var(--canvas, #0a0a0a); }
+.bg-canvas { background-color: var(--canvas, #0a0a0a); }
+
 @media (prefers-reduced-motion: reduce) {
   .execution-spark,
   .execution-dot,
@@ -311,3 +528,129 @@ body {
   .thinking-shimmer,
   .thinking-spinner { animation: none; }
 }
+
+/* User Focused Element Style Rules */
+.dark div#root:nth-of-type(1) > div:nth-of-type(1) > aside:nth-of-type(1) > div:nth-of-type(1) {
+  background-color: #202020;
+}
+.dark div#root:nth-of-type(1) > div:nth-of-type(1) > aside:nth-of-type(1) > nav:nth-of-type(1) {
+  background-color: #202020;
+}
+.dark div#root:nth-of-type(1) > div:nth-of-type(1) > aside:nth-of-type(1) > div:nth-of-type(2) {
+  background-color: #222222;
+}
+.dark div#root:nth-of-type(1) > div:nth-of-type(1) > aside:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) {
+  background-color: #272727;
+}
+.dark div#root:nth-of-type(1) > div:nth-of-type(1) > aside:nth-of-type(1) > nav:nth-of-type(1) > div:nth-of-type(3) > button:nth-of-type(1) {
+  background-color: #292929;
+}
+.dark div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) {
+  background-color: #171717;
+}
+.dark div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) {
+  background-color: #171717;
+}
+.dark div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) {
+  background-color: #202020;
+  padding-left: 4px;
+}
+
+/* Additional User Focused Element Style Rules */
+.dark div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > button:nth-of-type(1) {
+  background-color: #202020;
+  border-color: #323232;
+  color: #b6b6b6;
+}
+.dark div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) {
+  background-color: #202020;
+  border-color: #323232;
+  color: #c2c2c2;
+}
+.dark div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > svg:nth-of-type(1) {
+  color: #d8d8d8;
+}
+.dark div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > span:nth-of-type(1) {
+  color: #ffffff;
+}
+.dark div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(2) > div:nth-of-type(3) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > ol:nth-of-type(1) > li:nth-of-type(1) > span:nth-of-type(1),
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(2) > div:nth-of-type(3) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > ol:nth-of-type(1) > li:nth-of-type(1) > span:nth-of-type(1) {
+  background-color: #1a1a1a;
+  border-color: #464646;
+  color: #ffffff;
+}
+
+/* Light Mode Equivalent Element Style Rules */
+.light div#root:nth-of-type(1) > div:nth-of-type(1) > aside:nth-of-type(1) > div:nth-of-type(1) {
+  background-color: #FAF9F6;
+}
+.light div#root:nth-of-type(1) > div:nth-of-type(1) > aside:nth-of-type(1) > nav:nth-of-type(1) {
+  background-color: #FAF9F6;
+}
+.light div#root:nth-of-type(1) > div:nth-of-type(1) > aside:nth-of-type(1) > div:nth-of-type(2) {
+  background-color: #F4F3F0;
+}
+.light div#root:nth-of-type(1) > div:nth-of-type(1) > aside:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) {
+  background-color: #EAE9E5;
+}
+.light div#root:nth-of-type(1) > div:nth-of-type(1) > aside:nth-of-type(1) > nav:nth-of-type(1) > div:nth-of-type(3) > button:nth-of-type(1) {
+  background-color: #EAE9E5;
+}
+.light div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) {
+  background-color: #FAF9F6;
+}
+.light div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) {
+  background-color: #FAF9F6;
+}
+.light div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) {
+  background-color: #F4F3F0;
+  padding-left: 4px;
+}
+.light div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > button:nth-of-type(1) {
+  background-color: #EAE9E5;
+  border-color: #C0BDB8;
+  color: #1A1A18;
+}
+.light div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) {
+  background-color: #EAE9E5;
+  border-color: #C0BDB8;
+  color: #1A1A18;
+}
+.light div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > svg:nth-of-type(1) {
+  color: #1A1A18;
+}
+.light div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > span:nth-of-type(1) {
+  color: #1A1A18;
+}
+
+/* Hardcoded Dark Value Overrides for Light Mode */
+.light .bg-\[\#08080a\] { background-color: var(--color-bg-canvas-main) !important; }
+.light .bg-\[\#121212\] { background-color: var(--color-bg-canvas-main) !important; }
+.light .bg-\[\#141414\] { background-color: var(--color-bg-canvas-main) !important; }
+.light .bg-\[\#1c1c1c\] { background-color: var(--color-bg-surface-panel) !important; }
+.light .bg-\[\#202020\] { background-color: var(--color-bg-surface-panel) !important; }
+.light .bg-\[\#151515\] { background-color: var(--color-bg-surface-panel) !important; }
+.light .bg-\[\#181818\] { background-color: var(--color-bg-surface-panel) !important; }
+.light .bg-\[\#1a1a1a\] { background-color: var(--color-bg-surface-panel) !important; }
+.light .bg-\[\#242424\] { background-color: var(--color-bg-surface-panel) !important; }
+.light .bg-white\/8 { background-color: var(--color-bg-action-hover) !important; }
+.light .bg-white\/10 { background-color: var(--color-bg-action-hover) !important; }
+
+/* Text Overrides */
+.light .text-white { color: var(--color-text-content-primary) !important; }
+.light .text-white\/45 { color: var(--color-text-content-secondary) !important; opacity: 0.75; }
+.light .text-white\/70 { color: var(--color-text-content-primary) !important; opacity: 0.85; }
+.light .text-white\/80 { color: var(--color-text-content-primary) !important; opacity: 0.9; }
+.light .text-white\/65 { color: var(--color-text-content-secondary) !important; opacity: 0.8; }
+.light .text-white\/30 { color: var(--color-text-content-secondary) !important; opacity: 0.5; }
+.light .text-white\/10 { color: var(--color-border-divider-subtle) !important; }
+
+/* Border Overrides */
+.light .border-white\/8 { border-color: var(--color-border-divider-subtle) !important; }
+.light .border-white\/7 { border-color: var(--color-border-divider-subtle) !important; }
+.light .border-white\/5 { border-color: var(--color-border-divider-subtle) !important; }
+.light .border-white\/10 { border-color: var(--color-border-divider-subtle) !important; }
+.light .border-white\/15 { border-color: var(--color-border-divider-subtle) !important; }
+.light .border-\[\#333333\] { border-color: var(--color-border-divider-subtle) !important; }
+
+

@@ -48,6 +48,20 @@ export interface AgentResponsePayload {
   response: string;
   suggestions: string[];
   clarifications?: string[];
+  questionnaire?: {
+    title?: string;
+    description?: string;
+    questions?: Array<{
+      name: string;
+      title: string;
+      description: string;
+      choices: Array<{
+        value: string;
+        label: string;
+        hint: string;
+      }>;
+    }>;
+  };
   files?: Array<{
     path: string;
     code: string;

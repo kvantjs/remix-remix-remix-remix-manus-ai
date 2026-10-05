@@ -1,22 +1,22 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
-  Search, 
+  MagnifyingGlass as Search, 
   Pause, 
   Play, 
-  Server, 
-  Trash2, 
+  HardDrives as Server, 
+  Trash as Trash2, 
   SlidersHorizontal, 
-  AlertTriangle, 
+  Warning as AlertTriangle, 
   Info, 
   X,
-  Sparkles,
+  Sparkle as Sparkles,
   Terminal,
-  Activity,
+  Pulse as Activity,
   Download,
-  Filter,
+  Funnel as Filter,
   Check,
-  ChevronDown
-} from 'lucide-react';
+  CaretDown as ChevronDown
+} from '@phosphor-icons/react';
 
 type Severity = 'debug' | 'info' | 'warn' | 'error';
 

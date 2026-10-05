@@ -9,6 +9,7 @@ import {
   Code
 } from '@phosphor-icons/react';
 import { DynamicRuntimeRunner } from './DynamicRuntimeRunner';
+import { Favicon } from '@/lib/favicon';
 
 interface RuntimePreviewProps {
   activeCode?: string;
@@ -73,7 +74,7 @@ export function RuntimePreview({ activeCode, onSendPrompt }: RuntimePreviewProps
         {/* Center: Browser Address Bar */}
         <div className="flex-1 max-w-md mx-auto">
           <div className="bg-[#1a1a1a] border border-white/5 rounded-lg px-2.5 py-1 flex items-center gap-2 text-xs text-white/50 focus-within:border-white/20 transition-all">
-            <Globe size={12} className="text-white/30 shrink-0" />
+            <Favicon urlOrDomain={inputUrl} size={12} fallbackIcon={<Globe size={12} className="text-white/30 shrink-0" />} />
             <span className="text-white/70 font-mono text-[11px] truncate flex-1">{inputUrl}</span>
             <span className="text-[9px] bg-green-500/10 text-green-400 border border-green-500/20 px-1.5 py-0.2 rounded font-mono shrink-0 flex items-center gap-1">
               <span className="size-1.5 rounded-full bg-green-500 animate-pulse" />
