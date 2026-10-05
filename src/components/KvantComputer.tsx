@@ -8,7 +8,9 @@ import {
   RotateCw, 
   Lock, 
   Loader2,
-  Globe
+  Globe,
+  Hand,
+  Unlock
 } from 'lucide-react';
 import { ToolCallTrace } from '../types/project';
 import { DynamicRuntimeRunner } from './DynamicRuntimeRunner';
@@ -225,6 +227,7 @@ export function KvantComputer({
 
   // Exclusive agent mode notification when user tries to click the remote desktop
   const [showObserverNotice, setShowObserverNotice] = useState<boolean>(false);
+  const [userControlMode, setUserControlMode] = useState<boolean>(false);
   const noticeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const chromiumWindowRef = useRef<HTMLDivElement>(null);
@@ -287,6 +290,7 @@ export function KvantComputer({
 
   // Agent live action animation on the browser
   const runAgentLiveActionAnimation = (actionType: 'navigate' | 'click' | 'scroll' | 'type', targetVal: string) => {
+    if (userControlMode) return targetVal;
     clearAllAnimationTimers();
     setIsLoading(true);
 
@@ -566,6 +570,21 @@ export function KvantComputer({
     }
   };
 
+  const toggleUserControl = () => {
+    setUserControlMode((current) => {
+      const next = !current;
+      setShowObserverNotice(false);
+      setLiveScreenshot(null);
+      setIframeLoaded(false);
+      setAgentCursor((cursor) => ({
+        ...cursor,
+        visible: !next,
+        status: next ? 'Controle do usuário' : 'Agente no controle'
+      }));
+      return next;
+    });
+  };
+
   const proxySrc = `/api/browser/proxy?url=${encodeURIComponent(currentUrl)}`;
 
   return (
@@ -584,9 +603,18 @@ export function KvantComputer({
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-mono">
-            <Lock size={10} className="text-emerald-400" />
-            <span>Controle Exclusivo do Agente</span>
+          <button
+            type="button"
+            onClick={toggleUserControl}
+            className={`flex items-center gap-1.5 rounded px-2 py-1 text-[10px] font-mono transition-colors ${userControlMode ? 'border border-amber-400/30 bg-amber-400/10 text-amber-300 hover:bg-amber-400/15' : 'border border-cyan-400/25 bg-cyan-400/10 text-cyan-300 hover:bg-cyan-400/15'}`}
+            title={userControlMode ? 'Devolver o controle ao agente' : 'Assumir o controle do navegador'}
+          >
+            {userControlMode ? <Unlock size={10} /> : <Hand size={10} />}
+            <span>{userControlMode ? 'Retomar controle do agente' : 'Assumir controle'}</span>
+          </button>
+          <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded border text-[10px] font-mono ${userControlMode ? 'bg-amber-500/10 border-amber-500/20 text-amber-300' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'}`}>
+            <Lock size={10} className={userControlMode ? 'text-amber-300' : 'text-emerald-400'} />
+            <span>{userControlMode ? 'Controle manual ativo' : 'Controle exclusivo do agente'}</span>
           </div>
         </div>
       </div>
@@ -661,7 +689,7 @@ export function KvantComputer({
 
         {/* BROWSER WEBPAGE VIEWPORT: 100% COMPLETE SITE */}
         <div 
-          onClick={handleUserAttemptClick}
+          onClick={userControlMode ? undefined : handleUserAttemptClick}
           className="relative flex-1 bg-white overflow-hidden flex flex-col min-h-0 cursor-not-allowed select-none"
         >
           {isLoading && (
@@ -676,7 +704,7 @@ export function KvantComputer({
                   <img
                     src={liveScreenshot}
                     alt={`Captura ao vivo de ${pageTitle || currentUrl}`}
-                    className="h-full w-full object-contain pointer-events-none"
+                    className={`h-full w-full object-contain ${userControlMode ? 'pointer-events-none' : 'pointer-events-none'}`}
                     onError={() => setLiveScreenshot(null)}
                   />
                   <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full border border-black/10 bg-white/85 px-2 py-1 text-[9px] font-medium text-slate-700 shadow-sm backdrop-blur-sm">
@@ -690,7 +718,7 @@ export function KvantComputer({
                     ref={iframeRef}
                     src={proxySrc}
                     title="Computador na Nuvem"
-                    className="w-full h-full border-0 absolute inset-0 bg-white pointer-events-none"
+                    className={`w-full h-full border-0 absolute inset-0 bg-white ${userControlMode ? 'pointer-events-auto' : 'pointer-events-none'}`}
                     sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
                     onLoad={() => {
                       setIframeLoaded(true);
@@ -713,13 +741,13 @@ export function KvantComputer({
               )}
             </div>
           ) : (
-            <div className="w-full h-full flex-1 relative overflow-auto bg-[#090907] text-[#f8f8f6] pointer-events-none">
+              <div className={`w-full h-full flex-1 relative overflow-auto bg-[#090907] text-[#f8f8f6] ${userControlMode ? 'pointer-events-auto' : 'pointer-events-none'}`}>
               <DynamicRuntimeRunner code={customCode} />
             </div>
           )}
 
           {/* Observer Mode / Exclusive Agent Notice (Appears if user clicks into screen) */}
-          {showObserverNotice && (
+          {showObserverNotice && !userControlMode && (
             <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center p-4 z-40 animate-in fade-in duration-200">
               <div className="bg-[#18181b] border border-cyan-500/30 rounded-xl p-4 max-w-sm w-full shadow-2xl text-center space-y-2.5 animate-in zoom-in-95">
                 <div className="size-10 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center mx-auto">
@@ -739,6 +767,13 @@ export function KvantComputer({
                   Entendido
                 </button>
               </div>
+            </div>
+          )}
+
+          {userControlMode && (
+            <div className="absolute left-3 bottom-3 z-40 flex items-center gap-2 rounded-full border border-amber-400/30 bg-[#17130c]/90 px-3 py-1.5 text-[10px] text-amber-200 shadow-xl backdrop-blur-md">
+              <Hand size={12} />
+              <span>Você está no controle · clique e navegue normalmente</span>
             </div>
           )}
         </div>

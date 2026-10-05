@@ -1043,7 +1043,7 @@ function ThinkingState({ elapsedSeconds, step, steps }: { elapsedSeconds: number
           </span>
         </div>
       </div>
-      <div data-component="thinking-state" className="pl-8">
+      <div className="pl-8 bg-transparent">
         <ExecutionTimeline steps={steps} activeStep={step} elapsedSeconds={elapsedSeconds} />
       </div>
     </div>
