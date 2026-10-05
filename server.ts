@@ -18,6 +18,7 @@ import { databaseAvailable, ensureDatabaseSchema, query } from './src/server/dat
 import { beginOAuth, clearSession, finishOAuth, getAuthenticatedUser, getCookie, getScheduledClaims, resolveScheduledIdentity } from './src/server/auth.js';
 import { createDownloadUrl, createUpload, listObjects, softDeleteObject } from './src/server/storage.js';
 import { createProject, createSnapshot, deleteProjectFile, diffProjectFile, getProject, listProjectFiles, listProjects, projectStatus, projectVersions, readProjectFile, restoreProjectFiles, syncProjectToGitHub, writeProjectFile } from './src/server/projects.js';
+import { buildIntentInstruction, classifyAgentIntent, conversationFallback, filterToolDeclarations, isToolAllowed, type AgentIntent } from './src/server/intent-router.js';
 
 const execAsync = promisify(exec);
 
@@ -400,6 +401,13 @@ AS 7 LEIS INVIOLÁVEIS DO AGENTE DE CRIAÇÃO:
   * "computer.fs": Lê, lista, cria e edita arquivos e pastas no workspace.
   * "computer.api": Realiza chamadas HTTP/REST reais a qualquer endpoint externo.
 - Registre cada operação de computador no array "toolCalls" com dados reais, permitindo ao usuário auditar e acompanhar no painel do Computador.
+
+10. ROTEAMENTO RIGOROSO DE INTENÇÃO E FRONTEIRAS DE AUTORIDADE
+- Antes de responder ou agir, diferencie explicitamente: CONVERSATION (resposta natural sem ferramentas), WEB_RESEARCH (pesquisa e leitura web), CLOUD_COMPUTER (terminal, navegador e filesystem), APP_CREATION (criação/modificação de aplicações e sites), EXPLICIT_TOOL_CALL (ferramenta nomeada pelo usuário) e PROJECT_OPERATION (arquivos, versões, snapshots e GitHub).
+- Uma pergunta, explicação, saudação ou pedido de opinião NÃO autoriza navegador, terminal, filesystem, edição de código ou chamada MCP.
+- Não transforme uma pergunta sobre o computador em uma alteração no computador; não transforme uma pergunta sobre criar um site em uma navegação; não transforme uma conversa em execução.
+- Em cada turno, use somente as ferramentas permitidas pelo modo classificado. Se houver ambiguidade ou mudança de modo, peça esclarecimento antes de agir.
+- Nunca alegue ação, navegação, arquivo, chamada de ferramenta, fonte ou resultado que não tenha sido realmente executado e registrado.
 
 ESTRUTURA JSON OBRIGATÓRIA:
 {
@@ -2953,9 +2961,12 @@ async function runRealTool(toolName: string, args: Record<string, any>): Promise
 
 // 6. Direct Endpoint to Execute Tools on Demand
 app.post('/api/agent/tool/execute', async (req, res) => {
-  const { toolName, arguments: args } = req.body;
+  const { toolName, arguments: args, intentMessage } = req.body;
   if (!toolName) {
     return res.status(400).json({ error: 'toolName é obrigatório' });
+  }
+  if (!intentMessage || !isToolAllowed(classifyAgentIntent(String(intentMessage)), String(toolName))) {
+    return res.status(403).json({ error: 'A chamada foi bloqueada: forneça uma intenção explícita compatível com a ferramenta solicitada.' });
   }
   const trace = await runRealTool(toolName, args || {});
   return res.json({ toolCall: trace });
@@ -3648,12 +3659,18 @@ function planRealAgentActions(message: string): Array<{ toolName: string; args: 
   return plan;
 }
 
+app.get('/api/agent/intent', (req, res) => {
+  const message = typeof req.query.message === 'string' ? req.query.message : '';
+  return res.json(classifyAgentIntent(message));
+});
+
 // 7. Streaming Agent Chat Endpoint (Server-Sent Events) with Real Function Calling
 app.post('/api/agent/chat/stream', async (req, res) => {
   const { message, history, currentFiles } = req.body;
   if (!message) {
     return res.status(400).json({ error: 'Message is required' });
   }
+  const intent = classifyAgentIntent(message);
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -3703,8 +3720,8 @@ app.post('/api/agent/chat/stream', async (req, res) => {
               model: modelCandidate,
               contents: chatContents,
               config: {
-                systemInstruction: CORE_SPARK_SYSTEM_INSTRUCTION + '\n\nDIRETIVA OBRIGATÓRIA DE ACESSO WEB: Você é um agente com um Computador na Nuvem completo. Quando o usuário solicitar uma pesquisa ou informação sobre qualquer assunto, você NÃO DEVE apenas pesquisar: você DEVE SEMPRE ACESSAR a página web de maior relevância usando browser_navigate e web_fetch para carregar a página real no navegador da nuvem, extrair os dados e responder citando os links e fontes reais.' + '\n\nDIRETIVA DE RESPOSTA SEM CÓDIGO NO CHAT: NUNCA responda com blocos de código grandes ou listagens de código-fonte no chat. Se o usuário estiver apenas conversando, fazendo perguntas gerais, ou solicitando navegação na web/pesquisas, responda estritamente em linguagem natural direta e amigável. Só produza códigos se for explicitamente solicitado para criar ou modificar uma aplicação/arquivo.',
-                tools: [{ functionDeclarations: AGENT_TOOL_DECLARATIONS as any }]
+                systemInstruction: CORE_SPARK_SYSTEM_INSTRUCTION + buildIntentInstruction(intent) + '\n\nDIRETIVA DE RESPOSTA SEM CÓDIGO NO CHAT: NUNCA responda com blocos de código grandes ou listagens de código-fonte no chat. Só produza códigos se a intenção APP_CREATION estiver ativa.',
+                tools: intent.allowedTools.length ? [{ functionDeclarations: filterToolDeclarations(intent, AGENT_TOOL_DECLARATIONS) as any }] : undefined
               }
             });
 
@@ -3743,6 +3760,13 @@ app.post('/api/agent/chat/stream', async (req, res) => {
         for (const call of functionCalls) {
           const toolName = call.name;
           const args = call.args || {};
+
+          if (!isToolAllowed(intent, toolName)) {
+            const blocked = { error: `A ferramenta ${toolName} não está autorizada no modo ${intent.mode}.` };
+            sendEvent('tool_finish', { toolCall: { id: `blocked_${Date.now()}`, toolName, arguments: args, result: JSON.stringify(blocked), timestamp: new Date().toLocaleTimeString(), status: 'error' } });
+            responseParts.push({ functionResponse: { name: toolName, response: blocked } });
+            continue;
+          }
 
           sendEvent('tool_start', {
             toolName,
@@ -3805,7 +3829,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
         }
       }
 
-      const finalResult = {
+      const finalResult: any = {
         thought: `Agente completou raciocínio com ${executedToolCalls.length} execuções de ferramentas reais.`,
         explanation: modelTextResponse || (pendingApproval ? 'Aguardando sua autorização para prosseguir com a operação.' : 'Tarefa concluída com sucesso no Computador na Nuvem.'),
         files: [],
@@ -3814,12 +3838,13 @@ app.post('/api/agent/chat/stream', async (req, res) => {
         approval: pendingApproval
       };
 
+      finalResult.intent = intent;
       sendEvent('complete', finalResult);
       return res.end();
     }
 
     // 2. Local Fallback Execution when API key is unconfigured or unavailable
-    const plannedActions = planRealAgentActions(message);
+    const plannedActions = intent.mode === 'conversation' ? [] : planRealAgentActions(message);
     for (const action of plannedActions) {
       sendEvent('tool_start', {
         toolName: action.toolName,
@@ -3879,10 +3904,12 @@ app.post('/api/agent/chat/stream', async (req, res) => {
       await new Promise(r => setTimeout(r, 500));
     }
 
-    const isCodeAction = /crie um app|crie uma aplicação|faça um dashboard|escreva o código/i.test(message);
+    const isCodeAction = intent.mode === 'app_creation';
     let finalResult: any;
 
-    if (isCodeAction) {
+    if (intent.mode === 'conversation') {
+      finalResult = { thought: 'Modo conversa: nenhuma ferramenta foi autorizada.', explanation: conversationFallback(), files: [], sources: [], toolCalls: [] };
+    } else if (isCodeAction) {
       finalResult = generateAutonomousRuleEnforcedFallback(message, history, currentFiles);
       finalResult.toolCalls = executedToolCalls;
     } else {
@@ -3899,6 +3926,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
       };
     }
 
+    finalResult.intent = intent;
     sendEvent('complete', finalResult);
     res.end();
   } catch (err: any) {
@@ -3914,6 +3942,7 @@ app.post('/api/agent/chat', async (req, res) => {
   if (!message) {
     return res.status(400).json({ error: 'Message is required' });
   }
+  const intent = classifyAgentIntent(message);
 
   const currentAppCode = currentFiles?.['client/src/App.tsx'] || 
     currentFiles?.['App.tsx'] || 
@@ -3937,7 +3966,7 @@ app.post('/api/agent/chat', async (req, res) => {
       }
     }
 
-    const isCodeAction = /crie um app|crie uma aplicação|faça um dashboard|escreva o código|código|programar|desenvolva|app\.tsx|componente|crie um componente/i.test(message);
+    const isCodeAction = intent.mode === 'app_creation';
     let userPromptWithContext = message;
     if (isCodeAction && currentAppCode && typeof currentAppCode === 'string' && currentAppCode.length > 50) {
       userPromptWithContext = `INSTRUÇÃO:\n${message}\n\nCÓDIGO ATUAL DE client/src/App.tsx:\n\`\`\`tsx\n${currentAppCode}\n\`\`\``;
@@ -3959,8 +3988,8 @@ app.post('/api/agent/chat', async (req, res) => {
             model: modelCandidate,
             contents: chatContents,
             config: {
-              systemInstruction: CORE_SPARK_SYSTEM_INSTRUCTION + '\n\nDIRETIVA OBRIGATÓRIA DE ACESSO WEB: Você é um agente com um Computador na Nuvem completo. Quando o usuário solicitar uma pesquisa ou informação sobre qualquer assunto, você NÃO DEVE apenas pesquisar: você DEVE SEMPRE ACESSAR a página web de maior relevância usando browser_navigate e web_fetch para carregar a página real no navegador da nuvem, extrair os dados e responder citando os links e fontes reais.' + '\n\nDIRETIVA DE RESPOSTA SEM CÓDIGO NO CHAT: NUNCA responda com blocos de código grandes ou listagens de código-fonte no chat. Se o usuário estiver apenas conversando, fazendo perguntas gerais, ou solicitando navegação na web/pesquisas, responda estritamente em linguagem natural direta e amigável. Só produza códigos se for explicitamente solicitado para criar ou modificar uma aplicação/arquivo.',
-              tools: [{ functionDeclarations: AGENT_TOOL_DECLARATIONS as any }]
+              systemInstruction: CORE_SPARK_SYSTEM_INSTRUCTION + buildIntentInstruction(intent) + '\n\nDIRETIVA DE RESPOSTA SEM CÓDIGO NO CHAT: NUNCA responda com blocos de código grandes ou listagens de código-fonte no chat. Só produza códigos se a intenção APP_CREATION estiver ativa.',
+              tools: intent.allowedTools.length ? [{ functionDeclarations: filterToolDeclarations(intent, AGENT_TOOL_DECLARATIONS) as any }] : undefined
             }
           });
 
@@ -3988,6 +4017,10 @@ app.post('/api/agent/chat', async (req, res) => {
           for (const call of functionCalls) {
             const toolName = call.name;
             const args = call.args || {};
+            if (!isToolAllowed(intent, toolName)) {
+              responseParts.push({ functionResponse: { name: toolName, response: { error: `A ferramenta ${toolName} não está autorizada no modo ${intent.mode}.` } } });
+              continue;
+            }
             const execResult = await agentToolExecutor.executeTool(toolName, args);
 
             const trace = {
@@ -4039,7 +4072,8 @@ app.post('/api/agent/chat', async (req, res) => {
           files: [],
           sources: webSources,
           toolCalls: executedToolCalls,
-          approval: pendingApproval
+          approval: pendingApproval,
+          intent
         });
       } catch (err: any) {
         console.warn(`[CoreSpark Engine] Candidate ${modelCandidate} error: ${err?.message}`);
@@ -4049,7 +4083,7 @@ app.post('/api/agent/chat', async (req, res) => {
 
   // 2. Autonomous rule-enforced fallback
   console.log('[CoreSpark Engine] Applying local autonomous rule-enforced engine with real tool executions.');
-  const plannedActions = planRealAgentActions(message);
+  const plannedActions = intent.mode === 'conversation' ? [] : planRealAgentActions(message);
 
   for (const action of plannedActions) {
     if (action.toolName === 'fs.writeFile') continue;
@@ -4081,10 +4115,12 @@ app.post('/api/agent/chat', async (req, res) => {
     }
   }
 
-  const isCodeAction = /crie um app|crie uma aplicação|faça um dashboard|escreva o código/i.test(message);
+  const isCodeAction = intent.mode === 'app_creation';
   let fallback: any;
 
-  if (isCodeAction) {
+  if (intent.mode === 'conversation') {
+    fallback = { thought: 'Modo conversa: nenhuma ferramenta foi autorizada.', response: conversationFallback(), files: [], sources: [], toolCalls: [] };
+  } else if (isCodeAction) {
     fallback = generateAutonomousRuleEnforcedFallback(message, history, currentFiles);
   } else {
     const lastTrace = executedToolCalls[executedToolCalls.length - 1];
@@ -4102,6 +4138,7 @@ app.post('/api/agent/chat', async (req, res) => {
 
   fallback.toolCalls = executedToolCalls;
   fallback.sources = webSources;
+  fallback.intent = intent;
   return res.json(fallback);
 });
 
