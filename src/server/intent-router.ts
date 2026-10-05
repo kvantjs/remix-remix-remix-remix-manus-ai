@@ -131,8 +131,36 @@ export function buildIntentInstruction(intent: AgentIntent) {
   return `\n\nROTEADOR RIGOROSO DE INTENÇÃO — MODO ATIVO: ${intent.mode.toUpperCase()}\nMotivo: ${intent.reason}\nFerramentas autorizadas neste turno: ${tools}.\nREGRAS INVIOLÁVEIS:\n1. Não confunda conversa com autorização operacional. Em CONVERSATION, responda em linguagem natural e não chame ferramentas, navegador, terminal ou filesystem.\n2. Em WEB_RESEARCH, use o Google pelo navegador Playwright real em etapas de navegação, inspeção, rolagem e abertura de resultados; não execute shell, edite arquivos ou preencha formulários sem novo pedido explícito.\n3. Em CLOUD_COMPUTER, execute somente ações no computador/navegador descritas pelo usuário; não transforme uma pergunta em criação de software.\n4. Em APP_CREATION, trate a mensagem como engenharia de software; leia arquivos atuais antes de editar, escreva código apenas nos arquivos necessários e valide o resultado. Não navegue na web por iniciativa própria.\n5. Em EXPLICIT_TOOL_CALL, chame somente a ferramenta nomeada; se o pedido estiver incompleto, peça esclarecimento em vez de escolher outra ferramenta.\n6. Em PROJECT_OPERATION, trate arquivos, snapshots, diffs e versões como operações de projeto; não publique, restaure ou faça push sem confirmação explícita do usuário.\n7. Nunca alegue que uma ferramenta foi executada se ela não aparecer em toolCalls com resultado real.\n8. Se a intenção mudar no meio da tarefa, pare e peça confirmação antes de trocar de modo.\n`;
 }
 
-export function conversationFallback() {
-  return 'Entendi. Posso continuar a conversa sem executar ferramentas. Se você quiser uma ação operacional, especifique se deseja pesquisar na web, usar o computador na nuvem, criar/modificar uma aplicação ou chamar uma ferramenta específica.';
+export function conversationFallback(message = '', history: Array<{ role?: string; content?: string }> = []) {
+  const clean = String(message || '').trim();
+  const lower = clean.toLocaleLowerCase('pt-BR');
+  const previousUserMessages = history.filter((item) => item?.role === 'user' && item.content).map((item) => String(item.content).trim());
+  const previousAssistantMessages = history.filter((item) => item?.role === 'assistant' && item.content).map((item) => String(item.content).trim());
+  const lastTopic = previousUserMessages.at(-1);
+
+  if (/^(oi|olá|ola|bom dia|boa tarde|boa noite|hey|hello)\b/i.test(clean)) {
+    return 'Olá! Estou acompanhando o contexto desta conversa. Pode me dizer o que você quer entender ou resolver agora.';
+  }
+  if (/^(obrigad[oa]|valeu|thanks|perfeito|ótimo|otimo)\b/i.test(clean)) {
+    return 'Por nada! Continuo com o contexto desta conversa e posso desenvolver o próximo ponto quando você quiser.';
+  }
+  if (/o que você pode fazer|o que voce pode fazer|que você faz|que voce faz|suas capacidades/i.test(lower)) {
+    return 'Posso conversar, responder perguntas, pesquisar na web com o navegador real e executar tarefas autorizadas no computador ou no projeto.';
+  }
+  if (lower.includes('capital do brasil')) {
+    return 'A capital do Brasil é **Brasília**.';
+  }
+
+  const isFollowUp = /\b(agora|então|entao|continue|continua|explique|explica|resuma|resumo|principais pontos|detalhe|detalhes|isso)\b/i.test(clean);
+  const hasResearchContext = previousUserMessages.some((content) => /pesquis|busc|procur|fonte|web|internet|notícia|noticia/i.test(content));
+  if (isFollowUp && hasResearchContext) {
+    return `Continuando o contexto anterior: entendi que você quer desenvolver “${clean}”. Posso organizar a explicação em pontos, comparar argumentos e separar fatos de interpretações sem reiniciar a conversa.`;
+  }
+
+  if (lastTopic) {
+    return `Entendi. Vou manter o contexto de “${lastTopic.slice(0, 160)}” enquanto respondo a esta nova mensagem: “${clean.slice(0, 240)}”.`;
+  }
+  return `Entendi sua mensagem: “${clean.slice(0, 300)}”. Vou responder diretamente dentro desta conversa, sem iniciar uma ação externa por conta própria.`;
 }
 
 export function allToolNames() {

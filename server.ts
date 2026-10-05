@@ -4085,7 +4085,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
     let finalResult: any;
 
     if (intent.mode === 'conversation') {
-      finalResult = { thought: 'Modo conversa: nenhuma ferramenta foi autorizada.', explanation: conversationFallback(), files: [], sources: [], toolCalls: [] };
+      finalResult = { thought: 'Modo conversa: nenhuma ferramenta foi autorizada.', explanation: conversationFallback(message, Array.isArray(history) ? history : []), files: [], sources: [], toolCalls: [] };
     } else if (isCodeAction) {
       finalResult = generateAutonomousRuleEnforcedFallback(message, history, currentFiles);
       finalResult.toolCalls = executedToolCalls;
@@ -4299,7 +4299,7 @@ app.post('/api/agent/chat', async (req, res) => {
   let fallback: any;
 
   if (intent.mode === 'conversation') {
-    fallback = { thought: 'Modo conversa: nenhuma ferramenta foi autorizada.', response: conversationFallback(), files: [], sources: [], toolCalls: [] };
+    fallback = { thought: 'Modo conversa: nenhuma ferramenta foi autorizada.', response: conversationFallback(message, Array.isArray(history) ? history : []), files: [], sources: [], toolCalls: [] };
   } else if (isCodeAction) {
     fallback = generateAutonomousRuleEnforcedFallback(message, history, currentFiles);
   } else {

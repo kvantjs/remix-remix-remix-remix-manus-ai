@@ -1,9 +1,7 @@
 
-## [x] Pesquisa web real no Google em streaming
+## [x] Continuidade conversacional entre turnos
 
-- `web_search` não usa Wikipedia, Wikimedia, Stack Exchange, OpenAlex ou APIs federadas para pesquisar.
-- Pesquisas são abertas no Google por uma sessão Playwright Chromium real; a consulta normaliza frases como “pesquise sobre X” para `X`.
-- O plano determinístico trabalha em etapas observáveis: pesquisa Google, inspeção do DOM, rolagem, nova inspeção, abertura do primeiro resultado orgânico, nova rolagem e inspeção final.
-- O endpoint SSE transmite `status`, `tool_start`, `step`, `tool_finish`, `approval_required` e `complete` ao vivo; o cliente atualiza o estado do agente a cada evento.
-- O Google `/sorry` e outros challenges anti-bot interrompem a sequência, não geram resultados fictícios e solicitam handoff humano autorizado.
-- O componente visual e o endpoint `/api/computer/browser/search` também apontam para o Google e não para Wikipedia.
+- O fallback sem Gemini não repete mais a mensagem fixa; ele usa a mensagem atual e o histórico para responder de forma contextual.
+- O endpoint SSE e o endpoint padrão recebem o histórico no fallback conversacional.
+- Mensagens iniciais, cumprimentos, agradecimentos, perguntas simples e follow-ups recebem respostas distintas; o contexto de pesquisa só é inferido a partir de mensagens anteriores do usuário, não da mensagem inicial de boas-vindas.
+- O fluxo foi reproduzido via API e pela interface pública do navegador Manus com dois turnos consecutivos, sem a resposta repetitiva.

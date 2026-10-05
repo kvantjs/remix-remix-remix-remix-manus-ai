@@ -106,7 +106,7 @@ export function ChatArea({
 Estou conectado a um **Computador na Nuvem Linux 100% real e operacional**, onde realizo ações ao vivo para atender às suas solicitações:
 
 ### O que o Computador do Agente faz em tempo real:
-1. **Navegador Web Real**: Abro o navegador para navegar em URLs reais, inspecionar APIs e extrair dados da web em tempo real. Pesquisas usam APIs públicas e não redirecionam a sessão para mecanismos de busca.
+1. **Navegador Web Real**: Abro o navegador para navegar em URLs reais, pesquisar no Google, rolar páginas, inspecionar fontes e extrair dados da web em tempo real.
 2. **Terminal Shell Bash**: Executo comandos no container Linux Ubuntu (Node.js, npm, curl, verificações de rede e processos).
 3. **Editor de Código do Workspace**: Escrevo e gravo código-fonte limpo com estados dinâmicos e sincronização com o preview.
 4. **Transmissão ao Vivo**: O computador da nuvem é operado com exclusividade pelo agente. Na aba **Computador do Agente**, você assiste à transmissão ao vivo das minhas ações em tempo real (navegações no Playwright, cliques, comandos no terminal e código gerado), sem necessidade de botões manuais.
