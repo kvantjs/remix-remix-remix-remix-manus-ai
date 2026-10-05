@@ -17,6 +17,7 @@ import { getPlatformOverview, loadPlatformConfig, savePlatformConfig } from './s
 import { databaseAvailable, ensureDatabaseSchema, query } from './src/server/database.js';
 import { beginOAuth, clearSession, finishOAuth, getAuthenticatedUser, getCookie, getScheduledClaims, resolveScheduledIdentity } from './src/server/auth.js';
 import { createDownloadUrl, createUpload, listObjects, softDeleteObject } from './src/server/storage.js';
+import { createProject, createSnapshot, getProject, listProjects, projectStatus, projectVersions, syncProjectToGitHub } from './src/server/projects.js';
 
 const execAsync = promisify(exec);
 
@@ -65,6 +66,60 @@ app.get('/api/platform/routes', async (_req, res) => {
     res.type('application/json').send(routes);
   } catch (error: any) {
     res.status(404).json({ error: redactSecrets(error?.message || String(error)) });
+  }
+});
+
+app.get('/api/projects', async (_req, res) => {
+  try {
+    res.json({ projects: await listProjects() });
+  } catch (error: any) {
+    res.status(500).json({ error: redactSecrets(error?.message || String(error)) });
+  }
+});
+
+app.post('/api/projects', async (req, res) => {
+  try {
+    const name = String(req.body?.name || '').trim();
+    if (!name) return res.status(400).json({ error: 'name é obrigatório.' });
+    res.status(201).json({ project: await createProject(name, req.body?.repoUrl ? String(req.body.repoUrl) : undefined) });
+  } catch (error: any) {
+    res.status(400).json({ error: redactSecrets(error?.message || String(error)) });
+  }
+});
+
+app.get('/api/projects/:id', async (req, res) => {
+  try {
+    const project = await getProject(req.params.id);
+    res.json({ project, status: await projectStatus(project) });
+  } catch (error: any) {
+    res.status(404).json({ error: redactSecrets(error?.message || String(error)) });
+  }
+});
+
+app.get('/api/projects/:id/versions', async (req, res) => {
+  try {
+    const project = await getProject(req.params.id);
+    res.json({ projectId: project.id, versions: await projectVersions(project, Number(req.query.limit) || 50) });
+  } catch (error: any) {
+    res.status(404).json({ error: redactSecrets(error?.message || String(error)) });
+  }
+});
+
+app.post('/api/projects/:id/snapshots', async (req, res) => {
+  try {
+    const project = await getProject(req.params.id);
+    res.json(await createSnapshot(project, String(req.body?.message || 'Snapshot do Workspace')));
+  } catch (error: any) {
+    res.status(400).json({ error: redactSecrets(error?.message || String(error)) });
+  }
+});
+
+app.post('/api/projects/:id/sync-github', async (req, res) => {
+  try {
+    const project = await getProject(req.params.id);
+    res.json(await syncProjectToGitHub(project));
+  } catch (error: any) {
+    res.status(502).json({ error: redactSecrets(error?.message || String(error)) });
   }
 });
 

@@ -102,6 +102,33 @@ export async function ensureDatabaseSchema() {
       INDEX idx_scheduled_task (task_uid)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+  await activePool.query(`
+    CREATE TABLE IF NOT EXISTS project_registry (
+      project_id VARCHAR(96) PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      slug VARCHAR(96) NOT NULL UNIQUE,
+      project_path VARCHAR(1024) NOT NULL,
+      repo_url VARCHAR(1024) NULL,
+      branch VARCHAR(255) NOT NULL DEFAULT 'main',
+      active BOOLEAN NOT NULL DEFAULT FALSE,
+      created_at DATETIME NOT NULL,
+      updated_at DATETIME NOT NULL,
+      INDEX idx_projects_active (active),
+      INDEX idx_projects_updated (updated_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+  await activePool.query(`
+    CREATE TABLE IF NOT EXISTS project_versions (
+      version_id CHAR(40) PRIMARY KEY,
+      project_id VARCHAR(96) NOT NULL,
+      short_sha CHAR(12) NOT NULL,
+      author VARCHAR(255) NOT NULL,
+      message VARCHAR(500) NOT NULL,
+      committed_at DATETIME NOT NULL,
+      UNIQUE KEY uq_project_version (project_id, version_id),
+      INDEX idx_versions_project (project_id, committed_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
 
   return { available: true, migrated: true };
 }

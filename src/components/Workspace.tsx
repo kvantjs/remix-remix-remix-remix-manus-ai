@@ -41,7 +41,7 @@ import {
 } from "@/components/reui/code-block/code-block";
 
 export type TopLevelTab = 'computer' | 'home_code' | 'website' | 'workspace' | 'terminal_tab';
-export type WorkspaceSubTab = 'preview' | 'code' | 'terminal' | 'automations' | 'settings';
+export type WorkspaceSubTab = 'preview' | 'code' | 'terminal' | 'projects' | 'automations' | 'settings';
 
 interface WorkspaceProps {
   onClose: () => void;
@@ -333,6 +333,12 @@ export function Workspace({
                 label="Execuções" 
               />
               <NavButton 
+                active={workspaceSubTab === 'projects'} 
+                onClick={() => setWorkspaceSubTab('projects')}
+                icon={<Folder size={13} />} 
+                label="Projetos" 
+              />
+              <NavButton 
                 active={workspaceSubTab === 'settings'} 
                 onClick={() => setWorkspaceSubTab('settings')}
                 icon={<Gear size={13} />} 
@@ -375,6 +381,7 @@ export function Workspace({
               <TerminalView activeCode={activeCodeContent} />
             )}
             {workspaceSubTab === 'automations' && <AutomationsView />}
+            {workspaceSubTab === 'projects' && <ProjectsView />}
             {workspaceSubTab === 'settings' && <SettingsView />}
           </div>
         </div>
@@ -564,6 +571,80 @@ function FileTreeNode({ node, level, activeFile, onFileChange }: any) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function ProjectsView() {
+  const [projects, setProjects] = useState<any[]>([]);
+  const [selected, setSelected] = useState<any>(null);
+  const [versions, setVersions] = useState<any[]>([]);
+  const [newName, setNewName] = useState('');
+  const [message, setMessage] = useState('');
+
+  const refresh = async () => {
+    const response = await fetch('/api/projects');
+    if (!response.ok) throw new Error('Não foi possível carregar os projetos.');
+    const payload = await response.json();
+    setProjects(payload.projects || []);
+    if (!selected && payload.projects?.[0]) await selectProject(payload.projects[0].id);
+  };
+
+  const selectProject = async (id: string) => {
+    const [projectResponse, versionsResponse] = await Promise.all([
+      fetch(`/api/projects/${encodeURIComponent(id)}`),
+      fetch(`/api/projects/${encodeURIComponent(id)}/versions`)
+    ]);
+    if (!projectResponse.ok || !versionsResponse.ok) throw new Error('Não foi possível carregar o projeto.');
+    const projectPayload = await projectResponse.json();
+    const versionsPayload = await versionsResponse.json();
+    setSelected(projectPayload);
+    setVersions(versionsPayload.versions || []);
+  };
+
+  useEffect(() => { refresh().catch((error) => setMessage(error?.message || 'Falha ao carregar projetos.')); }, []);
+
+  const create = async () => {
+    if (!newName.trim()) return;
+    const response = await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newName.trim() }) });
+    const payload = await response.json();
+    if (!response.ok) return setMessage(payload.error || 'Falha ao criar projeto.');
+    setNewName(''); setMessage('Projeto criado.'); await refresh(); await selectProject(payload.project.id);
+  };
+
+  const snapshot = async () => {
+    if (!selected?.project?.id) return;
+    const response = await fetch(`/api/projects/${selected.project.id}/snapshots`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: `Snapshot do Workspace — ${new Date().toLocaleString('pt-BR')}` }) });
+    const payload = await response.json();
+    setMessage(payload.created ? `Snapshot ${payload.version?.shortSha || ''} criado.` : payload.reason || payload.error || 'Nenhuma alteração.');
+    await selectProject(selected.project.id);
+  };
+
+  const sync = async () => {
+    if (!selected?.project?.id) return;
+    const response = await fetch(`/api/projects/${selected.project.id}/sync-github`, { method: 'POST' });
+    const payload = await response.json();
+    setMessage(response.ok ? 'Sincronizado com o GitHub privado.' : (payload.error || 'Falha no sync GitHub.'));
+    await selectProject(selected.project.id);
+  };
+
+  return (
+    <div className="h-full overflow-y-auto custom-scrollbar bg-[#141414] p-6">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex items-start justify-between gap-4 mb-5">
+          <div><h2 className="text-lg font-semibold text-white">Projetos e versões</h2><p className="text-xs text-white/45 mt-1">Registro local com histórico Git e sincronização privada.</p></div>
+          <div className="flex gap-2"><input value={newName} onChange={(event) => setNewName(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && create()} placeholder="Nome do novo projeto" className="w-44 rounded-lg bg-[#202020] border border-white/10 px-3 py-2 text-xs text-white outline-none" /><button onClick={create} className="px-3 py-2 rounded-lg bg-white text-black text-xs font-medium">Criar</button></div>
+        </div>
+        {message && <div className="mb-4 text-xs text-white/50">{message}</div>}
+        <div className="grid grid-cols-[220px_1fr] gap-4">
+          <div className="space-y-2">{projects.map((project) => <button key={project.id} onClick={() => selectProject(project.id)} className={`w-full text-left rounded-lg border px-3 py-3 ${selected?.project?.id === project.id ? 'border-blue-400/50 bg-blue-400/10' : 'border-white/7 bg-[#1c1c1c] hover:border-white/15'}`}><div className="text-xs text-white truncate">{project.name}</div><div className="text-[10px] text-white/35 mt-1">{project.branch} · {project.slug}</div></button>)}</div>
+          {selected ? <div className="rounded-xl border border-white/7 bg-[#1c1c1c] p-4">
+            <div className="flex items-start justify-between gap-3"><div><div className="text-sm font-semibold text-white">{selected.project.name}</div><div className="text-[11px] text-white/35 font-mono mt-1 break-all">{selected.project.path}</div><div className="text-[11px] text-emerald-400 mt-2">HEAD {selected.status?.head?.slice(0, 12)} · {selected.status?.branch}</div></div><div className="flex gap-2"><button onClick={snapshot} className="px-2.5 py-1.5 rounded-lg bg-white/10 text-xs text-white hover:bg-white/15">Snapshot</button><button onClick={sync} className="px-2.5 py-1.5 rounded-lg bg-white text-black text-xs hover:bg-white/80">Sync GitHub</button></div></div>
+            <div className="mt-5 text-xs font-semibold text-white/70">Histórico de versões</div>
+            <div className="mt-2 space-y-2">{versions.map((version) => <div key={version.sha} className="border-l-2 border-blue-400/50 pl-3 py-1"><div className="text-xs text-white">{version.message}</div><div className="text-[10px] text-white/35 font-mono mt-1">{version.shortSha} · {version.author} · {new Date(version.date).toLocaleString('pt-BR')}</div></div>)}</div>
+          </div> : <div className="rounded-xl border border-dashed border-white/10 p-8 text-center text-xs text-white/40">Selecione um projeto.</div>}
+        </div>
+      </div>
     </div>
   );
 }
