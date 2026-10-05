@@ -33,6 +33,17 @@ function slugify(value: string) {
   return slug;
 }
 
+function resolveProjectFile(project: ProjectRecord, requestedPath: string) {
+  const relativePath = String(requestedPath || '').replace(/\\/g, '/').replace(/^\/+/, '');
+  if (!relativePath || relativePath.includes('\0') || relativePath.startsWith('.git/') || relativePath === '.git' || relativePath.includes('/.git/')) {
+    throw new Error('Caminho de arquivo inválido ou protegido.');
+  }
+  const absolutePath = path.resolve(project.path, relativePath);
+  const projectRoot = path.resolve(project.path);
+  if (absolutePath !== projectRoot && !absolutePath.startsWith(`${projectRoot}${path.sep}`)) throw new Error('Caminho fora do projeto.');
+  return { relativePath, absolutePath };
+}
+
 async function git(projectPath: string, args: string[]) {
   try {
     const result = await execFileAsync('git', ['-C', projectPath, ...args], {
@@ -166,4 +177,77 @@ export async function createSnapshot(project: ProjectRecord, message: string) {
 export async function syncProjectToGitHub(project: ProjectRecord) {
   const result = await git(project.path, ['push', 'github', project.branch]);
   return { ok: true, branch: project.branch, output: `${result.stdout}${result.stderr}`.trim(), version: (await projectVersions(project, 1))[0] };
+}
+
+export async function listProjectFiles(project: ProjectRecord, requestedDirectory = '') {
+  const { absolutePath } = requestedDirectory ? resolveProjectFile(project, requestedDirectory) : { absolutePath: project.path };
+  const files: Array<{ path: string; name: string; type: 'file' | 'directory'; sizeBytes?: number }> = [];
+  async function walk(current: string) {
+    if (files.length >= 1000) return;
+    const entries = await fs.readdir(current, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.name === '.git' || entry.name === 'node_modules' || entry.name === 'dist' || entry.name === '.kvant') continue;
+      const full = path.join(current, entry.name);
+      const relative = path.relative(project.path, full).split(path.sep).join('/');
+      if (entry.isDirectory()) {
+        files.push({ path: relative, name: entry.name, type: 'directory' });
+        await walk(full);
+      } else if (entry.isFile()) {
+        const stat = await fs.stat(full);
+        files.push({ path: relative, name: entry.name, type: 'file', sizeBytes: stat.size });
+      }
+      if (files.length >= 1000) return;
+    }
+  }
+  await walk(absolutePath);
+  return files;
+}
+
+export async function readProjectFile(project: ProjectRecord, requestedPath: string) {
+  const { relativePath, absolutePath } = resolveProjectFile(project, requestedPath);
+  const stat = await fs.stat(absolutePath);
+  if (!stat.isFile()) throw new Error('O caminho informado não é um arquivo.');
+  if (stat.size > 2 * 1024 * 1024) throw new Error('Arquivo excede o limite de leitura de 2 MB.');
+  return { path: relativePath, content: await fs.readFile(absolutePath, 'utf8'), sizeBytes: stat.size, updatedAt: stat.mtime.toISOString() };
+}
+
+export async function writeProjectFile(project: ProjectRecord, requestedPath: string, content: string) {
+  const { relativePath, absolutePath } = resolveProjectFile(project, requestedPath);
+  if (Buffer.byteLength(String(content || ''), 'utf8') > 2 * 1024 * 1024) throw new Error('Arquivo excede o limite de escrita de 2 MB.');
+  await fs.mkdir(path.dirname(absolutePath), { recursive: true });
+  await fs.writeFile(absolutePath, String(content || ''), 'utf8');
+  const stat = await fs.stat(absolutePath);
+  return { path: relativePath, sizeBytes: stat.size, updatedAt: stat.mtime.toISOString() };
+}
+
+export async function deleteProjectFile(project: ProjectRecord, requestedPath: string) {
+  const { relativePath, absolutePath } = resolveProjectFile(project, requestedPath);
+  const stat = await fs.stat(absolutePath);
+  if (!stat.isFile()) throw new Error('Somente arquivos podem ser removidos por esta API.');
+  await fs.unlink(absolutePath);
+  return { deleted: true, path: relativePath };
+}
+
+function safeRevision(value: unknown, fallback: string) {
+  const revision = String(value || fallback);
+  if (!/^(HEAD|[0-9a-f]{7,40})$/.test(revision)) throw new Error('Revisão Git inválida.');
+  return revision;
+}
+
+export async function diffProjectFile(project: ProjectRecord, requestedPath: string, from?: unknown, to?: unknown) {
+  const { relativePath } = resolveProjectFile(project, requestedPath);
+  const base = safeRevision(from, 'HEAD');
+  const target = to ? safeRevision(to, 'HEAD') : '';
+  const args = target ? ['diff', '--no-ext-diff', base, target, '--', relativePath] : ['diff', '--no-ext-diff', base, '--', relativePath];
+  const result = await git(project.path, args);
+  return { path: relativePath, from: base, to: target || 'WORKTREE', diff: result.stdout };
+}
+
+export async function restoreProjectFiles(project: ProjectRecord, revision: unknown, requestedPaths: unknown, confirmed: boolean) {
+  if (!confirmed) throw new Error('A restauração exige confirm=true no corpo da requisição.');
+  const source = safeRevision(revision, 'HEAD');
+  const paths = Array.isArray(requestedPaths) ? requestedPaths.map((item) => resolveProjectFile(project, String(item)).relativePath) : [];
+  if (!paths.length) throw new Error('Informe pelo menos um arquivo para restaurar.');
+  await git(project.path, ['restore', `--source=${source}`, '--worktree', '--staged', '--', ...paths]);
+  return { restored: true, source, paths, status: await projectStatus(project) };
 }

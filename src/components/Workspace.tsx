@@ -579,6 +579,10 @@ function ProjectsView() {
   const [projects, setProjects] = useState<any[]>([]);
   const [selected, setSelected] = useState<any>(null);
   const [versions, setVersions] = useState<any[]>([]);
+  const [files, setFiles] = useState<any[]>([]);
+  const [selectedFile, setSelectedFile] = useState('');
+  const [fileContent, setFileContent] = useState('');
+  const [fileDiff, setFileDiff] = useState('');
   const [newName, setNewName] = useState('');
   const [message, setMessage] = useState('');
 
@@ -591,15 +595,21 @@ function ProjectsView() {
   };
 
   const selectProject = async (id: string) => {
-    const [projectResponse, versionsResponse] = await Promise.all([
+    const [projectResponse, versionsResponse, filesResponse] = await Promise.all([
       fetch(`/api/projects/${encodeURIComponent(id)}`),
-      fetch(`/api/projects/${encodeURIComponent(id)}/versions`)
+      fetch(`/api/projects/${encodeURIComponent(id)}/versions`),
+      fetch(`/api/projects/${encodeURIComponent(id)}/files`)
     ]);
-    if (!projectResponse.ok || !versionsResponse.ok) throw new Error('Não foi possível carregar o projeto.');
+    if (!projectResponse.ok || !versionsResponse.ok || !filesResponse.ok) throw new Error('Não foi possível carregar o projeto.');
     const projectPayload = await projectResponse.json();
     const versionsPayload = await versionsResponse.json();
+    const filesPayload = await filesResponse.json();
     setSelected(projectPayload);
     setVersions(versionsPayload.versions || []);
+    setFiles(filesPayload.files || []);
+    setSelectedFile('');
+    setFileContent('');
+    setFileDiff('');
   };
 
   useEffect(() => { refresh().catch((error) => setMessage(error?.message || 'Falha ao carregar projetos.')); }, []);
@@ -628,6 +638,28 @@ function ProjectsView() {
     await selectProject(selected.project.id);
   };
 
+  const openFile = async (filePath: string) => {
+    const response = await fetch(`/api/projects/${selected.project.id}/files/read?path=${encodeURIComponent(filePath)}`);
+    const payload = await response.json();
+    if (!response.ok) return setMessage(payload.error || 'Falha ao ler arquivo.');
+    setSelectedFile(filePath); setFileContent(payload.content || ''); setFileDiff('');
+  };
+
+  const saveFile = async () => {
+    if (!selectedFile) return;
+    const response = await fetch(`/api/projects/${selected.project.id}/files`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: selectedFile, content: fileContent }) });
+    const payload = await response.json();
+    setMessage(response.ok ? `Arquivo ${selectedFile} salvo.` : (payload.error || 'Falha ao salvar arquivo.'));
+    if (response.ok) await selectProject(selected.project.id);
+  };
+
+  const showDiff = async () => {
+    if (!selectedFile) return;
+    const response = await fetch(`/api/projects/${selected.project.id}/diff?path=${encodeURIComponent(selectedFile)}`);
+    const payload = await response.json();
+    setFileDiff(response.ok ? payload.diff || '(sem alterações)' : (payload.error || 'Falha ao gerar diff.'));
+  };
+
   return (
     <div className="h-full overflow-y-auto custom-scrollbar bg-[#141414] p-6">
       <div className="max-w-4xl mx-auto">
@@ -642,6 +674,13 @@ function ProjectsView() {
             <div className="flex items-start justify-between gap-3"><div><div className="text-sm font-semibold text-white">{selected.project.name}</div><div className="text-[11px] text-white/35 font-mono mt-1 break-all">{selected.project.path}</div><div className="text-[11px] text-emerald-400 mt-2">HEAD {selected.status?.head?.slice(0, 12)} · {selected.status?.branch}</div></div><div className="flex gap-2"><button onClick={snapshot} className="px-2.5 py-1.5 rounded-lg bg-white/10 text-xs text-white hover:bg-white/15">Snapshot</button><button onClick={sync} className="px-2.5 py-1.5 rounded-lg bg-white text-black text-xs hover:bg-white/80">Sync GitHub</button></div></div>
             <div className="mt-5 text-xs font-semibold text-white/70">Histórico de versões</div>
             <div className="mt-2 space-y-2">{versions.map((version) => <div key={version.sha} className="border-l-2 border-blue-400/50 pl-3 py-1"><div className="text-xs text-white">{version.message}</div><div className="text-[10px] text-white/35 font-mono mt-1">{version.shortSha} · {version.author} · {new Date(version.date).toLocaleString('pt-BR')}</div></div>)}</div>
+            <div className="mt-6 border-t border-white/7 pt-4">
+              <div className="flex items-center justify-between mb-2"><div className="text-xs font-semibold text-white/70">Arquivos do projeto</div><div className="text-[10px] text-white/35">Somente arquivos fora de .git e node_modules</div></div>
+              <div className="grid grid-cols-[180px_1fr] gap-3">
+                <div className="max-h-52 overflow-y-auto space-y-1">{files.filter((file) => file.type === 'file').map((file) => <button key={file.path} onClick={() => openFile(file.path)} className={`w-full text-left rounded px-2 py-1.5 text-[11px] truncate ${selectedFile === file.path ? 'bg-blue-400/15 text-blue-200' : 'text-white/50 hover:bg-white/5'}`}>{file.path}</button>)}</div>
+                <div className="min-w-0"><div className="flex items-center gap-2 mb-2"><span className="text-[11px] text-white/45 font-mono truncate flex-1">{selectedFile || 'Selecione um arquivo'}</span><button disabled={!selectedFile} onClick={showDiff} className="px-2 py-1 rounded bg-white/8 text-[10px] text-white disabled:opacity-30">Diff</button><button disabled={!selectedFile} onClick={saveFile} className="px-2 py-1 rounded bg-white text-black text-[10px] disabled:opacity-30">Salvar</button></div><textarea value={fileContent} onChange={(event) => setFileContent(event.target.value)} disabled={!selectedFile} className="w-full h-44 resize-y rounded-lg bg-[#121212] border border-white/8 p-3 text-[11px] leading-relaxed font-mono text-white/80 outline-none focus:border-blue-400/50 disabled:opacity-40" spellCheck={false} />{fileDiff && <pre className="mt-2 max-h-44 overflow-auto rounded-lg bg-[#101010] border border-white/7 p-3 text-[10px] leading-relaxed text-white/65">{fileDiff}</pre>}</div>
+              </div>
+            </div>
           </div> : <div className="rounded-xl border border-dashed border-white/10 p-8 text-center text-xs text-white/40">Selecione um projeto.</div>}
         </div>
       </div>
