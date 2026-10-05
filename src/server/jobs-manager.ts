@@ -1,4 +1,6 @@
 import { redactSecrets } from './security.js';
+import fs from 'fs';
+import path from 'path';
 
 export type JobStatus = 
   | 'queued' 
@@ -56,6 +58,44 @@ export interface AgentJob {
 
 class JobsManager {
   private jobs: Map<string, AgentJob> = new Map();
+  private readonly stateFile = path.resolve(process.cwd(), '.kvant/jobs.json');
+
+  constructor() {
+    this.restore();
+  }
+
+  private persist() {
+    try {
+      fs.mkdirSync(path.dirname(this.stateFile), { recursive: true });
+      const serializable = Array.from(this.jobs.values()).map((job) => {
+        const copy = { ...job } as Partial<AgentJob>;
+        delete copy.abortController;
+        return copy;
+      });
+      fs.writeFileSync(this.stateFile, JSON.stringify(serializable, null, 2) + '\n', 'utf8');
+    } catch (error) {
+      console.warn('[JobsManager] Não foi possível persistir os jobs:', error);
+    }
+  }
+
+  private restore() {
+    try {
+      const raw = fs.readFileSync(this.stateFile, 'utf8');
+      const saved = JSON.parse(raw) as AgentJob[];
+      for (const job of saved) {
+        if (job.status === 'queued' || job.status === 'running' || job.status === 'waiting_for_approval') {
+          job.status = 'failed';
+          job.finishedAt = new Date().toISOString();
+          job.error = 'Processo reiniciado antes da conclusão do job.';
+          job.currentStep = 'Interrompido durante a recuperação do processo';
+        }
+        job.abortController = new AbortController();
+        this.jobs.set(job.id, job);
+      }
+    } catch {
+      // Primeiro boot ou arquivo ainda inexistente.
+    }
+  }
 
   createJob(title: string, type: string, approval?: JobApprovalRequest): AgentJob {
     const id = `job_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -80,6 +120,7 @@ class JobsManager {
     };
 
     this.jobs.set(id, job);
+    this.persist();
     return this.sanitizeJob(job);
   }
 
@@ -112,6 +153,7 @@ class JobsManager {
         message: redactSecrets(logMsg)
       });
     }
+    this.persist();
   }
 
   addLog(id: string, message: string, level: 'info' | 'warn' | 'error' = 'info') {
@@ -123,6 +165,7 @@ class JobsManager {
       level,
       message: redactSecrets(message)
     });
+    this.persist();
   }
 
   addArtifact(id: string, name: string, filePath: string, sizeBytes: number, mimeType = 'text/plain'): JobArtifact {
@@ -142,6 +185,7 @@ class JobsManager {
       job.artifacts.push(artifact);
       this.addLog(id, `Artefato gerado com sucesso: ${name} (${Math.round(sizeBytes / 1024)} KB)`);
     }
+    this.persist();
     return artifact;
   }
 
@@ -158,6 +202,7 @@ class JobsManager {
     }
     job.result = result;
     this.addLog(id, `Job finalizado com êxito em ${job.durationMs ? (job.durationMs / 1000).toFixed(1) + 's' : '0s'}`);
+    this.persist();
   }
 
   failJob(id: string, error: string) {
@@ -169,6 +214,7 @@ class JobsManager {
     job.error = redactSecrets(error);
     job.currentStep = `Falha: ${job.error}`;
     this.addLog(id, `Erro na execução: ${job.error}`, 'error');
+    this.persist();
   }
 
   cancelJob(id: string, reason = 'Cancelado pelo usuário'): boolean {
@@ -186,6 +232,7 @@ class JobsManager {
       job.abortController.abort(reason);
     }
     this.addLog(id, `Job interrompido: ${reason}`, 'warn');
+    this.persist();
     return true;
   }
 
@@ -207,6 +254,7 @@ class JobsManager {
       this.addLog(id, `Ação cancelada: o usuário recusou a autorização`, 'warn');
     }
 
+    this.persist();
     return true;
   }
 
