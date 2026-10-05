@@ -452,7 +452,7 @@ AS 7 LEIS INVIOLÁVEIS DO AGENTE DE CRIAÇÃO:
 - Código 100% puro e completo TypeScript/React com Tailwind CSS, sem comentários preguiçosos ("// adicione aqui"), pronto para rodar no navegador.
 
 8. PROIBIÇÃO ABSOLUTA DE EMOJIS (USE EXCLUSIVAMENTE ÍCONES VETORIAIS)
-- PROIBIDO o uso de qualquer emoji em qualquer parte: nas respostas do chat, no raciocínio (thought), nos logs, nos botões, nos títulos ou no código da aplicação.
+- PROIBIDO o uso de qualquer emoji em qualquer parte: nas respostas do chat, no raciocínio (thought), nos logs, nos botões, nos títulos ou no código da aplica��ão.
 - NUNCA use emojis (como 💡, 🚀, 📄, 💳, ��, 🔥, ✨, etc.).
 - Toda iconografia DEVE ser feita exclusivamente com componentes vetoriais das bibliotecas '@phosphor-icons/react' ou 'lucide-react' (ou SVG puro).
 
@@ -700,7 +700,7 @@ Sintetizei todo o contexto coletado ao vivo das múltiplas páginas visitadas pa
 
 4. **Verificação de Limites de Taxa (\`https://api.github.com/rate_limit\`):**
    * **Sem autenticação (por IP)**: 60 requisições por hora.
-   * **Com autenticação (Token / PAT / OAuth)**: 5.000 requisições por hora (ou até 15.000 req/h para GitHub Enterprise).
+   * **Com autenticaç��o (Token / PAT / OAuth)**: 5.000 requisições por hora (ou até 15.000 req/h para GitHub Enterprise).
 
 Todos os passos, links e respostas coletadas podem ser acompanhados em tempo real na aba **"Computador do Kvant"** no painel de navegação do Playwright!`,
       clarifications: [],
@@ -4606,7 +4606,13 @@ async function startServer() {
         middlewareMode: true,
         // Attach Vite's HMR WebSocket to the same HTTP server used by Express.
         // Without this, the preview loads but @vite/client cannot complete its handshake.
-        hmr: { server: httpServer },
+        hmr: {
+    server: httpServer,
+    // O preview é servido por HTTPS através de um proxy; o cliente precisa
+    // abrir o WebSocket seguro na porta pública, não na porta interna 3000.
+    protocol: 'wss',
+    clientPort: 443,
+  },
       },
       appType: 'spa',
     });
