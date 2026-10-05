@@ -5,14 +5,14 @@ import {
   Check, 
   ArrowLeft, 
   ArrowRight, 
-  RotateCw, 
+  ArrowClockwise, 
   Lock, 
-  Loader2,
-  Globe,
-  Hand,
-  Unlock,
-  ShieldAlert
-} from 'lucide-react';
+  Spinner, 
+  Globe, 
+  Hand, 
+  LockOpen, 
+  ShieldWarning 
+} from '@phosphor-icons/react';
 import { ToolCallTrace } from '../types/project';
 import { DynamicRuntimeRunner } from './DynamicRuntimeRunner';
 import { Favicon, extractCleanDomain } from '@/lib/favicon';
@@ -640,7 +640,7 @@ export function KvantComputer({
             className={`flex items-center gap-1.5 rounded px-2 py-1 text-[10px] font-mono transition-colors ${userControlMode ? 'border border-amber-400/30 bg-amber-400/10 text-amber-300 hover:bg-amber-400/15' : 'border border-cyan-400/25 bg-cyan-400/10 text-cyan-300 hover:bg-cyan-400/15'}`}
             title={userControlMode ? 'Devolver o controle ao agente' : 'Assumir o controle do navegador'}
           >
-            {userControlMode ? <Unlock size={10} /> : <Hand size={10} />}
+            {userControlMode ? <LockOpen size={10} /> : <Hand size={10} />}
             <span>{userControlMode ? 'Retomar controle do agente' : 'Assumir controle'}</span>
           </button>
           <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded border text-[10px] font-mono ${userControlMode ? 'bg-amber-500/10 border-amber-500/20 text-amber-300' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'}`}>
@@ -697,7 +697,7 @@ export function KvantComputer({
               className="p-1 rounded hover:bg-bg-action-hover hover:text-text-content-primary transition-colors" 
               title="Recarregar página"
             >
-              <RotateCw size={12} strokeWidth={2} className={isLoading ? 'animate-spin text-cyan-400' : ''} />
+              <ArrowClockwise size={12} strokeWidth={2} className={isLoading ? 'animate-spin text-cyan-400' : ''} />
             </button>
           </div>
 
@@ -731,7 +731,7 @@ export function KvantComputer({
           {/* Floating CAPTCHA / Security Challenge Alert Banner */}
           {isCaptchaOrChallenge && (
             <div className="absolute top-3 left-1/2 -translate-x-1/2 z-40 bg-amber-500/95 text-slate-950 font-medium text-xs px-4 py-2 rounded-xl shadow-2xl border border-amber-300 flex items-center gap-3 backdrop-blur-md animate-in slide-in-from-top-4 duration-300">
-              <ShieldAlert size={16} className="text-slate-950 shrink-0 animate-bounce" />
+              <ShieldWarning size={16} className="text-slate-950 shrink-0 animate-bounce" />
               <span><strong>CAPTCHA / Desafio de Segurança Detectado!</strong> O navegador ao vivo está liberado para interagir.</span>
               <button
                 type="button"
@@ -974,7 +974,7 @@ export function KvantComputer({
           <div className="flex items-center gap-1.5 font-medium text-[11.5px]">
             {isWorking ? (
               <div className="flex items-center gap-1.5 text-cyan-400">
-                <Loader2 size={13} className="animate-spin" />
+                <Spinner size={13} className="animate-spin" />
                 <span>Agente executando ação no computador...</span>
               </div>
             ) : (

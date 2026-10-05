@@ -30,7 +30,8 @@ import {
   ShieldCheck,
   DownloadSimple,
   XCircle,
-  Faders
+  Faders,
+  Spinner
 } from '@phosphor-icons/react';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { ToolCallTrace, AgentExecutionLog } from '../types/project';
@@ -50,7 +51,7 @@ interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   isStreaming?: boolean;
-  status?: 'completed' | 'failed' | 'waiting_for_approval';
+  status?: 'completed' | 'failed' | 'waiting_for_approval' | 'in_background' | 'waiting_for_user';
   time?: string;
   workingTime?: string;
   thought?: string;
@@ -147,6 +148,22 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
     description?: string;
     questions?: QuestionnaireQuestion[];
   } | null>(null);
+  const [isQuestionnaireMinimized, setIsQuestionnaireMinimized] = useState(false);
+  const [isAgentInBackground, setIsAgentInBackground] = useState(false);
+  const [bgElapsedSeconds, setBgElapsedSeconds] = useState(0);
+
+  // Background elapsed timer
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isAgentInBackground) {
+      interval = setInterval(() => {
+        setBgElapsedSeconds(prev => prev + 1);
+      }, 1000);
+    } else {
+      setBgElapsedSeconds(0);
+    }
+    return () => clearInterval(interval);
+  }, [isAgentInBackground]);
 
   const handleStreamingDone = (messageId: string) => {
     setStreamedIds(prev => {
@@ -251,6 +268,10 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
 
   useEffect(() => {
     if (isThinkingPrev.current && !isThinking) {
+      if (isAgentInBackground) {
+        // Keep agent active in background state
+        return;
+      }
       const allToolCalls: ToolCallTrace[] = [];
       messages.forEach(m => {
         if (m.toolCalls && m.toolCalls.length > 0) {
@@ -266,7 +287,23 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
       });
     }
     isThinkingPrev.current = isThinking;
-  }, [isThinking, messages]);
+  }, [isThinking, messages, isAgentInBackground]);
+
+  const handleResumeFromBackground = (summaryText: string) => {
+    setIsAgentInBackground(false);
+    setActiveQuestionnaireModal(null);
+    setIsQuestionnaireMinimized(false);
+    setMessages(prev => prev.map(m => m.status === 'in_background' ? { ...m, status: 'completed' } : m));
+    handleSendMessage(`[Contexto Definido]: ${summaryText}`);
+  };
+
+  const handleResumeWithDefaults = () => {
+    setIsAgentInBackground(false);
+    setActiveQuestionnaireModal(null);
+    setIsQuestionnaireMinimized(false);
+    setMessages(prev => prev.map(m => m.status === 'in_background' ? { ...m, status: 'completed' } : m));
+    handleSendMessage(`[Contexto Definido]: Prossiga com a melhor arquitetura de software, padrão Fintech/SaaS, paleta escura e recursos dinâmicos autônomos.`);
+  };
 
   useEffect(() => {
     if (externalPrompt) {
@@ -459,11 +496,12 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
         });
       }
 
+      const isBg = Boolean(payload.questionnaire) || payload.status === 'in_background';
       const assistantMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         isStreaming: true,
-        status: payload.approval ? 'waiting_for_approval' : 'completed',
+        status: isBg ? 'in_background' : payload.approval ? 'waiting_for_approval' : 'completed',
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         workingTime: payload.workingTime || `${elapsedSeconds || 24}s`,
         thought: payload.thought,
@@ -474,27 +512,33 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
           {
             id: 1,
             type: 'command',
-            content: `${(payload.toolCalls || liveToolCalls).length} ferramentas reais executadas no computador da nuvem`,
+            content: isBg 
+              ? 'Agente esperando uma resposta com os parâmetros do usuário'
+              : `${(payload.toolCalls || liveToolCalls).length} ferramentas reais executadas no computador da nuvem`,
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
           }
         ],
         toolCalls: payload.toolCalls || liveToolCalls,
         content: payload.explanation || payload.response || 'Tarefa executada pelo agente.',
         suggestions: payload.suggestions || [
-          "Inspecionar ações do agente no Computador",
-          "Visualizar runtime interativo no Preview",
-          "Executar novos comandos de teste"
+          "Definir preferências no questionário",
+          "Continuar com arquitetura padrão",
+          "Inspecionar ações do agente no Computador"
         ],
         clarifications: payload.clarifications,
         questionnaire: payload.questionnaire,
-        files: generatedFilesList
-        ,executionSteps: [
+        files: generatedFilesList,
+        executionSteps: [
           ...executionStepsRef.current.map((step) => step.status === 'running' ? { ...step, status: 'complete' as const } : step),
           {
             id: `summary_${Date.now()}`,
-            label: 'Síntese final',
-            detail: payload.approval ? 'A execução foi pausada para autorização.' : 'Resultados reunidos e resposta pronta para você.',
-            status: payload.approval ? 'warning' : 'complete',
+            label: isBg ? 'Agente esperando uma resposta' : payload.approval ? 'Aguardando autorização' : 'Síntese final',
+            detail: isBg 
+              ? 'O agente está aguardando sua resposta para prosseguir a criação.'
+              : payload.approval 
+                ? 'A execução foi pausada para autorização.' 
+                : 'Resultados reunidos e resposta pronta para você.',
+            status: isBg ? 'running' : payload.approval ? 'warning' : 'complete',
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
           }
         ]
@@ -504,6 +548,32 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
 
       if (payload.questionnaire) {
         setActiveQuestionnaireModal(payload.questionnaire);
+        setIsAgentInBackground(true);
+        setIsQuestionnaireMinimized(false);
+        if (onAgentStateChange) {
+          onAgentStateChange({
+            isWorking: true,
+            statusText: '⏳ Agente esperando uma resposta',
+            contextText: 'O agente está aguardando suas definições de opções no pop-up para prosseguir a criação.',
+            toolCalls: [
+              ...liveToolCalls,
+              {
+                id: `bg_wait_${Date.now()}`,
+                toolName: 'agent.waitingForResponse',
+                server: 'kvant_engine',
+                arguments: { mode: 'waiting_for_user_response', waitReason: 'user_questionnaire_options' },
+                result: 'Aguardando resposta do usuário.',
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                status: 'running',
+                screenData: {
+                  actionDescription: 'Agente aguardando resposta do usuário para continuar a execução'
+                }
+              }
+            ]
+          });
+        }
+      } else {
+        setIsAgentInBackground(false);
       }
 
       // Trigger reactive sync with Workspace
@@ -560,10 +630,17 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
             <ArrowsOut size={18} />
           </button>
           <div className="h-4 w-px bg-white/10" />
-          <div className="flex items-center gap-2 text-blue-400 text-xs font-medium bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-md cursor-pointer hover:bg-blue-500/20 transition-colors">
-             <Lightning size={14} />
-             <span>Ativo</span>
-          </div>
+          {isAgentInBackground ? (
+            <div className="flex items-center gap-1.5 text-xs font-medium bg-[#222226] border border-[#333338] px-2.5 py-1 rounded-md">
+               <Spinner size={14} className="text-yellow-400 shrink-0" />
+               <span className="text-yellow-400">Esperando resposta</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-text-content-secondary text-xs font-medium bg-bg-action-hover border border-border-divider-subtle px-2.5 py-1 rounded-md">
+               <Lightning size={14} />
+               <span>Ativo</span>
+            </div>
+          )}
           <button title="Compartilhar" className="hover:text-[#dcdcdc] transition-colors cursor-pointer">
             <ShareNetwork size={18} />
           </button>
@@ -613,13 +690,15 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
         <div className="h-28 shrink-0" />
       </div>
 
+
+
       {/* Floating Input Section */}
       <div className="absolute bottom-5 left-1/2 -translate-x-1/2 w-full max-w-2xl px-6 z-20">
         <PromptBar 
           onSend={(text) => handleSendMessage(text)} 
           onStop={handleStop}
           isThinking={isThinking} 
-          placeholder="Mensagem para o agente manus ou digite @ para fontes e / para comandos..."
+          placeholder={isAgentInBackground ? "Agente esperando uma resposta..." : "Mensagem para o agente manus ou digite @ para fontes e / para comandos..."}
         />
         
         <p className="mt-2 text-center text-[10px] text-[#dcdcdc]/30">
@@ -627,18 +706,32 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
         </p>
       </div>
 
-      {/* Pop-up Questionnaire Modal */}
-      {activeQuestionnaireModal && (
-        <AgentContextQuestionnaire
-          title={activeQuestionnaireModal.title}
-          description={activeQuestionnaireModal.description}
-          questions={activeQuestionnaireModal.questions}
-          onClose={() => setActiveQuestionnaireModal(null)}
-          onSubmitContext={(_answers, summaryText) => {
-            setActiveQuestionnaireModal(null);
-            handleSendMessage(`[Contexto Definido]: ${summaryText}`);
-          }}
-        />
+      {/* Floating Small Pop-up Questionnaire (STRICTLY inside ChatArea, bottom-right) */}
+      {activeQuestionnaireModal && !isQuestionnaireMinimized && (
+        <div className="absolute bottom-28 right-6 z-40 max-w-84 w-[calc(100%-3rem)] sm:w-80 animate-in fade-in slide-in-from-bottom-3 duration-300 drop-shadow-2xl">
+          <AgentContextQuestionnaire
+            title={activeQuestionnaireModal.title}
+            description={activeQuestionnaireModal.description}
+            questions={activeQuestionnaireModal.questions}
+            onClose={() => setIsQuestionnaireMinimized(true)}
+            onSubmitContext={(_answers, summaryText) => {
+              handleResumeFromBackground(summaryText);
+            }}
+          />
+        </div>
+      )}
+
+      {/* Floating Minimized Badge inside ChatArea */}
+      {activeQuestionnaireModal && isQuestionnaireMinimized && (
+        <button
+          type="button"
+          onClick={() => setIsQuestionnaireMinimized(false)}
+          className="absolute bottom-28 right-6 z-40 flex items-center gap-2 px-3 py-2 rounded-xl bg-[#18181b] border border-[#27272a] text-xs font-medium shadow-2xl hover:bg-[#202024] hover:border-zinc-500 transition-all cursor-pointer group animate-in fade-in"
+        >
+          <Spinner size={14} className="text-yellow-400 shrink-0" />
+          <span className="text-yellow-400">Agente esperando uma resposta ({activeQuestionnaireModal.questions?.length || 3} perguntas)</span>
+          <span className="text-[10px] bg-white/10 text-zinc-300 px-1.5 py-0.5 rounded font-mono border border-white/10">Abrir</span>
+        </button>
       )}
     </div>
   );
@@ -947,9 +1040,9 @@ function MessageItem({
 
         {/* Compact Context Questionnaire Card (opens pop-up) */}
         {message.questionnaire && (
-          <div className="bg-[#18181b] border border-[#27272a] hover:border-blue-500/40 rounded-xl p-3.5 flex items-center justify-between transition-all shadow-sm">
+          <div className="bg-[#18181b] border border-[#27272a] hover:border-zinc-500 rounded-xl p-3.5 flex items-center justify-between transition-all shadow-sm">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="size-9 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+              <div className="size-9 rounded-lg bg-white/5 border border-white/10 text-white flex items-center justify-center shrink-0">
                 <Faders size={18} />
               </div>
               <div className="min-w-0">
@@ -957,7 +1050,7 @@ function MessageItem({
                   <span className="text-xs font-semibold text-white truncate">
                     {message.questionnaire.title || 'Questionário de Contexto do Agente'}
                   </span>
-                  <span className="text-[9.5px] bg-blue-500/15 text-blue-400 border border-blue-500/25 px-1.5 py-0.2 rounded font-mono font-medium">
+                  <span className="text-[9.5px] bg-white/5 text-zinc-300 border border-white/10 px-1.5 py-0.2 rounded font-mono font-medium">
                     Pop-up
                   </span>
                 </div>
@@ -968,7 +1061,7 @@ function MessageItem({
             </div>
             <button
               onClick={() => onOpenQuestionnaire?.(message.questionnaire)}
-              className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-sm cursor-pointer shrink-0 ml-3"
+              className="bg-white hover:bg-zinc-200 text-black text-xs font-semibold px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-sm cursor-pointer shrink-0 ml-3"
             >
               <Faders size={13} />
               <span>Abrir Opções</span>
@@ -998,6 +1091,26 @@ function MessageItem({
                 </button>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Waiting for Response Status Bar */}
+        {(message.status === 'in_background' || (message.questionnaire && message.status !== 'completed')) && (
+          <div className="flex items-center justify-between pt-2.5 border-t border-border-divider-subtle">
+            <div className="flex items-center gap-2 text-xs font-medium">
+              <Spinner size={15} className="text-yellow-400 shrink-0" />
+              <span className="font-semibold text-yellow-400">Agente esperando uma resposta</span>
+              <span className="text-[11px] text-zinc-400 font-normal">
+                (aguardando suas definições de opções no pop-up)
+              </span>
+            </div>
+            <button
+              onClick={() => onOpenQuestionnaire?.(message.questionnaire)}
+              className="text-xs text-zinc-300 hover:text-white font-medium flex items-center gap-1.5 cursor-pointer bg-white/10 hover:bg-white/15 px-2.5 py-1 rounded-lg transition-colors border border-white/10"
+            >
+              <span>Abrir opções</span>
+              <ArrowRight size={12} />
+            </button>
           </div>
         )}
 
@@ -1257,7 +1370,7 @@ function ExecutionTimeline({
         ) : isWarning ? (
           <ShieldWarning size={13} className="shrink-0 text-amber-300" />
         ) : isRunning ? (
-          <span className="size-3 shrink-0 rounded-full border-[1.5px] border-border-divider-subtle border-t-blue-300 thinking-spinner" />
+          <Spinner size={13} className="animate-spin text-text-content-secondary shrink-0" />
         ) : (
           getContextualToolIcon(step.label, step.label, step.detail)
         )}

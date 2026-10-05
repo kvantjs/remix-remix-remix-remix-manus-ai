@@ -412,7 +412,7 @@ const FILE_CONTENTS: Record<string, { lang: string; code: string }> = {
   'Home.tsx': {
     lang: 'typescript',
     code: `import React, { useState } from 'react';
-import { Star, ArrowRight, ShieldCheck, Zap } from 'lucide-react';
+import { Star, ArrowRight, ShieldCheck, Lightning as Zap } from '@phosphor-icons/react';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState('templates');

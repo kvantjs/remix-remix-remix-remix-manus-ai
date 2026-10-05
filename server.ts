@@ -581,7 +581,7 @@ function generateAutonomousRuleEnforcedFallback(
           }
         }
       ],
-      response: `Para criar a aplicação **exatamente de acordo com a sua visão** e sem tomar decisões arbitrárias, preparei um **questionário de contexto interativo (@reui/c-questionnaire-1)**.\n\nPor favor, marque as opções abaixo informando o **nicho**, a **direção visual** e os **recursos prioritários** desejados:`,
+      response: `O agente iniciou a execução autônoma e está **esperando uma resposta** com as suas definições no pop-up para construir o projeto com total fidelidade à sua visão, mantendo a conversa aberta.\n\nPor favor, selecione suas preferências no questionário pop-up abaixo:`,
       questionnaire: {
         title: 'Especificação de Contexto do Agente',
         description: 'Marque suas preferências para que o agente construa o projeto exatamente de acordo com a sua visão:',
@@ -4322,6 +4322,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
         sources: [],
         toolCalls: fallback.toolCalls || [],
         suggestions: fallback.suggestions,
+        status: 'in_background',
         intent
       });
       return res.end();

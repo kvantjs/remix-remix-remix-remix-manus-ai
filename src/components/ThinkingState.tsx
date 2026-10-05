@@ -138,7 +138,7 @@ export default function ThinkingState({
             {icon}
           </span>
         ) : (
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`text-text-content-secondary ${working ? 'animate-spin-slow text-blue-400' : ''}`}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`text-text-content-secondary ${working ? 'animate-spin-slow text-text-content-primary' : ''}`}>
             <path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z" />
           </svg>
         )}
@@ -165,7 +165,7 @@ export default function ThinkingState({
             /* Frameless Transparent AI Reasoning Trace */
             <div className="space-y-1.5 pl-3 border-l border-border-divider-subtle/40 ml-1 text-xs">
               <div className="flex items-center gap-2 font-mono text-[10px] text-text-content-secondary uppercase tracking-wider">
-                <span className="size-1.5 rounded-full bg-blue-400 animate-pulse" />
+                <span className="size-1.5 rounded-full bg-text-content-secondary animate-pulse" />
                 Raciocínio do Agente
               </div>
               <div className="space-y-1.5 text-text-content-primary/90 font-normal leading-relaxed text-[12.5px]">

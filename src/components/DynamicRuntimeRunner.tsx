@@ -1,6 +1,5 @@
 import React, { useState, useEffect, Component, ErrorInfo, ReactNode } from 'react';
 import * as Babel from '@babel/standalone';
-import * as LucideIcons from 'lucide-react';
 import * as PhosphorIcons from '@phosphor-icons/react';
 
 interface ErrorBoundaryProps {
@@ -65,7 +64,7 @@ const FallbackIcon = ({ size = 18, className = '', ...props }: any) => (
 );
 
 // Proxy for Lucide icons: prevents undefined icon crashes
-const SafeLucideIcons = new Proxy(LucideIcons, {
+const SafePhosphorIcons = new Proxy(PhosphorIcons, {
   get(target: any, prop: string) {
     if (prop in target) return target[prop];
     const lower = prop.toLowerCase();
@@ -249,9 +248,9 @@ export function DynamicRuntimeRunner({ code }: DynamicRuntimeRunnerProps) {
         memo: React.memo,
         forwardRef: React.forwardRef,
         // Lucide Icons (Safe with Fallback)
-        ...SafeLucideIcons,
-        Lucide: SafeLucideIcons,
-        icons: SafeLucideIcons,
+        ...SafePhosphorIcons,
+        Lucide: SafePhosphorIcons,
+        icons: SafePhosphorIcons,
         // Phosphor Icons
         ...PhosphorIcons,
         // Framer Motion / Motion Compatibility
@@ -305,7 +304,7 @@ export function DynamicRuntimeRunner({ code }: DynamicRuntimeRunnerProps) {
     return (
       <div className="p-6 bg-red-950/25 border border-red-500/30 rounded-xl text-red-200 text-xs font-mono space-y-3 m-4 shadow-xl">
         <div className="font-bold text-red-400 flex items-center gap-2">
-          <LucideIcons.AlertTriangle size={16} className="text-red-400 shrink-0" />
+          <PhosphorIcons.Warning size={16} className="text-red-400 shrink-0" />
           <span>Erro no DynamicApp.tsx</span>
         </div>
         <p className="text-white/80 whitespace-pre-wrap bg-black/40 p-3 rounded-lg border border-white/5">{compilationError}</p>
@@ -329,7 +328,7 @@ export function DynamicRuntimeRunner({ code }: DynamicRuntimeRunnerProps) {
     return (
       <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-4">
         <div className="size-12 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center text-white/40">
-          <LucideIcons.Sparkles size={24} className="text-blue-400 animate-pulse" />
+          <PhosphorIcons.Sparkle size={24} className="text-blue-400 animate-pulse" />
         </div>
         <div className="space-y-1 max-w-sm">
           <h2 className="text-sm font-semibold text-white">Preview de Runtime Pronto</h2>
@@ -348,7 +347,7 @@ export function DynamicRuntimeRunner({ code }: DynamicRuntimeRunnerProps) {
       fallback={(error) => (
         <div className="p-6 bg-red-950/30 border border-red-500/30 rounded-xl text-red-200 text-xs font-mono space-y-2 m-4">
           <div className="font-bold text-red-400 flex items-center gap-2">
-            <LucideIcons.AlertTriangle size={15} className="text-red-400 shrink-0" />
+            <PhosphorIcons.Warning size={15} className="text-red-400 shrink-0" />
             <span>Erro em tempo de execução no DynamicApp.tsx:</span>
           </div>
           <p className="text-white/80">{error.message}</p>
