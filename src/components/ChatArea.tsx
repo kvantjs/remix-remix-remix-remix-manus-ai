@@ -3,9 +3,7 @@ import {
   ShareNetwork, 
   ArrowsOut, 
   Clock, 
-  Terminal, 
   Play, 
-  GreaterThanOrEqual, 
   Plus, 
   GithubLogo, 
   Cloud, 
@@ -24,10 +22,8 @@ import {
   Stack,
   Sparkle,
   Question,
-  Wrench,
   ArrowSquareOut,
   CaretUp,
-  Lightbulb,
   FileText,
   Globe,
   ShieldWarning,
@@ -596,8 +592,6 @@ function MessageItem({
   onApprovalDecision?: (messageId: string, approved: boolean) => void;
 }) {
   const isAssistant = message.role === 'assistant';
-  const [showLogs, setShowLogs] = useState(false);
-  const [showTools, setShowTools] = useState(false);
   const [showCodeSnippet, setShowCodeSnippet] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -632,134 +626,8 @@ function MessageItem({
       </div>
 
       <div className="pl-8 space-y-4">
-        {/* Working Duration & Execution Trace Accordion */}
-        {message.workingTime && (
-          <div 
-            data-component="working-time"
-            style={{ backgroundColor: '#202020' }}
-            className="space-y-2.5 bg-[#202020] border border-white/5 rounded-xl p-3"
-          >
-             <button
-                onClick={() => setShowLogs(!showLogs)}
-                className="flex items-center gap-2 text-[11px] text-[#dcdcdc]/60 hover:text-[#dcdcdc] transition-colors w-full text-left cursor-pointer"
-             >
-                <GreaterThanOrEqual size={12} className="text-blue-400" />
-                <span className="font-medium">Trabalhou por {message.workingTime}</span>
-                <CaretRight size={12} className={`transition-transform ${showLogs ? 'rotate-90' : ''}`} />
-             </button>
-             
-             {showLogs && message.logs && (
-               <div className="space-y-2 pt-1 border-t border-white/5">
-                  {message.thought && (
-                    <div style={{ backgroundColor: '#202020' }} className="text-[11px] text-[#dcdcdc]/60 italic bg-[#202020] p-2 rounded-lg border border-white/5 flex items-start gap-1.5">
-                      <Lightbulb size={13} className="text-amber-400 shrink-0 mt-0.5" />
-                      <span><strong>Raciocínio da Demanda:</strong> {message.thought}</span>
-                    </div>
-                  )}
-                  {message.logs.map((log) => (
-                    <div key={log.id} className="space-y-1 text-xs">
-                       <div className="flex items-center gap-2 text-[#dcdcdc]/30 text-[10px] font-mono">
-                          <Terminal size={10} className="text-green-400" />
-                          <span>{log.time}</span>
-                       </div>
-                       <p className="text-xs text-[#dcdcdc]/70 leading-relaxed font-sans pl-4 border-l border-white/10">
-                         {log.content}
-                       </p>
-                    </div>
-                  ))}
-               </div>
-             )}
-          </div>
-        )}
-
         {message.executionSteps && message.executionSteps.length > 0 && (
           <ExecutionTimeline steps={message.executionSteps} completed />
-        )}
-
-        {/* MCP & Tool Calls Box (Manus style) */}
-        {message.toolCalls && message.toolCalls.length > 0 && (
-          <div 
-            data-component="tool-calls"
-            style={{ backgroundColor: '#202020' }}
-            className="space-y-2.5 bg-[#202020] border border-white/5 rounded-xl p-3.5"
-          >
-            <button 
-              onClick={() => setShowTools(!showTools)}
-              className="flex items-center justify-between w-full text-left cursor-pointer"
-            >
-              <div className="flex items-center gap-2 text-xs font-semibold text-white/80">
-                <Wrench size={13} className="text-blue-400" />
-                <span>Chamadas de Ferramentas & MCP ({message.toolCalls.length})</span>
-              </div>
-              <CaretRight size={13} className={`text-white/40 transition-transform ${showTools ? 'rotate-90' : ''}`} />
-            </button>
-
-            {showTools && (
-              <div className="space-y-3 pt-2">
-                {message.toolCalls.map((tc) => (
-                  <div 
-                    key={tc.id} 
-                    data-slot="tool-call-item"
-                    style={{ backgroundColor: '#202020' }}
-                    className="bg-[#202020] border border-white/5 rounded-lg p-3 space-y-2 font-mono text-[11px]"
-                  >
-                    <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-white font-semibold">{tc.toolName}</span>
-                        {tc.server && (
-                          <span className="text-[9px] bg-white/5 text-white/40 px-1.5 py-0.5 rounded">
-                            {tc.server}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-1.5 py-0.5 rounded font-mono">
-                          tool.call
-                        </span>
-                      </div>
-                    </div>
-
-                    {tc.arguments && Object.keys(tc.arguments).length > 0 && (
-                      <div className="space-y-1">
-                        <span className="text-[10px] text-white/40 uppercase font-sans tracking-wider block">Argumentos</span>
-                        <SyntaxCodeView 
-                          code={JSON.stringify(tc.arguments, null, 2)}
-                          language="json"
-                          filename="arguments.json"
-                          compact
-                          showLineNumbers={false}
-                          maxHeight="220px"
-                          className="!bg-[#202020] border-white/5"
-                        />
-                      </div>
-                    )}
-
-                    <div className="space-y-1">
-                      <span className="text-[10px] text-white/40 uppercase font-sans tracking-wider block">Resultado</span>
-                      {typeof tc.result === 'string' && (tc.result.trim().startsWith('{') || tc.result.trim().startsWith('[') || tc.result.includes('```')) ? (
-                        <SyntaxCodeView 
-                          code={tc.result.trim().startsWith('{') || tc.result.trim().startsWith('[')
-                            ? (function() { try { return JSON.stringify(JSON.parse(tc.result), null, 2); } catch { return tc.result; } })()
-                            : tc.result
-                          }
-                          language={tc.result.trim().startsWith('{') || tc.result.trim().startsWith('[') ? "json" : undefined}
-                          filename="result.json"
-                          compact
-                          showLineNumbers={false}
-                          maxHeight="220px"
-                          className="!bg-[#202020] border-white/5"
-                        />
-                      ) : (
-                        <div style={{ backgroundColor: '#202020' }} className="text-white/80 bg-[#202020] p-2.5 rounded-lg text-[11px] leading-relaxed font-sans border border-white/5">
-                          {tc.result}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         )}
 
         {/* Clean Executive Response Text with Markdown Renderer */}

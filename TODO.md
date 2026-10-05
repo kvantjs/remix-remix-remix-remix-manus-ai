@@ -1,4 +1,4 @@
 
-## [x] Separação entre pensamento e tempo de trabalho
+## [x] Resposta principal sem painéis secundários
 
-A timeline de Thinking não exibe mais segundos de trabalho nem chama esse valor de pensamento. Ela ocupa até 780px de largura, permanece sem fundo e sem card externo, e conserva apenas o trace visual. O tempo real de execução é propagado ao computador do agente e aparece no status final como “Tarefa concluída · Trabalhou por Ns”. O estado inicial não exibe o valor fictício de 0s.
+A resposta do agente não renderiza mais os componentes “Trabalhou por X segundos” nem “Chamadas de Ferramentas & MCP”. O conteúdo principal permanece acompanhado apenas pelo Thinking/execution trace; chamadas e tempo continuam disponíveis internamente para o computador do agente e para o estado operacional, sem ocupar a resposta visual.
