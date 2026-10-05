@@ -40,7 +40,7 @@ export function Sidebar({ theme, toggleTheme, onNewTask }: { theme: 'light' | 'd
       {/* Main Nav */}
       <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-1 custom-scrollbar">
         <button onClick={onNewTask} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-text-content-primary/90 hover:bg-bg-action-hover rounded-lg transition-colors group border border-transparent hover:border-border-divider-subtle" aria-label="Criar nova tarefa">
-          <span className="size-7 rounded-md bg-white/[0.08] flex items-center justify-center group-hover:bg-white/[0.14] transition-colors">
+          <span className="size-7 rounded-md bg-bg-action-hover flex items-center justify-center group-hover:bg-border-control-active transition-colors">
             <Plus size={16} className="text-text-content-primary/60 group-hover:text-text-content-primary" />
           </span>
           <span className="font-medium">Nova tarefa</span>
@@ -141,7 +141,7 @@ function NavItem({ icon, label, badge }: { icon: React.ReactNode; label: string;
         <span>{label}</span>
       </div>
       {badge && (
-        <span className="bg-white/5 text-[9px] px-1.5 py-0.5 rounded font-bold text-text-content-secondary">
+        <span className="bg-bg-action-hover text-[9px] px-1.5 py-0.5 rounded font-bold text-text-content-secondary">
           {badge}
         </span>
       )}

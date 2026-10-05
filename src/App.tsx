@@ -114,7 +114,7 @@ export default function App() {
   }, []);
 
   return (
-    <div className={`${theme} flex h-screen w-full bg-bg-canvas-main text-text-content-primary overflow-hidden font-sans selection:bg-blue-500/20`}>
+    <div className={`${theme} flex h-screen w-full bg-bg-canvas-main text-text-content-primary overflow-hidden font-sans selection:bg-interactive-accent/30`}>
       <Sidebar theme={theme} toggleTheme={toggleTheme} onNewTask={handleNewTask} />
       <main className="flex-1 flex overflow-hidden relative">
         <ChatArea
