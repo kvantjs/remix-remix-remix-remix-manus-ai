@@ -384,16 +384,15 @@ app.post('/api/scheduled/agent', async (req, res) => {
   }
 });
 
-// Initialize Google GenAI
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// Initialize Google GenAI with environment API Key
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY });
 
 // Multi-model fallback priority chain with active Gemini models
 const MODEL_CANDIDATES = [
-  'gemini-2.0-flash',
-  'gemini-2.5-flash',
-  'gemini-2.0-flash-lite',
-  'gemini-1.5-flash',
-  'gemini-1.5-pro'
+  'gemini-3.8-flash',
+  'gemini-3.8-pro',
+  'gemini-3.7-flash',
+  'gemini-2.5-flash'
 ];
 
 // System prompt strictly enforcing bespoke branding, production design rules, and high interactivity:
@@ -484,6 +483,11 @@ AS 7 LEIS INVIOLÁVEIS DO AGENTE DE CRIAÇÃO:
     5. Sintetizar todo o contexto acumulado de múltiplos sites em um raciocínio profundo e estruturado.
   * O agente "pensa de verdade": analisa os endpoints reais, limites de taxa, cabeçalhos, modelos de dados e fluxos de integração encontrados ao vivo em cada site acessado.
 
+12. OBTENÇÃO DE CONTEXTO E QUESTIONÁRIO INTERATIVO (@reui/c-questionnaire-1):
+- Quando o usuário fizer um pedido amplo ou genérico de criação de site/aplicação (ex: "crie um site", "faça um site", "criar um app", "quero um site") sem especificar o nicho, o estilo visual ou os recursos dinâmicos, o agente NÃO deve criar nada de forma arbitrária.
+- O agente DEVE solicitar contexto ao usuário retornando um objeto "questionnaire" estruturado com perguntas e opções de múltipla escolha utilizando o componente @reui/c-questionnaire-1.
+- O usuário responderá marcando as opções na caixa de diálogo interativa, e o agente utilizará esse contexto para construir exatamente o que foi solicitado.
+
 DIRETIVA DE FORMATO DE RESPOSTA EM PORTUGUÊS:
 - Você deve responder SEMPRE em texto Markdown corrido de forma humana, natural, amigável e explicativa, em PORTUGUÊS.
 - NUNCA, SOB NENHUMA CIRCUNSTÂNCIA, retorne uma estrutura JSON, blocos JSON ou tags JSON em suas respostas de texto. Suas respostas devem ser de texto corrido puramente explicativo para o usuário.
@@ -501,6 +505,175 @@ function generateAutonomousRuleEnforcedFallback(
   const currentCode = currentFiles?.['client/src/App.tsx'] || 
     currentFiles?.['App.tsx'] || 
     (currentFiles && Object.keys(currentFiles).length > 0 ? Object.values(currentFiles)[0] : '');
+
+  // 0. Context Gathering Questionnaire Trigger (@reui/c-questionnaire-1)
+  const hasExplicitContextTag = lower.includes('[contexto') || lower.includes('contexto definido') || lower.includes('contexto selecionado');
+  const isGenericCreationPrompt = 
+    lower.includes('crie um site') ||
+    lower.includes('criar um site') ||
+    lower.includes('faça um site') ||
+    lower.includes('fazer um site') ||
+    lower.includes('crie um app') ||
+    lower.includes('criar um app') ||
+    lower.includes('crie uma aplicação') ||
+    lower.includes('criar uma aplicação') ||
+    lower.includes('crie uma landing page') ||
+    lower.includes('faça uma landing page') ||
+    lower.includes('construa um site') ||
+    lower.includes('desenvolva um site') ||
+    lower.includes('desenvolver um site') ||
+    lower.includes('desenvolva um app') ||
+    lower.includes('desenvolver uma aplicação') ||
+    lower.includes('quero um site') ||
+    lower.includes('preciso de um site') ||
+    lower.includes('preciso de um app') ||
+    lower.includes('quero um app') ||
+    lower.includes('obter contexto') ||
+    lower.includes('/context') ||
+    lower.includes('questions') ||
+    lower.includes('questionario') ||
+    lower.includes('questionário');
+
+  const hasSpecificNicheOrTech = 
+    lower.includes('fintech') || 
+    lower.includes('banco') || 
+    lower.includes('saas') || 
+    lower.includes('telemetria') || 
+    lower.includes('ecommerce') || 
+    lower.includes('e-commerce') || 
+    lower.includes('loja') || 
+    lower.includes('editorial') || 
+    lower.includes('portfolio') || 
+    lower.includes('portfólio') || 
+    lower.includes('logística') || 
+    lower.includes('delivery') || 
+    lower.includes('restaurante') ||
+    lower.includes('simulador de juros') ||
+    lower.includes('dashboard de logs') ||
+    lower.includes('github api') ||
+    lower.includes('playwright');
+
+  const needsContextQuestionnaire = (isGenericCreationPrompt || lower === '/context') && !hasExplicitContextTag && !hasSpecificNicheOrTech;
+
+  if (needsContextQuestionnaire) {
+    return {
+      thought: 'O usuário solicitou a criação de um site/aplicação sem fornecer especificações de nicho, estilo ou funcionalidades dinâmicas. Ativando o protocolo de obtenção de contexto através da caixa de diálogo/questions (@reui/c-questionnaire-1) para coletar preferências antes da construção.',
+      workingTime: '6s',
+      logs: [
+        { id: 1, type: 'info', content: 'Análise de requisitos: solicitação aberta de criação de software detectada', time: nowTime },
+        { id: 2, type: 'tool', content: 'questionnaire.render: Renderizando caixa de diálogo @reui/c-questionnaire-1 com perguntas estruturadas', time: nowTime },
+        { id: 3, type: 'command', content: 'Aguardando seleção do usuário para guiar a arquitetura do projeto', time: nowTime }
+      ],
+      toolCalls: [
+        {
+          id: `trace_context_q_${Date.now()}`,
+          toolName: 'agent.requestContext',
+          server: 'kvant_questionnaire_engine',
+          arguments: {
+            reason: 'Solicitação aberta de criação de software sem definição de nicho ou estilo visual',
+            component: '@reui/c-questionnaire-1'
+          },
+          result: 'Diálogo de questionário contextual apresentado com sucesso.',
+          timestamp: nowTime,
+          status: 'success',
+          screenData: {
+            actionDescription: 'Apresentou caixa de diálogo/questions interativa para obter contexto do usuário'
+          }
+        }
+      ],
+      response: `Para criar a aplicação **exatamente de acordo com a sua visão** e sem tomar decisões arbitrárias, preparei um **questionário de contexto interativo (@reui/c-questionnaire-1)**.\n\nPor favor, marque as opções abaixo informando o **nicho**, a **direção visual** e os **recursos prioritários** desejados:`,
+      questionnaire: {
+        title: 'Especificação de Contexto do Agente',
+        description: 'Marque suas preferências para que o agente construa o projeto exatamente de acordo com a sua visão:',
+        questions: [
+          {
+            name: 'niche',
+            title: 'Qual é o segmento / nicho da aplicação?',
+            description: 'Isso define a arquitetura de informação, modelos de dados e fluxos de navegação.',
+            choices: [
+              {
+                value: 'fintech',
+                label: 'Fintech & Private Banking',
+                hint: 'Carteira global de ativos, PIX/transferências com modal dinâmico e simulador de juros compostos.'
+              },
+              {
+                value: 'saas',
+                label: 'SaaS & Telemetria em Tempo Real',
+                hint: 'Painel de logs com streaming ao vivo, métricas de CPU/RAM e busca instantânea.'
+              },
+              {
+                value: 'ecommerce',
+                label: 'E-Commerce & Loja de Alta Performance',
+                hint: 'Grade de produtos, carrinho reativo com cupons, cálculo de frete e checkout em etapas.'
+              },
+              {
+                value: 'editorial',
+                label: 'Editorial & Estúdio Criativo',
+                hint: 'Tipografia editorial premium, showcase de projetos, leitor de artigos e alternância de temas.'
+              }
+            ]
+          },
+          {
+            name: 'style',
+            title: 'Qual é a direção visual e paleta de cores?',
+            description: 'Aplica a regra 60-30-10 com contraste elevado e sem cores genéricas saturadas.',
+            choices: [
+              {
+                value: 'dark_emerald',
+                label: 'Dark Obsidian & Esmeralda (Fintech Pro)',
+                hint: 'Fundo profundo #070D0B, bordas refinadas esmeralda e acentos de alta intenção.'
+              },
+              {
+                value: 'dark_slate',
+                label: 'Dark Slate & Roxo Cyber (Dev SaaS)',
+                hint: 'Fundo #090A0F, cartões translúcidos e acentos em violeta e ciano.'
+              },
+              {
+                value: 'warm_bone',
+                label: 'Warm Bone & Tipografia Serif (Editorial)',
+                hint: 'Fundo creme/marfim #FBFBFA, tipografia serifada e contrastes limpos.'
+              },
+              {
+                value: 'neon_volt',
+                label: 'High-Contrast Neon & Volt (Performance)',
+                hint: 'Fundo ultra-escuro #0C0C0E com acento volt #D4FF00 e fontes mono.'
+              }
+            ]
+          },
+          {
+            name: 'features',
+            title: 'Quais recursos dinâmicos você quer como prioridade?',
+            description: 'Todos os componentes serão implementados com estado React 100% interativo.',
+            choices: [
+              {
+                value: 'simulator',
+                label: 'Simulador / Calculadora Matemática Interativa',
+                hint: 'Recálculo instantâneo com sliders e fórmulas financeiras/operacionais.'
+              },
+              {
+                value: 'live_stream',
+                label: 'Feed de Dados em Tempo Real com Filtros',
+                hint: 'Atualizações contínuas de telemetria, pausa/play e busca instantânea.'
+              },
+              {
+                value: 'forms_modal',
+                label: 'Modais de Transação & Formulários com Validação',
+                hint: 'Fluxo completo de criação de registros adicionando itens ao estado em tempo real.'
+              }
+            ]
+          }
+        ]
+      },
+      clarifications: [],
+      suggestions: [
+        'Fintech com simulador de juros',
+        'SaaS com telemetria em tempo real',
+        'E-Commerce de alta performance',
+        'Editorial com tipografia refinada'
+      ],
+      files: []
+    };
+  }
 
   // 0. Specialized Multi-Step Web & API Deep Exploration (e.g. GitHub API, Docs, Endpoints)
   const isGitHubApiRequest = lower.includes('github') && (lower.includes('api') || lower.includes('inspecionar') || lower.includes('docs') || lower.includes('pesquisar') || lower.includes('navegador') || lower.includes('endpoints'));
@@ -4056,6 +4229,59 @@ function cleanChatResponseOfCodeBlocks(text: string): string {
   return cleaned.replace(/```[a-zA-Z0-9+#-]*\n[\s\S]*?```/g, '\n*(O código completo foi gerado e atualizado na aba Código no Workspace)*\n');
 }
 
+function checkNeedsContextQuestionnaire(message: string): boolean {
+  const lower = String(message || '').toLowerCase();
+  const hasExplicitContextTag = lower.includes('[contexto') || lower.includes('contexto definido') || lower.includes('contexto selecionado');
+  if (hasExplicitContextTag) return false;
+
+  const isGenericCreationPrompt = 
+    lower.includes('crie um site') ||
+    lower.includes('criar um site') ||
+    lower.includes('faça um site') ||
+    lower.includes('fazer um site') ||
+    lower.includes('crie um app') ||
+    lower.includes('criar um app') ||
+    lower.includes('crie uma aplicação') ||
+    lower.includes('criar uma aplicação') ||
+    lower.includes('crie uma landing page') ||
+    lower.includes('faça uma landing page') ||
+    lower.includes('construa um site') ||
+    lower.includes('desenvolva um site') ||
+    lower.includes('desenvolver um site') ||
+    lower.includes('desenvolva um app') ||
+    lower.includes('desenvolver uma aplicação') ||
+    lower.includes('quero um site') ||
+    lower.includes('preciso de um site') ||
+    lower.includes('preciso de um app') ||
+    lower.includes('quero um app') ||
+    lower.includes('obter contexto') ||
+    lower.includes('questions') ||
+    lower.includes('questionario') ||
+    lower.includes('questionário') ||
+    lower.trim() === '/context';
+
+  const hasSpecificNicheOrTech = 
+    lower.includes('fintech') || 
+    lower.includes('banco') || 
+    lower.includes('saas') || 
+    lower.includes('telemetria') || 
+    lower.includes('ecommerce') || 
+    lower.includes('e-commerce') || 
+    lower.includes('loja') || 
+    lower.includes('editorial') || 
+    lower.includes('portfolio') || 
+    lower.includes('portfólio') || 
+    lower.includes('logística') || 
+    lower.includes('delivery') || 
+    lower.includes('restaurante') ||
+    lower.includes('simulador de juros') ||
+    lower.includes('dashboard de logs') ||
+    lower.includes('github api') ||
+    lower.includes('playwright');
+
+  return (isGenericCreationPrompt || lower.trim() === '/context') && !hasSpecificNicheOrTech;
+}
+
 // 7. Streaming Agent Chat Endpoint (Server-Sent Events) with Real Function Calling
 app.post('/api/agent/chat/stream', async (req, res) => {
   const { message, history, currentFiles } = req.body;
@@ -4075,6 +4301,31 @@ app.post('/api/agent/chat/stream', async (req, res) => {
 
   try {
     sendEvent('status', { text: 'Iniciando raciocínio do Agente...' });
+
+    // Check if context questionnaire is needed before anything else
+    if (checkNeedsContextQuestionnaire(message)) {
+      const fallback = generateAutonomousRuleEnforcedFallback(message, history, currentFiles);
+      sendEvent('tool_start', {
+        toolName: 'agent.requestContext',
+        arguments: { component: '@reui/c-questionnaire-1' },
+        reason: 'Solicitando preferências e especificações de contexto ao usuário'
+      });
+      await new Promise(r => setTimeout(r, 400));
+      if (fallback.toolCalls?.[0]) {
+        sendEvent('tool_finish', { toolCall: fallback.toolCalls[0] });
+      }
+      sendEvent('complete', {
+        thought: fallback.thought,
+        explanation: fallback.response,
+        questionnaire: fallback.questionnaire,
+        files: [],
+        sources: [],
+        toolCalls: fallback.toolCalls || [],
+        suggestions: fallback.suggestions,
+        intent
+      });
+      return res.end();
+    }
 
     const executedToolCalls: any[] = [];
     const webSources: Array<{ title: string; url: string; snippet: string }> = [];
@@ -4384,6 +4635,20 @@ app.post('/api/agent/chat', async (req, res) => {
     return res.status(400).json({ error: 'Message is required' });
   }
   const intent = classifyAgentIntent(message);
+
+  if (checkNeedsContextQuestionnaire(message)) {
+    const fallback = generateAutonomousRuleEnforcedFallback(message, history, currentFiles);
+    return res.json({
+      thought: fallback.thought,
+      response: fallback.response,
+      questionnaire: fallback.questionnaire,
+      files: [],
+      sources: [],
+      toolCalls: fallback.toolCalls || [],
+      suggestions: fallback.suggestions,
+      intent
+    });
+  }
 
   const currentAppCode = currentFiles?.['client/src/App.tsx'] || 
     currentFiles?.['App.tsx'] || 

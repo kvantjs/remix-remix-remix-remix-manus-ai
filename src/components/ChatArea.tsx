@@ -29,7 +29,8 @@ import {
   ShieldWarning,
   ShieldCheck,
   DownloadSimple,
-  XCircle
+  XCircle,
+  Faders
 } from '@phosphor-icons/react';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { ToolCallTrace, AgentExecutionLog } from '../types/project';
@@ -39,13 +40,16 @@ import { SyntaxCodeView, InlineCodeSnippet } from './SyntaxCodeView';
 import ThinkingState, { ThinkingStateGroup } from './ThinkingState';
 import ToolChips, { getContextualToolIcon, getContextualFileIcon, ToolStep, ToolDiff } from './ToolChips';
 import StreamingText from './StreamingText';
+import { MarkdownRenderer } from './MarkdownRenderer';
 import { Favicon, extractCleanDomain } from '@/lib/favicon';
 import PromptBar from './PromptBar';
+import { AgentContextQuestionnaire, QuestionnaireQuestion, DEFAULT_APP_QUESTIONS } from './AgentContextQuestionnaire';
 
 interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  isStreaming?: boolean;
   status?: 'completed' | 'failed' | 'waiting_for_approval';
   time?: string;
   workingTime?: string;
@@ -54,6 +58,11 @@ interface ChatMessage {
   toolCalls?: ToolCallTrace[];
   suggestions?: string[];
   clarifications?: string[];
+  questionnaire?: {
+    title?: string;
+    description?: string;
+    questions?: QuestionnaireQuestion[];
+  };
   sources?: Array<{ title: string; url: string; snippet: string }>;
   approval?: {
     actionName: string;
@@ -104,6 +113,7 @@ export function ChatArea({
       id: '1',
       role: 'assistant',
       status: 'completed',
+      isStreaming: false,
       time: '15:43',
       workingTime: '12s',
       thought: 'Constituição de Design Ativa: O agente opera sob regras rigorosas de design de produção inspiradas em Linear, Stripe, Apple, Vercel e Airbnb para criar sites e aplicações do zero com identidade visual própria, cores exclusivas e alta interatividade dinâmica.',
@@ -130,6 +140,22 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
       ]
     }
   ]);
+
+  const [streamedIds, setStreamedIds] = useState<Set<string>>(() => new Set(['1']));
+  const [activeQuestionnaireModal, setActiveQuestionnaireModal] = useState<{
+    title?: string;
+    description?: string;
+    questions?: QuestionnaireQuestion[];
+  } | null>(null);
+
+  const handleStreamingDone = (messageId: string) => {
+    setStreamedIds(prev => {
+      const next = new Set(prev);
+      next.add(messageId);
+      return next;
+    });
+    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isStreaming: false } : m));
+  };
 
   const [isThinking, setIsThinking] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -251,6 +277,15 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
 
   const handleSendMessage = async (userPrompt: string) => {
     if (!userPrompt.trim() || isThinking) return;
+
+    if (userPrompt.trim().toLowerCase() === '/context' || userPrompt.trim().toLowerCase() === 'context') {
+      setActiveQuestionnaireModal({
+        title: 'Especificação de Contexto do Agente',
+        description: 'Defina o nicho, direção visual e prioridades para personalizar a criação:',
+        questions: DEFAULT_APP_QUESTIONS
+      });
+      return;
+    }
 
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
@@ -427,6 +462,7 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
       const assistantMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
+        isStreaming: true,
         status: payload.approval ? 'waiting_for_approval' : 'completed',
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         workingTime: payload.workingTime || `${elapsedSeconds || 24}s`,
@@ -450,6 +486,7 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
           "Executar novos comandos de teste"
         ],
         clarifications: payload.clarifications,
+        questionnaire: payload.questionnaire,
         files: generatedFilesList
         ,executionSteps: [
           ...executionStepsRef.current.map((step) => step.status === 'running' ? { ...step, status: 'complete' as const } : step),
@@ -464,6 +501,10 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
       };
 
       setMessages(prev => [...prev, assistantMsg]);
+
+      if (payload.questionnaire) {
+        setActiveQuestionnaireModal(payload.questionnaire);
+      }
 
       // Trigger reactive sync with Workspace
       if (generatedFilesList.length > 0 && onFileUpdate) {
@@ -539,8 +580,11 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
             <MessageItem 
               key={msg.id} 
               message={msg} 
+              isAlreadyStreamed={streamedIds.has(msg.id)}
+              onStreamingDone={handleStreamingDone}
               onSelectSuggestion={handleSendMessage}
               onInspectInComputer={onInspectInComputer}
+              onOpenQuestionnaire={(q) => setActiveQuestionnaireModal(q)}
               onApprovalDecision={(messageId, approved) => {
                 setMessages(prev => prev.map(m => m.id === messageId ? {
                   ...m,
@@ -582,6 +626,20 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
           manus ativo: digite @ para fontes & arquivos, / para comandos rápidos e selecione o modelo de IA.
         </p>
       </div>
+
+      {/* Pop-up Questionnaire Modal */}
+      {activeQuestionnaireModal && (
+        <AgentContextQuestionnaire
+          title={activeQuestionnaireModal.title}
+          description={activeQuestionnaireModal.description}
+          questions={activeQuestionnaireModal.questions}
+          onClose={() => setActiveQuestionnaireModal(null)}
+          onSubmitContext={(_answers, summaryText) => {
+            setActiveQuestionnaireModal(null);
+            handleSendMessage(`[Contexto Definido]: ${summaryText}`);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -590,12 +648,18 @@ function MessageItem({
   message, 
   onSelectSuggestion,
   onInspectInComputer,
-  onApprovalDecision
+  onApprovalDecision,
+  onStreamingDone,
+  onOpenQuestionnaire,
+  isAlreadyStreamed
 }: { 
   message: ChatMessage; 
   onSelectSuggestion: (s: string) => void;
   onInspectInComputer?: () => void;
   onApprovalDecision?: (messageId: string, approved: boolean) => void;
+  onStreamingDone?: (id: string) => void;
+  onOpenQuestionnaire?: (q: any) => void;
+  isAlreadyStreamed?: boolean;
 }) {
   const isAssistant = message.role === 'assistant';
   const [showCodeSnippet, setShowCodeSnippet] = useState(false);
@@ -683,9 +747,21 @@ function MessageItem({
           <ExecutionTimeline steps={message.executionSteps} completed />
         )}
 
-        {/* Clean Executive Response Text with Markdown Renderer */}
+        {/* Clean Executive Response Text with Streaming Text Animation */}
         <div className="text-sm leading-relaxed text-text-content-primary/90 font-sans">
-          <MarkdownRenderer content={cleanText} />
+          <StreamingText 
+            content={cleanText}
+            isStreaming={Boolean(message.isStreaming && !isAlreadyStreamed)}
+            initialDone={!message.isStreaming || Boolean(isAlreadyStreamed)}
+            onDone={() => onStreamingDone?.(message.id)}
+            sources={message.sources?.map(s => ({
+              name: s.title,
+              domain: extractCleanDomain(s.url) || s.url,
+              href: s.url
+            }))}
+            followUps={message.suggestions}
+            onFollowUp={(text) => onSelectSuggestion(text)}
+          />
         </div>
 
         {/* Generated Files Notification Box (Vibecoding Clean UI) */}
@@ -866,6 +942,37 @@ function MessageItem({
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Compact Context Questionnaire Card (opens pop-up) */}
+        {message.questionnaire && (
+          <div className="bg-[#18181b] border border-[#27272a] hover:border-blue-500/40 rounded-xl p-3.5 flex items-center justify-between transition-all shadow-sm">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="size-9 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+                <Faders size={18} />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-white truncate">
+                    {message.questionnaire.title || 'Questionário de Contexto do Agente'}
+                  </span>
+                  <span className="text-[9.5px] bg-blue-500/15 text-blue-400 border border-blue-500/25 px-1.5 py-0.2 rounded font-mono font-medium">
+                    Pop-up
+                  </span>
+                </div>
+                <p className="text-[11px] text-[#a1a1aa] truncate mt-0.5">
+                  {message.questionnaire.description || 'Defina o nicho, direção visual e prioridades para o agente'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => onOpenQuestionnaire?.(message.questionnaire)}
+              className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-sm cursor-pointer shrink-0 ml-3"
+            >
+              <Faders size={13} />
+              <span>Abrir Opções</span>
+            </button>
           </div>
         )}
 
@@ -1278,228 +1385,4 @@ function ChatInput({ onSend, onStop, isThinking }: { onSend: (val: string) => vo
       </div>
     </div>
   );
-}
-
-interface MarkdownRendererProps {
-  content: string;
-}
-
-export function MarkdownRenderer({ content }: MarkdownRendererProps) {
-  if (!content) return null;
-
-  const lines = content.split('\n');
-  const elements: React.ReactNode[] = [];
-  let inCodeBlock = false;
-  let codeBlockLang = '';
-  let codeBlockLines: string[] = [];
-  let inList = false;
-  let listItems: React.ReactNode[] = [];
-
-  const parseInline = (text: string) => {
-    const tokens: Array<{ type: 'text' | 'bold' | 'italic' | 'code' | 'link'; text: string; url?: string }> = [];
-    let i = 0;
-    while (i < text.length) {
-      if (text.startsWith('**', i)) {
-        const end = text.indexOf('**', i + 2);
-        if (end !== -1) {
-          tokens.push({ type: 'bold', text: text.slice(i + 2, end) });
-          i = end + 2;
-          continue;
-        }
-      }
-      if (text.startsWith('*', i)) {
-        const end = text.indexOf('*', i + 1);
-        if (end !== -1) {
-          tokens.push({ type: 'italic', text: text.slice(i + 1, end) });
-          i = end + 1;
-          continue;
-        }
-      }
-      if (text.startsWith('`', i)) {
-        const end = text.indexOf('`', i + 1);
-        if (end !== -1) {
-          tokens.push({ type: 'code', text: text.slice(i + 1, end) });
-          i = end + 1;
-          continue;
-        }
-      }
-      if (text.startsWith('[', i)) {
-        const endText = text.indexOf(']', i + 1);
-        if (endText !== -1 && text.startsWith('(', endText + 1)) {
-          const endUrl = text.indexOf(')', endText + 2);
-          if (endUrl !== -1) {
-            tokens.push({
-              type: 'link',
-              text: text.slice(i + 1, endText),
-              url: text.slice(endText + 2, endUrl)
-            });
-            i = endUrl + 1;
-            continue;
-          }
-        }
-      }
-      
-      const lastToken = tokens[tokens.length - 1];
-      if (lastToken && lastToken.type === 'text') {
-        lastToken.text += text[i];
-      } else {
-        tokens.push({ type: 'text', text: text[i] });
-      }
-      i++;
-    }
-
-    return tokens.map((token, idx) => {
-      const key = `${idx}-${token.text}`;
-      if (token.type === 'bold') {
-        return <strong key={key} className="font-bold text-white">{token.text}</strong>;
-      }
-      if (token.type === 'italic') {
-        return <em key={key} className="italic text-white/80">{token.text}</em>;
-      }
-      if (token.type === 'code') {
-        return <InlineCodeSnippet key={key} code={token.text} />;
-      }
-      if (token.type === 'link') {
-        return (
-          <a
-            key={key}
-            href={token.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-400 hover:text-blue-300 hover:underline transition-colors font-medium inline-flex items-center gap-0.5"
-          >
-            {token.text}
-          </a>
-        );
-      }
-      return token.text;
-    });
-  };
-
-  const flushList = (key: string | number) => {
-    if (listItems.length > 0) {
-      elements.push(
-        <ul key={`list-${key}`} className="list-disc pl-5 space-y-1 my-2 text-white/80">
-          {listItems}
-        </ul>
-      );
-      listItems = [];
-      inList = false;
-    }
-  };
-
-  const flushCodeBlock = (key: string | number) => {
-    if (inCodeBlock) {
-      const code = codeBlockLines.join('\n');
-      elements.push(
-        <ProfessionalCodeBlock 
-          key={`code-${key}`}
-          code={code}
-          language={codeBlockLang || undefined}
-        />
-      );
-      codeBlockLines = [];
-      codeBlockLang = '';
-      inCodeBlock = false;
-    }
-  };
-
-  for (let idx = 0; idx < lines.length; idx++) {
-    const line = lines[idx];
-    const trimmed = line.trim();
-
-    // Check for fenced code block toggle
-    if (trimmed.startsWith('```')) {
-      if (inCodeBlock) {
-        flushCodeBlock(idx);
-        continue;
-      } else {
-        flushList(idx);
-        inCodeBlock = true;
-        codeBlockLang = trimmed.slice(3).trim();
-        codeBlockLines = [];
-        continue;
-      }
-    }
-
-    if (inCodeBlock) {
-      codeBlockLines.push(line);
-      continue;
-    }
-
-    if (trimmed.startsWith('### ')) {
-      flushList(idx);
-      elements.push(
-        <h3 key={idx} className="text-xs font-bold text-white mt-3 mb-1.5 tracking-tight border-b border-white/5 pb-0.5">
-          {parseInline(trimmed.slice(4))}
-        </h3>
-      );
-      continue;
-    }
-
-    if (trimmed.startsWith('## ')) {
-      flushList(idx);
-      elements.push(
-        <h2 key={idx} className="text-sm font-extrabold text-white mt-4 mb-2 tracking-tight">
-          {parseInline(trimmed.slice(3))}
-        </h2>
-      );
-      continue;
-    }
-
-    if (trimmed.startsWith('# ')) {
-      flushList(idx);
-      elements.push(
-        <h1 key={idx} className="text-base font-black text-white mt-5 mb-2.5 tracking-tight">
-          {parseInline(trimmed.slice(2))}
-        </h1>
-      );
-      continue;
-    }
-
-    if (trimmed === '---') {
-      flushList(idx);
-      elements.push(<hr key={idx} className="border-white/5 my-3" />);
-      continue;
-    }
-
-    if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-      inList = true;
-      listItems.push(
-        <li key={idx} className="text-xs leading-relaxed text-white/80">
-          {parseInline(trimmed.slice(2))}
-        </li>
-      );
-      continue;
-    }
-
-    if (trimmed.startsWith('> ')) {
-      flushList(idx);
-      elements.push(
-        <blockquote key={idx} className="border-l-2 border-blue-500 bg-white/[0.02] pl-3 py-1 my-2 text-xs italic text-white/70 rounded-r">
-          {parseInline(trimmed.slice(2))}
-        </blockquote>
-      );
-      continue;
-    }
-
-    if (trimmed === '') {
-      flushList(idx);
-      elements.push(<div key={idx} className="h-1.5" />);
-    } else {
-      if (inList) {
-        flushList(idx);
-      }
-      elements.push(
-        <p key={idx} className="text-xs md:text-sm leading-relaxed text-[#dcdcdc]/90">
-          {parseInline(line)}
-        </p>
-      );
-    }
-  }
-
-  flushList('end');
-  flushCodeBlock('end');
-
-  return <div className="space-y-1">{elements}</div>;
 }

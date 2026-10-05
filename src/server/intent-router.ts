@@ -71,7 +71,8 @@ export function classifyAgentIntent(message: string): AgentIntent {
     'crie um app', 'criar um app', 'crie uma aplicação', 'criar uma aplicação', 'desenvolva um app',
     'desenvolver uma aplicação', 'faça um site', 'fazer um site', 'crie um site', 'construa um site',
     'construir uma aplicação', 'programe', 'programar', 'implemente', 'implementar', 'escreva o código',
-    'edite o código', 'modifique o arquivo', 'corrija o código', 'dashboard', 'landing page', 'react', 'typescript'
+    'edite o código', 'modifique o arquivo', 'corrija o código', 'dashboard', 'landing page', 'react', 'typescript',
+    '[contexto', 'contexto definido', 'contexto selecionado'
   ]);
   if (appCreation) {
     return { mode: 'app_creation', confidence: 'high', reason: 'Pedido contém intenção explícita de criar ou modificar software.', allowedTools: APP_TOOLS };

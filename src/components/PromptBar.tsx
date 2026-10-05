@@ -97,6 +97,7 @@ export const SOURCES: Source[] = [
 ];
 
 export const COMMANDS = [
+  { key: "context", name: "/context", desc: "Abrir questionário de preferências e contexto" },
   { key: "compare", name: "/compare", desc: "Flavor vs. last summer & code diffs" },
   { key: "churn-plan", name: "/churn-plan", desc: "Draft an autonomous execution plan" },
   { key: "restock", name: "/restock", desc: "Build a reorder list & install packages" },

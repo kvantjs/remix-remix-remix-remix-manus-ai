@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Favicon } from "@/lib/favicon";
+import React, { useEffect, useState, useMemo, useRef } from "react";
+import { MarkdownRenderer } from "./MarkdownRenderer";
 
 /* ─────────────────────────────────────────────────────────
  * STREAMING TEXT
@@ -9,44 +9,17 @@ import { Favicon } from "@/lib/favicon";
  * context, then actions and follow-up prompts become usable.
  * ───────────────────────────────────────────────────────── */
 
-const WORD_MS = 55;
-const HOLD_MS = 3400;
+const WORD_MS = 20;
 
-/* one streamed word, or a `cite` placeholder that renders an inline source chip */
-export type StreamingToken = { text: string; cite?: boolean };
+export type StreamingToken = { text: string; cite?: boolean; sourceIndex?: number };
 
-const TOKENS: StreamingToken[] = [
-  ..."Pistachio is your fastest-growing flavor — sales are up 23% this month and margins beat vanilla by 8 points."
-    .split(" ")
-    .map((text) => ({ text })),
-  { text: "", cite: true },
-  ..."Stone-fruit flavors are trending in the same range."
-    .split(" ")
-    .map((text) => ({ text })),
-];
+export type StreamingSource = { name: string; domain: string; href: string; image?: string };
 
-const FOLLOW_UPS = [
-  "Which flavors sell best in winter",
-  "Compare gelato and soft serve margins",
-];
-
-const SOURCE_IMAGES = {
-  scoop:
-    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%231f7a5f'/%3E%3Cpath d='M20 36c0 7 5.4 12 12 12s12-5 12-12H20Z' fill='%23fff'/%3E%3Ccircle cx='32' cy='25' r='11' fill='%23bff3dd'/%3E%3Cpath d='M24 24c4-7 13-7 17 0' fill='none' stroke='%231f7a5f' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E",
-  trends:
-    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%232f6fec'/%3E%3Cpath d='M15 43 27 31l8 7 14-18' fill='none' stroke='%23fff' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='49' cy='20' r='5' fill='%23bfe0ff'/%3E%3C/svg%3E",
-  market:
-    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23e56d24'/%3E%3Cpath d='M17 45V25h8v20h-8Zm11 0V16h8v29h-8Zm11 0V30h8v15h-8Z' fill='%23fff'/%3E%3Cpath d='M16 49h32' stroke='%23ffd6b8' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E",
-};
-
-/* one cited source rendered as an inline chip and in the sources list */
-export type StreamingSource = { name: string; domain: string; href: string; image: string };
-
-const SOURCES: StreamingSource[] = [
-  { name: "Scoop Data", domain: "scoopdata.io", href: "https://scoopdata.io/", image: SOURCE_IMAGES.scoop },
-  { name: "Trends Index", domain: "trends.google.com", href: "https://trends.google.com/trends/", image: SOURCE_IMAGES.trends },
-  { name: "Market Basket", domain: "marketbasket.io", href: "https://marketbasket.io/", image: SOURCE_IMAGES.market },
-];
+function sourceImage(source: StreamingSource) {
+  if (source.image) return source.image;
+  const domain = source.domain || "google.com";
+  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`;
+}
 
 function SourceChip({ source }: { source?: StreamingSource }) {
   if (!source) return null;
@@ -55,12 +28,12 @@ function SourceChip({ source }: { source?: StreamingSource }) {
       href={source.href}
       target="_blank"
       rel="noreferrer"
-      className="ml-0.5 mr-1 inline-flex h-5 items-center gap-1.5 rounded-[5px]
-        bg-[var(--hover-2)] pr-[6px] pl-[5px] align-middle font-mono text-[10.5px] text-[var(--ink-2)] border border-[var(--line)]
-        transition-colors duration-150 hover:bg-[var(--hover)] hover:text-[var(--ink)] cursor-pointer"
+      className="ml-0 mr-1 inline-flex h-4.5 translate-y-[-1px] items-center gap-1 rounded-[5px]
+        bg-black/30 dark:bg-white/10 pr-[4px] pl-[4px] align-middle font-mono text-[10.5px] text-slate-300 border border-white/10
+        transition-colors duration-150 hover:bg-white/15 hover:text-white cursor-pointer"
       style={{ animation: "pop-in 250ms cubic-bezier(0.23,1,0.32,1) both" }}
     >
-      <Favicon urlOrDomain={source.domain || source.href} size={11} className="rounded-[2px]" />
+      <img src={sourceImage(source)} alt="" className="source-avatar size-3 rounded-[3px]" />
       <span>{source.domain}</span>
     </a>
   );
@@ -81,163 +54,209 @@ export type StreamingLabels = {
 };
 
 const DEFAULT_LABELS: StreamingLabels = {
-  sources: "3 sources",
+  sources: "Fontes consultadas",
   followUps: "Sugestões de acompanhamento",
 };
 
-export default function StreamingText({
-  content = TOKENS,
-  sources = SOURCES,
-  followUps = FOLLOW_UPS,
-  labels,
-  loop = false,
-  fill = true,
-  onDone,
-  onFollowUp,
-}: {
+export interface StreamingTextProps {
   variant?: string;
-  /** the streamed tokens; `cite` tokens render an inline source chip */
-  content?: StreamingToken[];
+  /** the streamed tokens or raw string; supports full markdown rendering */
+  content?: StreamingToken[] | string;
   /** cited sources shown in the chip, avatar stack, and expanded list */
   sources?: StreamingSource[];
   /** follow-up prompt suggestions shown once the stream completes */
   followUps?: string[];
   /** prominent copy strings */
   labels?: Partial<StreamingLabels>;
-  /** restart the stream after a hold; turn off when embedding in a real thread */
+  /** restart the stream after a hold; default false */
   loop?: boolean;
-  /** fill the parent width instead of the gallery's fixed measure */
+  /** fill the parent width */
   fill?: boolean;
+  /** stream animation speed per token in milliseconds */
+  speedMs?: number;
+  /** when true, immediately shows full content without streaming animation */
+  initialDone?: boolean;
+  /** whether the message is actively streaming right now */
+  isStreaming?: boolean;
   onDone?: () => void;
   /** fired when a follow-up prompt is chosen */
   onFollowUp?: (text: string, index: number) => void;
-}) {
+  children?: React.ReactNode;
+}
+
+export default function StreamingText({
+  content = "",
+  sources,
+  followUps,
+  labels,
+  loop = false,
+  fill = true,
+  speedMs = WORD_MS,
+  initialDone = false,
+  isStreaming = false,
+  onDone,
+  onFollowUp,
+  children,
+}: StreamingTextProps = {}) {
   const l = { ...DEFAULT_LABELS, ...labels };
-  const [count, setCount] = useState(content.length); // Full length initially for real chat messages
+
+  const rawString = useMemo(() => {
+    if (typeof content === "string") return content;
+    if (Array.isArray(content)) {
+      return content.map((t) => t.text).join(" ");
+    }
+    return "";
+  }, [content]);
+
+  // Tokenize by words and punctuation for smooth progressive streaming
+  const tokens = useMemo(() => {
+    if (!rawString) return [];
+    return rawString.split(/(\s+)/).filter(Boolean);
+  }, [rawString]);
+
+  // If not explicitly streaming or initialDone is set, mark as done immediately
+  const shouldStream = isStreaming && !initialDone && tokens.length > 0;
+  const [count, setCount] = useState<number>(() => (shouldStream ? 1 : tokens.length));
   const [sourcesOpen, setSourcesOpen] = useState(false);
-  const done = count >= content.length;
+  const done = count >= tokens.length;
+  const hasCalledDoneRef = useRef(false);
 
   useEffect(() => {
-    // If we want actual streaming animation on mount, we initialize count at 0
-    if (!loop) {
-      setCount(content.length);
+    if (!shouldStream) {
+      setCount(tokens.length);
       return;
     }
-    setCount(0);
-    const interval = setInterval(() => {
+    setCount(1);
+    hasCalledDoneRef.current = false;
+  }, [tokens.length, shouldStream]);
+
+  useEffect(() => {
+    if (done) {
+      if (!hasCalledDoneRef.current) {
+        hasCalledDoneRef.current = true;
+        onDone?.();
+      }
+      return;
+    }
+
+    const interval = setTimeout(() => {
       setCount((c) => {
-        if (c >= content.length) {
-          clearInterval(interval);
-          onDone?.();
-          return c;
-        }
-        return c + 1;
+        const next = Math.min(tokens.length, c + 2); // advance 2 tokens for fluid feel
+        return next;
       });
-    }, WORD_MS);
-    return () => clearInterval(interval);
-  }, [content, loop]);
+    }, speedMs);
+
+    return () => clearTimeout(interval);
+  }, [count, done, tokens.length, speedMs, onDone]);
+
+  // Progressive text string during streaming
+  const currentDisplayedText = useMemo(() => {
+    if (done || !shouldStream) return rawString;
+    return tokens.slice(0, count).join("");
+  }, [done, shouldStream, rawString, tokens, count]);
 
   return (
-    <div className={fill ? "w-full" : "min-h-[15rem] w-full max-w-95"}>
-      <div className="text-[13px] leading-relaxed text-[var(--ink)]">
-        {content.slice(0, count).map((token, i) =>
-          token.cite ? (
-            <SourceChip key={i} source={sources[i % sources.length]} />
-          ) : (
-            <span key={i} className="inline">
-              {token.text}{" "}
-            </span>
-          ),
-        )}
-        {!done && (
-          <span
-            className="ml-0.5 inline-block h-3 w-0.5 translate-y-0.5 rounded-full bg-[var(--ink)]"
-            style={{ animation: "fade-in 150ms ease-out both" }}
-          />
-        )}
-      </div>
+    <div className={fill ? "w-full" : "min-h-[15.5rem] w-full max-w-95"}>
+      {children ? (
+        <div className="relative">{children}</div>
+      ) : (
+        <div className="text-sm leading-relaxed text-[#f4f4f5]">
+          <MarkdownRenderer content={currentDisplayedText} />
+        </div>
+      )}
 
-      {/* action icons row */}
-      {done && (
+      {/* action icons row (when sources available) */}
+      {sources && sources.length > 0 && (
         <div
-          className="mt-3 flex items-center gap-0.5 animate-in fade-in duration-300"
+          className="mt-2.5 flex items-center gap-0.5 transition-opacity duration-300"
+          style={{ opacity: done ? 1 : 0.6, pointerEvents: done ? "auto" : "none" }}
         >
           {ACTION_ICONS.map((icon, i) => (
             <button
               key={i}
               type="button"
               aria-label="Action"
-              className="flex size-6 items-center justify-center rounded-[6px] text-[var(--ink-3)]
-                transition-colors duration-100 hover:bg-[var(--hover-2)] hover:text-[var(--ink-2)] cursor-pointer"
+              className="flex size-6 items-center justify-center rounded-[6px] text-slate-400
+                transition-colors duration-100 hover:bg-white/10 hover:text-white cursor-pointer"
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 {icon}
               </svg>
             </button>
           ))}
-          {sources.length > 0 && (
-            <button
-              type="button"
-              aria-expanded={sourcesOpen}
-              onClick={() => setSourcesOpen((current) => !current)}
-              className="ml-2 flex items-center gap-1.5 rounded-[6px] px-2 py-0.5 text-left transition-colors duration-150 hover:bg-[var(--hover)] cursor-pointer"
-            >
-              <span className="flex -space-x-1 items-center">
-                {sources.slice(0, 3).map((source) => (
-                  <Favicon
-                    key={source.domain}
-                    urlOrDomain={source.domain || source.href}
-                    size={14}
-                    containerClassName="rounded-full bg-[var(--canvas)] border border-[var(--line)] shadow-sm"
-                  />
-                ))}
-              </span>
-              <span className="text-[11.5px] text-[var(--ink-2)] font-medium">{sources.length} sources</span>
-            </button>
-          )}
+          <button
+            type="button"
+            aria-expanded={sourcesOpen}
+            onClick={() => setSourcesOpen((current) => !current)}
+            className="ml-1.5 flex items-center gap-1.5 rounded-[6px] px-2 py-0.5 text-left transition-colors duration-150 hover:bg-white/5 cursor-pointer"
+          >
+            <span className="flex -space-x-1">
+              {sources.slice(0, 3).map((source, idx) => (
+                <img
+                  key={idx}
+                  src={sourceImage(source)}
+                  alt=""
+                  className="source-avatar size-3.5 rounded-full bg-slate-900 shadow-[0_0_0_1.5px_rgba(255,255,255,0.1)]"
+                />
+              ))}
+            </span>
+            <span className="text-[11.5px] text-slate-300">{sources.length} {l.sources}</span>
+          </button>
         </div>
       )}
 
-      {/* Expanded Sources Panel */}
-      {done && sourcesOpen && sources.length > 0 && (
+      {/* Collapsible Sources Box */}
+      {sources && sources.length > 0 && (
         <div
-          className="mt-2 grid animate-in fade-in duration-300"
+          className="grid transition-[grid-template-rows,opacity] duration-300"
+          style={{
+            gridTemplateRows: done && sourcesOpen ? "1fr" : "0fr",
+            opacity: done && sourcesOpen ? 1 : 0,
+            transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)",
+          }}
         >
-          <div className="flex flex-col rounded-[10px] bg-black/5 dark:bg-white/[0.02] p-1 border border-[var(--line)] max-w-lg">
-            {sources.map((source) => (
-              <a
-                key={source.domain}
-                href={source.href}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-2 rounded-[6px] px-2 py-1.5 text-[12px] text-[var(--ink-2)] transition-colors duration-150 hover:bg-[var(--hover)] hover:text-[var(--ink)]"
-              >
-                <Favicon urlOrDomain={source.domain || source.href} size={16} containerClassName="rounded-[4px] border border-[var(--line)]" />
-                <span className="hover:underline font-medium">{source.name}</span>
-                <span className="ml-auto font-mono text-[10.5px] text-[var(--ink-3)]">{source.domain}</span>
-              </a>
-            ))}
+          <div className="overflow-hidden">
+            <div className="mt-1.5 flex flex-col rounded-[10px] bg-black/40 border border-white/10 p-1.5 shadow-sm max-w-lg">
+              {sources.map((source, idx) => (
+                <a
+                  key={idx}
+                  href={source.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-2 rounded-[6px] px-2 py-1.5 text-[12px] text-slate-300 transition-colors duration-150 hover:bg-white/5 hover:text-white"
+                >
+                  <img src={sourceImage(source)} alt="" className="source-avatar size-4 rounded-[4px]" />
+                  <span className="hover:underline font-medium text-white">{source.name}</span>
+                  <span className="ml-auto font-mono text-[10.5px] text-slate-500">{source.domain}</span>
+                </a>
+              ))}
+            </div>
           </div>
         </div>
       )}
 
-      {/* follow-ups */}
+      {/* follow-ups suggestions */}
       {done && followUps && followUps.length > 0 && (
         <div
-          className="mt-4 pt-3 border-t border-[var(--line)] animate-in fade-in duration-500"
+          className="mt-3 transition-opacity duration-400"
+          style={{ opacity: done ? 1 : 0, pointerEvents: done ? "auto" : "none" }}
         >
-          <p className="text-[12px] font-semibold text-[var(--ink-2)] mb-1">{l.followUps}</p>
-          <div className="flex flex-col gap-1">
+          <p className="text-[11.5px] font-medium text-slate-400">{l.followUps}</p>
+          <div className="mt-1 flex flex-col gap-1">
             {followUps.map((text, i) => (
               <button
                 key={text}
                 onClick={() => onFollowUp?.(text, i)}
-                className="-mx-1.5 flex items-center gap-2 rounded-[7px] border-b border-[var(--line)] last:border-0
-                  px-2.5 py-1.5 text-left text-[12.5px] text-[var(--ink)] transition-colors
-                  duration-100 hover:bg-[var(--hover-2)] cursor-pointer"
-                style={{ animation: `fade-up 350ms cubic-bezier(0.23,1,0.32,1) ${i * 90}ms both` }}
+                className="flex items-center gap-2 rounded-[7px] border-b border-white/5
+                  px-2 py-1.5 text-left text-[12px] text-slate-200 transition-colors
+                  duration-100 hover:bg-white/5 hover:text-white cursor-pointer"
+                style={
+                  done
+                    ? { animation: `fade-up 350ms cubic-bezier(0.23,1,0.32,1) ${i * 70}ms both` }
+                    : { opacity: 0 }
+                }
               >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-[var(--ink-3)]">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-slate-500">
                   <path d="M9 10l-5 5 5 5" />
                   <path d="M20 4v7a4 4 0 0 1-4 4H4" />
                 </svg>

@@ -543,6 +543,12 @@ body {
 .dark div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > span:nth-of-type(1) {
   color: #ffffff;
 }
+.dark div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(2) > div:nth-of-type(3) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > ol:nth-of-type(1) > li:nth-of-type(1) > span:nth-of-type(1),
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(2) > div:nth-of-type(3) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > ol:nth-of-type(1) > li:nth-of-type(1) > span:nth-of-type(1) {
+  background-color: #1a1a1a;
+  border-color: #464646;
+  color: #ffffff;
+}
 
 /* Light Mode Equivalent Element Style Rules */
 .light div#root:nth-of-type(1) > div:nth-of-type(1) > aside:nth-of-type(1) > div:nth-of-type(1) {
