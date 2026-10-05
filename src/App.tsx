@@ -34,7 +34,7 @@ export default function App() {
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
 
   const [workspaceTab, setWorkspaceTab] = useState<'computer' | 'workspace'>('computer');
-
+  const [taskVersion, setTaskVersion] = useState(0);
 
   // Agent execution state for Computador do Kvant
   const [toolCalls, setToolCalls] = useState<ToolCallTrace[]>([]);
@@ -104,11 +104,21 @@ export default function App() {
     setPendingPrompt(prompt);
   }, []);
 
+  const handleNewTask = useCallback(() => {
+    setPendingPrompt(null);
+    setTaskVersion(prev => prev + 1);
+    setToolCalls([]);
+    setIsWorking(false);
+    setWorkingTime('0s');
+    setStatusText('Computador do Agente 100% Operacional');
+  }, []);
+
   return (
     <div className={`${theme} flex h-screen w-full bg-bg-canvas-main text-text-content-primary overflow-hidden font-sans selection:bg-blue-500/20`}>
-      <Sidebar theme={theme} toggleTheme={toggleTheme} />
+      <Sidebar theme={theme} toggleTheme={toggleTheme} onNewTask={handleNewTask} />
       <main className="flex-1 flex overflow-hidden relative">
-        <ChatArea 
+        <ChatArea
+          key={taskVersion}
           onFileUpdate={handleFileUpdate} 
           externalPrompt={pendingPrompt}
           onClearExternalPrompt={handleClearExternalPrompt}

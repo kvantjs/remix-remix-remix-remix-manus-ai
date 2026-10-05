@@ -495,9 +495,9 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
   };
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-[#141414] relative">
+    <div className="flex-1 flex flex-col min-w-0 bg-bg-canvas-main relative">
       {/* Header */}
-      <header className="h-14 flex items-center justify-between px-6 border-b border-white/5 shrink-0 z-10 bg-[#1a1a1a]">
+      <header className="h-16 flex items-center justify-between px-6 border-b border-border-divider-subtle shrink-0 z-10 bg-bg-surface-panel/80 backdrop-blur-xl">
         <div className="flex items-center gap-2.5 cursor-pointer hover:bg-white/5 px-2.5 py-1.5 rounded-lg transition-colors group">
           <img 
             src="https://imgdb.io/i/6lwOlmk.png" 
@@ -533,7 +533,7 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
       </header>
 
       {/* Messages Stream */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col items-center bg-[#1a1a1a]">
+      <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col items-center bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.055),transparent_35%),var(--color-bg-canvas-main)]">
         <div className="w-full max-w-3xl px-6 py-8 space-y-10">
           {messages.map((msg) => (
             <MessageItem 

@@ -17,9 +17,10 @@ import {
   Moon
 } from '@phosphor-icons/react';
 
-export function Sidebar({ theme, toggleTheme }: { theme: 'light' | 'dark'; toggleTheme: () => void }) {
+export function Sidebar({ theme, toggleTheme, onNewTask }: { theme: 'light' | 'dark'; toggleTheme: () => void; onNewTask?: () => void }) {
   return (
-    <aside className="w-64 bg-bg-surface-panel border-r border-border-divider-subtle flex flex-col h-full shrink-0">
+    <aside className="w-64 bg-bg-surface-panel/95 border-r border-border-divider-subtle flex flex-col h-full shrink-0 shadow-[12px_0_40px_rgba(0,0,0,0.12)]">
+      <div className="h-1 w-full bg-gradient-to-r from-blue-500 via-cyan-400 to-transparent opacity-80" />
       {/* Header */}
       <div className="p-4 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
@@ -38,9 +39,12 @@ export function Sidebar({ theme, toggleTheme }: { theme: 'light' | 'dark'; toggl
 
       {/* Main Nav */}
       <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-1 custom-scrollbar">
-        <button className="w-full flex items-center gap-3 px-3 py-2 text-sm text-text-content-primary/90 hover:bg-bg-action-hover rounded-lg transition-colors group">
-          <Plus size={18} className="text-text-content-primary/40 group-hover:text-text-content-primary" />
-          <span>Nova tarefa</span>
+        <button onClick={onNewTask} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-text-content-primary/90 hover:bg-bg-action-hover rounded-lg transition-colors group border border-transparent hover:border-border-divider-subtle" aria-label="Criar nova tarefa">
+          <span className="size-7 rounded-md bg-white/[0.08] flex items-center justify-center group-hover:bg-white/[0.14] transition-colors">
+            <Plus size={16} className="text-text-content-primary/60 group-hover:text-text-content-primary" />
+          </span>
+          <span className="font-medium">Nova tarefa</span>
+          <span className="ml-auto text-[10px] text-text-content-secondary/50 font-mono">⌘ K</span>
         </button>
 
         <div className="pt-2 pb-1">
