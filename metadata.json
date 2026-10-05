@@ -1,0 +1,8 @@
+{
+  "name": "Remix Remix Remix Remix Manus AI",
+  "description": "A high-fidelity recreation of the Manus AI agent platform, featuring a multi-pane workspace, real-time agent execution logs, and an integrated IDE.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
