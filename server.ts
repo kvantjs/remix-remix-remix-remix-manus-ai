@@ -387,11 +387,12 @@ app.post('/api/scheduled/agent', async (req, res) => {
 // Initialize Google GenAI
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-// Multi-model fallback priority chain with active Gemini 3.x models
+// Multi-model fallback priority chain with active Gemini models
 const MODEL_CANDIDATES = [
-  'gemini-3.8-flash',
-  'gemini-3.1-flash-lite',
-  'gemini-2.5-flash-lite'
+  'gemini-3.5-flash-lite',
+  'gemini-3.5-flash',
+  'gemini-2.5-flash',
+  'gemini-1.5-flash'
 ];
 
 // System prompt strictly enforcing bespoke branding, production design rules, and high interactivity:
@@ -444,7 +445,7 @@ AS 7 LEIS INVIOLÁVEIS DO AGENTE DE CRIAÇÃO:
 - Ícones contextuais da biblioteca '@phosphor-icons/react' (ou 'lucide-react') com dimensões padronizadas (size={16} a {20}) e alinhados harmoniosamente com o texto.
 
 7. ARQUITETURA DE CÓDIGO AUTÔNOMO ROBUSTO
-- NUNCA cuspa blocos de código no campo "response". O chat é para síntese executiva de alto nível. O código pertence EXCLUSIVAMENTE ao array "files" no arquivo "client/src/App.tsx".
+- NUNCA, SOB NENHUMA CIRCUNSTÂNCIA, envie blocos de código ou listagens de código no campo "response" (que vai para o chat). O chat é estritamente para conversas e síntese executiva de alto nível. Qualquer código deve pertencer EXCLUSIVAMENTE ao array "files" (como por exemplo "client/src/App.tsx") e NUNCA ser repetido no chat.
 - O arquivo principal DEVE ser "client/src/App.tsx" com "export default function App() { ... }".
 - Código 100% puro e completo TypeScript/React com Tailwind CSS, sem comentários preguiçosos ("// adicione aqui"), pronto para rodar no navegador.
 
@@ -470,42 +471,10 @@ AS 7 LEIS INVIOLÁVEIS DO AGENTE DE CRIAÇÃO:
 - Em cada turno, use somente as ferramentas permitidas pelo modo classificado. Se houver ambiguidade ou mudança de modo, peça esclarecimento antes de agir.
 - Nunca alegue ação, navegação, arquivo, chamada de ferramenta, fonte ou resultado que não tenha sido realmente executado e registrado.
 
-ESTRUTURA JSON OBRIGATÓRIA:
-{
-  "thought": "Raciocínio detalhado sobre a demanda, paleta de cores exclusiva escolhida, arquitetura e estados interativos implementados de acordo com a Constituição de Design.",
-  "workingTime": "28s",
-  "logs": [
-    { "id": 1, "type": "command", "content": "Definiu identidade visual única, paleta de cores e tipografia de produção", "time": "12:00" },
-    { "id": 2, "type": "tool", "content": "fs.writeFile client/src/App.tsx com estados dinâmicos e componentes", "time": "12:01" },
-    { "id": 3, "type": "info", "content": "Compilação Vite e verificação de tipagem aprovadas com 0 erros", "time": "12:01" }
-  ],
-  "toolCalls": [
-    {
-      "id": "tc_1",
-      "toolName": "fs.writeFile",
-      "server": "workspace_filesystem",
-      "arguments": { "path": "client/src/App.tsx", "mode": "write" },
-      "result": "Arquivo client/src/App.tsx gravado com sucesso.",
-      "timestamp": "12:00:15",
-      "status": "success"
-    }
-  ],
-  "response": "Síntese executiva elegante destacando o conceito visual único, as cores escolhidas, os recursos interativos dinâmicos e instruções de teste no preview.",
-  "clarifications": [],
-  "suggestions": [
-    "Testar as interações dinâmicas no Preview de Runtime",
-    "Adicionar novo módulo ou fluxo interativo",
-    "Inspecionar o código completo no Workspace"
-  ],
-  "files": [
-    {
-      "path": "client/src/App.tsx",
-      "code": "Código React completo funcional com design próprio e estados dinâmicos",
-      "lang": "typescript"
-    }
-  ]
-}
-Responda APENAS o JSON puro.`;
+DIRETIVA DE FORMATO DE RESPOSTA EM PORTUGUÊS:
+- Você deve responder SEMPRE em texto Markdown corrido de forma humana, natural, amigável e explicativa, em PORTUGUÊS.
+- NUNCA, SOB NENHUMA CIRCUNSTÂNCIA, retorne uma estrutura JSON, blocos JSON ou tags JSON em suas respostas de texto. Suas respostas devem ser de texto corrido puramente explicativo para o usuário.
+- Se você criar ou modificar algum código através de ferramentas (como fs.writeFile), descreva o que você fez em termos de alto nível no texto, mas nunca coloque o código bruto no texto do chat.`;
 
 // Autonomous cognitive engine fallback when cloud model has 503 high demand or quota
 function generateAutonomousRuleEnforcedFallback(
@@ -3818,6 +3787,42 @@ app.get('/api/agent/intent', (req, res) => {
   return res.json(classifyAgentIntent(message));
 });
 
+function extractExplanationFromAccidentalJson(text: string): string {
+  if (!text) return text;
+  const trimmed = text.trim();
+  if (trimmed.startsWith('{') && trimmed.includes('}')) {
+    try {
+      const startIdx = trimmed.indexOf('{');
+      const endIdx = trimmed.lastIndexOf('}') + 1;
+      const jsonStr = trimmed.slice(startIdx, endIdx);
+      const parsed = JSON.parse(jsonStr);
+      if (parsed.response && typeof parsed.response === 'string') {
+        return parsed.response;
+      }
+      if (parsed.explanation && typeof parsed.explanation === 'string') {
+        return parsed.explanation;
+      }
+    } catch (e) {
+      const matchResponse = trimmed.match(/"response"\s*:\s*"([\s\S]*?)"/);
+      if (matchResponse && matchResponse[1]) {
+        return matchResponse[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+      }
+      const matchExplanation = trimmed.match(/"explanation"\s*:\s*"([\s\S]*?)"/);
+      if (matchExplanation && matchExplanation[1]) {
+        return matchExplanation[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+      }
+    }
+  }
+  return text;
+}
+
+function cleanChatResponseOfCodeBlocks(text: string): string {
+  if (!text) return text;
+  let cleaned = extractExplanationFromAccidentalJson(text);
+  // This will match any block starting with ``` and ending with ```
+  return cleaned.replace(/```[a-zA-Z0-9+#-]*\n[\s\S]*?```/g, '\n*(O código completo foi gerado e atualizado na aba Código no Workspace)*\n');
+}
+
 // 7. Streaming Agent Chat Endpoint (Server-Sent Events) with Real Function Calling
 app.post('/api/agent/chat/stream', async (req, res) => {
   const { message, history, currentFiles } = req.body;
@@ -3887,11 +3892,34 @@ app.post('/api/agent/chat/stream', async (req, res) => {
             modelResponse = await Promise.race([responsePromise, timeoutPromise]);
             break;
           } catch (err: any) {
-            console.warn(`[Stream Gemini API] ${modelCandidate} erro:`, err.message);
+            console.log(`[CoreSpark] Candidate ${modelCandidate} transition: proceeding to next candidate`);
           }
         }
 
-        if (!modelResponse) break;
+        if (!modelResponse) {
+          if (!modelTextResponse && executedToolCalls.length === 0) {
+            console.warn('[CoreSpark Engine] All API models rate-limited or unavailable. Activating autonomous fallback engine.');
+            const fallbackResult = generateAutonomousRuleEnforcedFallback(message, history, currentFiles);
+            modelTextResponse = fallbackResult.explanation;
+            if (fallbackResult.files && fallbackResult.files.length > 0) {
+              const codeToWrite = fallbackResult.files[0].code;
+              const execResult = await agentToolExecutor.executeTool('fs.writeFile', {
+                filePath: 'client/src/App.tsx',
+                content: codeToWrite
+              });
+              executedToolCalls.push({
+                id: `trace_${Date.now()}`,
+                toolName: 'fs.writeFile',
+                server: 'workspace_fs',
+                arguments: { filePath: 'client/src/App.tsx' },
+                result: JSON.stringify(execResult.result),
+                timestamp: new Date().toLocaleTimeString(),
+                status: 'success'
+              });
+            }
+          }
+          break;
+        }
 
         const candidate = modelResponse.candidates?.[0];
         const parts = candidate?.content?.parts || [];
@@ -3934,7 +3962,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
           if (Array.isArray(execResult.result?.steps)) {
             for (const step of execResult.result.steps) {
               sendEvent('step', { text: step.detail ? `${step.label}: ${step.detail}` : step.label, toolName });
-              await new Promise(r => setTimeout(r, 250));
+              await new Promise(r => setTimeout(r, 1200));
             }
           }
 
@@ -3993,7 +4021,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
 
       const finalResult: any = {
         thought: `Agente completou raciocínio com ${executedToolCalls.length} execuções de ferramentas reais.`,
-        explanation: modelTextResponse || (pendingApproval ? 'Aguardando sua autorização para prosseguir com a operação.' : 'Tarefa concluída com sucesso no Computador na Nuvem.'),
+        explanation: cleanChatResponseOfCodeBlocks(modelTextResponse) || (pendingApproval ? 'Aguardando sua autorização para prosseguir com a operação.' : 'Tarefa concluída com sucesso no Computador na Nuvem.'),
         files: [],
         sources: webSources,
         toolCalls: executedToolCalls,
@@ -4106,6 +4134,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
       };
     }
 
+    finalResult.explanation = cleanChatResponseOfCodeBlocks(finalResult.explanation);
     finalResult.intent = intent;
     sendEvent('complete', finalResult);
     res.end();
@@ -4248,7 +4277,7 @@ app.post('/api/agent/chat', async (req, res) => {
 
         return res.json({
           thought: `Agente completou a tarefa com ${executedToolCalls.length} ferramentas reais executadas.`,
-          response: finalModelText || 'Ação executada com sucesso no computador na nuvem.',
+          response: cleanChatResponseOfCodeBlocks(finalModelText) || 'Ação executada com sucesso no computador na nuvem.',
           files: [],
           sources: webSources,
           toolCalls: executedToolCalls,
@@ -4319,6 +4348,9 @@ app.post('/api/agent/chat', async (req, res) => {
   fallback.toolCalls = executedToolCalls;
   fallback.sources = webSources;
   fallback.intent = intent;
+  if (fallback.response) {
+    fallback.response = cleanChatResponseOfCodeBlocks(fallback.response);
+  }
   return res.json(fallback);
 });
 

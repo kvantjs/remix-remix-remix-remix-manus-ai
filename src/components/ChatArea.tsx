@@ -36,6 +36,9 @@ import { ToolCallTrace, AgentExecutionLog } from '../types/project';
 import { markdownFences } from '@/components/reui/code-block/code-block-highlight';
 import { ProfessionalCodeBlock } from './ProfessionalCodeBlock';
 import { SyntaxCodeView, InlineCodeSnippet } from './SyntaxCodeView';
+import ThinkingState, { ThinkingStateGroup } from './ThinkingState';
+import ToolChips from './ToolChips';
+import StreamingText from './StreamingText';
 
 interface ChatMessage {
   id: string;
@@ -499,7 +502,7 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
             alt="Logotipo do Agente" 
             className="size-6 object-contain rounded-md shadow-xs" 
           />
-          <span className="text-sm font-medium text-[#dcdcdc]">CoreSpark</span>
+          <span className="text-sm font-medium text-[#dcdcdc]">manus</span>
           <span className="text-[10px] bg-green-500/10 text-green-400 border border-green-500/20 px-1.5 py-0.5 rounded-full font-mono flex items-center gap-1">
             <span className="size-1.5 bg-green-400 rounded-full animate-pulse" />
             Online
@@ -552,7 +555,7 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
           ))}
           
           {isThinking && (
-            <ThinkingState 
+            <LocalActiveThinkingState 
               elapsedSeconds={elapsedSeconds} 
               step={currentStep}
               steps={executionSteps}
@@ -573,7 +576,7 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
         />
         
         <p className="mt-2 text-center text-[10px] text-[#dcdcdc]/30">
-          CoreSpark (Versão de Desenvolvimento) ativo: executa comandos, gera código na aba Código, renderiza no Runtime e chama ferramentas MCP.
+          manus (Versão de Desenvolvimento) ativo: executa comandos, gera código na aba Código, renderiza no Runtime e chama ferramentas MCP.
         </p>
       </div>
     </div>
@@ -601,7 +604,7 @@ function MessageItem({
   if (!isAssistant) {
     return (
       <div className="flex justify-end">
-        <div className="bg-[#262626] px-4 py-2.5 rounded-2xl max-w-[85%] text-sm leading-relaxed border border-white/5 text-[#dcdcdc] shadow-xs">
+        <div className="bg-bg-action-hover/60 px-4 py-2.5 rounded-2xl max-w-[85%] text-sm leading-relaxed border border-border-divider-subtle text-text-content-primary shadow-xs">
           <MarkdownRenderer content={message.content} />
         </div>
       </div>
@@ -615,11 +618,11 @@ function MessageItem({
         <img 
           src="https://imgdb.io/i/6lwOlmk.png" 
           alt="Logotipo do Agente" 
-          className="size-6 object-contain rounded-md shadow-xs bg-white/5 p-0.5" 
+          className="size-6 object-contain rounded-md shadow-xs bg-bg-surface-panel p-0.5" 
         />
         <div className="flex items-center gap-2 text-xs font-medium">
-          <span className="text-[#dcdcdc]">manus</span>
-          <span className="text-[9px] bg-white/5 border border-white/5 px-1.5 py-0.5 rounded text-[#dcdcdc]/50 font-mono">
+          <span className="text-text-content-primary">manus</span>
+          <span className="text-[9px] bg-bg-action-hover border border-border-divider-subtle px-1.5 py-0.5 rounded text-text-content-secondary font-mono">
             Autonomous Agent
           </span>
         </div>
@@ -631,24 +634,24 @@ function MessageItem({
         )}
 
         {/* Clean Executive Response Text with Markdown Renderer */}
-        <div className="text-sm leading-relaxed text-[#dcdcdc]/90 font-sans">
+        <div className="text-sm leading-relaxed text-text-content-primary/90 font-sans">
           <MarkdownRenderer content={cleanText} />
         </div>
 
         {/* Generated Files Notification Box (Vibecoding Clean UI) */}
         {message.files && message.files.length > 0 && (
-          <div className="bg-[#202020] border border-white/5 rounded-xl p-3.5 space-y-3">
+          <div className="bg-bg-surface-panel border border-border-divider-subtle rounded-xl p-3.5 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Code size={15} className="text-blue-400" />
-                <span className="text-xs font-semibold text-white">Arquivos Gerados & Sincronizados</span>
+                <span className="text-xs font-semibold text-text-content-primary">Arquivos Gerados & Sincronizados</span>
                 <span className="text-[10px] bg-green-500/10 text-green-400 border border-green-500/20 px-1.5 py-0.5 rounded-full font-mono">
                   {message.files.length} arquivo(s)
                 </span>
               </div>
               <button
                 onClick={() => setShowCodeSnippet(!showCodeSnippet)}
-                className="text-[11px] text-white/50 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
+                className="text-[11px] text-text-content-secondary hover:text-text-content-primary flex items-center gap-1 cursor-pointer transition-colors"
               >
                 <span>{showCodeSnippet ? 'Ocultar código' : 'Ver código'}</span>
                 <CaretRight size={12} className={`transition-transform ${showCodeSnippet ? 'rotate-90' : ''}`} />
@@ -657,12 +660,12 @@ function MessageItem({
 
             <div className="space-y-1.5">
               {message.files.map((file, fIdx) => (
-                <div key={fIdx} className="bg-[#212121] border border-white/5 rounded-lg px-3 py-2 flex items-center justify-between text-xs">
+                <div key={fIdx} className="bg-bg-canvas-main/50 border border-border-divider-subtle rounded-lg px-3 py-2 flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2 font-mono text-[11px]">
                     <FileText size={14} className="text-blue-400 shrink-0" />
-                    <span className="text-white/90 font-medium">{file.path}</span>
+                    <span className="text-text-content-primary/90 font-medium">{file.path}</span>
                   </div>
-                  <span className="text-[10px] text-white/40">
+                  <span className="text-[10px] text-text-content-secondary/60">
                     {file.code.split('\n').length} linhas · TypeScript
                   </span>
                 </div>
@@ -671,14 +674,14 @@ function MessageItem({
 
             {/* Collapsible Inspection with Professional Code Block */}
             {showCodeSnippet && (
-              <div className="pt-2 border-t border-white/5 space-y-3 animate-in fade-in duration-200">
+              <div className="pt-2 border-t border-border-divider-subtle space-y-3 animate-in fade-in duration-200">
                 {message.files.map((file, fIdx) => (
                   <ProfessionalCodeBlock 
-                    key={fIdx}
-                    code={file.code}
-                    language={file.lang || 'typescript'}
-                    filename={file.path}
-                    diff={{ added: "1-999" }}
+                     key={fIdx}
+                     code={file.code}
+                     language={file.lang || 'typescript'}
+                     filename={file.path}
+                     diff={{ added: "1-999" }}
                   />
                 ))}
               </div>
@@ -688,8 +691,8 @@ function MessageItem({
 
         {/* Web Search Sources & Citations (Grounding) */}
         {message.sources && message.sources.length > 0 && (
-          <div className="bg-[#1c1c1e] border border-white/10 rounded-xl p-3.5 space-y-2.5">
-            <div className="flex items-center gap-2 text-xs font-semibold text-white/90">
+          <div className="bg-bg-surface-panel border border-border-divider-subtle rounded-xl p-3.5 space-y-2.5">
+            <div className="flex items-center gap-2 text-xs font-semibold text-text-content-primary">
               <Globe size={14} className="text-cyan-400" />
               <span>Fontes da Web Consultadas ({message.sources.length})</span>
             </div>
@@ -700,20 +703,20 @@ function MessageItem({
                   href={src.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="bg-[#242426] hover:bg-[#2c2c30] border border-white/5 rounded-lg p-2.5 text-xs space-y-1 block transition-all group cursor-pointer"
+                  className="bg-bg-canvas-main/40 hover:bg-bg-action-hover border border-border-divider-subtle/50 rounded-lg p-2.5 text-xs space-y-1 block transition-all group cursor-pointer"
                 >
                   <div className="flex items-center justify-between gap-1">
                     <span className="font-medium text-blue-400 group-hover:text-blue-300 truncate text-[11px]">
                       {src.title}
                     </span>
-                    <ArrowSquareOut size={11} className="text-white/40 group-hover:text-white shrink-0" />
+                    <ArrowSquareOut size={11} className="text-text-content-secondary/60 group-hover:text-text-content-primary shrink-0" />
                   </div>
                   {src.snippet && (
-                    <p className="text-[10px] text-white/60 line-clamp-2 leading-relaxed">
+                    <p className="text-[10px] text-text-content-secondary/85 line-clamp-2 leading-relaxed">
                       {src.snippet}
                     </p>
                   )}
-                  <span className="text-[9px] text-white/30 font-mono truncate block">
+                  <span className="text-[9px] text-text-content-secondary/40 font-mono truncate block">
                     {src.url}
                   </span>
                 </a>
@@ -737,7 +740,7 @@ function MessageItem({
               </span>
             </div>
 
-            <p className="text-xs text-white/80 leading-relaxed">
+            <p className="text-xs text-text-content-primary/80 leading-relaxed">
               {message.approval.reason}
             </p>
 
@@ -783,18 +786,18 @@ function MessageItem({
 
         {/* Downloadable Artifacts Box */}
         {message.artifacts && message.artifacts.length > 0 && (
-          <div className="bg-[#1c1c1e] border border-white/10 rounded-xl p-3.5 space-y-2">
-            <div className="flex items-center gap-2 text-xs font-semibold text-white/90">
+          <div className="bg-bg-surface-panel border border-border-divider-subtle rounded-xl p-3.5 space-y-2">
+            <div className="flex items-center gap-2 text-xs font-semibold text-text-content-primary animate-pulse">
               <DownloadSimple size={14} className="text-green-400" />
               <span>Artefatos de Trabalho Gerados ({message.artifacts.length})</span>
             </div>
             <div className="space-y-1.5 pt-1">
               {message.artifacts.map((art) => (
-                <div key={art.id} className="bg-[#242426] border border-white/5 rounded-lg px-3 py-2 flex items-center justify-between text-xs">
+                <div key={art.id} className="bg-bg-canvas-main/40 border border-border-divider-subtle/50 rounded-lg px-3 py-2 flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2 font-mono text-[11px]">
                     <FileText size={14} className="text-blue-400" />
-                    <span className="text-white/90 font-medium">{art.name}</span>
-                    <span className="text-white/40 text-[10px]">({Math.round(art.sizeBytes / 1024)} KB)</span>
+                    <span className="text-text-content-primary font-medium">{art.name}</span>
+                    <span className="text-text-content-secondary/60 text-[10px]">({Math.round(art.sizeBytes / 1024)} KB)</span>
                   </div>
                   <a
                     href={art.downloadUrl}
@@ -817,7 +820,7 @@ function MessageItem({
               <Question size={14} />
               <span>Pontos de Clarificação da Demanda</span>
             </div>
-            <p className="text-[11px] text-white/50">
+            <p className="text-[11px] text-text-content-secondary/60">
               Para refinar ainda mais a arquitetura na próxima etapa, confirme se deseja especificar:
             </p>
             <div className="space-y-1.5 pt-1">
@@ -825,10 +828,10 @@ function MessageItem({
                 <button
                   key={idx}
                   onClick={() => onSelectSuggestion(q)}
-                  className="w-full text-left p-2 rounded-lg bg-black/20 hover:bg-black/40 border border-white/5 text-[#dcdcdc]/80 hover:text-white transition-colors flex items-center justify-between text-xs"
+                  className="w-full text-left p-2 rounded-lg bg-bg-canvas-main/50 hover:bg-bg-action-hover border border-border-divider-subtle text-text-content-primary/80 hover:text-text-content-primary transition-colors flex items-center justify-between text-xs"
                 >
                   <span>{q}</span>
-                  <ArrowRight size={12} className="text-white/30 shrink-0" />
+                  <ArrowRight size={12} className="text-text-content-secondary/50 shrink-0" />
                 </button>
               ))}
             </div>
@@ -837,7 +840,7 @@ function MessageItem({
 
         {/* Task Completion Bar */}
         {message.status === 'completed' && (
-          <div className="flex items-center justify-between pt-2 border-t border-white/5">
+          <div className="flex items-center justify-between pt-2 border-t border-border-divider-subtle">
              <div className="flex items-center gap-4">
                 <div className="flex items-center gap-1.5 text-green-400 text-xs font-medium">
                   <div className="size-4 bg-green-500/20 rounded-full flex items-center justify-center">
@@ -845,14 +848,14 @@ function MessageItem({
                   </div>
                   <span>Tarefa concluída</span>
                 </div>
-                <div className="flex items-center gap-2 text-[#dcdcdc]/30 text-xs">
+                <div className="flex items-center gap-2 text-text-content-secondary/40 text-xs">
                   <button 
                     onClick={() => {
                       navigator.clipboard?.writeText(message.content);
                       setCopied(true);
                       setTimeout(() => setCopied(false), 2000);
                     }}
-                    className="hover:text-[#dcdcdc] transition-colors" 
+                    className="hover:text-text-content-primary transition-colors" 
                     title="Copiar resposta"
                   >
                     {copied ? <Check size={13} className="text-green-400" /> : <Copy size={13} />}
@@ -861,11 +864,11 @@ function MessageItem({
                 </div>
              </div>
 
-             <div className="flex items-center gap-2 text-[#dcdcdc]/30">
+             <div className="flex items-center gap-2 text-text-content-secondary/40">
                <span className="text-[10px]">Avaliar resultado:</span>
                <div className="flex gap-0.5 cursor-pointer">
                  {[1,2,3,4,5].map(i => (
-                   <Star key={i} size={11} className="hover:text-yellow-400 transition-colors" />
+                    <Star key={i} size={11} className="hover:text-yellow-400 transition-colors" />
                  ))}
                </div>
              </div>
@@ -875,17 +878,17 @@ function MessageItem({
         {/* Dynamic Follow-up Suggestions */}
         {message.suggestions && message.suggestions.length > 0 && (
           <div className="space-y-2 pt-2">
-            <span className="text-[10px] font-bold text-[#dcdcdc]/30 uppercase tracking-wider block">
+            <span className="text-[10px] font-bold text-text-content-secondary/45 uppercase tracking-wider block">
               Próximos passos recomendados
             </span>
             {message.suggestions.map((s: string, i: number) => (
               <button 
                 key={i} 
                 onClick={() => onSelectSuggestion(s)}
-                className="w-full text-left p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] hover:border-white/10 transition-all flex items-center justify-between group cursor-pointer"
+                className="w-full text-left p-3 rounded-xl bg-bg-surface-panel/30 border border-border-divider-subtle hover:bg-bg-action-hover transition-all flex items-center justify-between group cursor-pointer"
               >
-                <span className="text-xs text-[#dcdcdc]/70 group-hover:text-[#dcdcdc]">{s}</span>
-                <ArrowRight size={13} className="text-[#dcdcdc]/20 group-hover:text-[#dcdcdc]/60 group-hover:translate-x-0.5 transition-all" />
+                <span className="text-xs text-text-content-secondary group-hover:text-text-content-primary">{s}</span>
+                <ArrowRight size={13} className="text-text-content-secondary/20 group-hover:text-text-content-secondary/60 group-hover:translate-x-0.5 transition-all" />
               </button>
             ))}
           </div>
@@ -895,7 +898,115 @@ function MessageItem({
   );
 }
 
-function ThinkingState({ elapsedSeconds, step, steps }: { elapsedSeconds: number; step: string; steps: ExecutionStep[] }) {
+function LocalActiveThinkingState({ elapsedSeconds, step, steps }: { elapsedSeconds: number; step: string; steps: ExecutionStep[] }) {
+  const [phase, setPhase] = useState<0 | 1 | 2 | 3>(0);
+
+  useEffect(() => {
+    if (steps.length === 0) {
+      setPhase(0);
+    }
+  }, [steps.length]);
+
+  useEffect(() => {
+    if (phase === 0) {
+      const t = setTimeout(() => setPhase(1), 3200); // 3.2s for Pensando
+      return () => clearTimeout(t);
+    } else if (phase === 1) {
+      const t = setTimeout(() => setPhase(2), 4200); // 4.2s for Raciocinando
+      return () => clearTimeout(t);
+    }
+  }, [phase]);
+
+  // A step is a real web search only if it explicitly involves search engines or browsing and is NOT a command, terminal, check, or sandbox task.
+  const isWebSearchStep = (text: string) => {
+    const isCommandOrCheck = /verify|check|exec|run|npm|test|install|sandbox|terminal|fs_|c[oó]digo|write|read/i.test(text);
+    if (isCommandOrCheck) return false;
+    return /google|bing|search|pesquis|crawler|navigate|url|site/i.test(text);
+  };
+
+  const hasSearchInHistory = steps.some(s => isWebSearchStep(`${s.label} ${s.detail}`));
+  const hasCodingInHistory = steps.some(s => !isWebSearchStep(`${s.label} ${s.detail}`) && /write|read|edit|c[oó]digo|npm|terminal|arquivo|fs_writeFile|fs_readFile|terminal_exec|sandbox|verify|check|exec|run/i.test(`${s.label} ${s.detail}`));
+
+  const isCurrentlySearching = isWebSearchStep(`${step} ${steps.find(s => s.status === 'running')?.label || ''}`);
+  const isCurrentlyCoding = !isCurrentlySearching && /write|read|edit|c[oó]digo|npm|terminal|arquivo|fs_writeFile|fs_readFile|terminal_exec|sandbox|verify|check|exec|run/i.test(`${step} ${steps.find(s => s.status === 'running')?.label || ''}`);
+
+  const isQueryRelatedToSearch = !isCurrentlyCoding && !hasCodingInHistory && /pesquis|procur|buscar|google|site|link|naveg|url|search|find|ycombinator|github/i.test(step);
+  const isQueryRelatedToCoding = /cria|codigo|escreve|edit|pasta|file|create|app|npm|run|install|yarn|verify|check|exec|sandbox/i.test(step);
+
+  const isReasoningActive = step.toLowerCase().includes('racioc') || step.toLowerCase().includes('analis') || step.toLowerCase().includes('planej');
+
+  // Determine active variant based on sequential cognitive phase:
+  // Phase 0: "Steps" (Thinking)
+  // Phase 1: "Reasoning" (Raciocínio)
+  // Phase 2: "Steps" (Thinking novamente)
+  // Phase 3: Context-aware variant ("Search", "Coding", or "Steps")
+  let contextVariant = "Steps";
+  if (isCurrentlyCoding || hasCodingInHistory || isQueryRelatedToCoding) {
+    contextVariant = "Coding";
+  } else if (isCurrentlySearching || hasSearchInHistory || isQueryRelatedToSearch) {
+    contextVariant = "Search";
+  } else if (isReasoningActive) {
+    contextVariant = "Reasoning";
+  }
+
+  // Enforce natural cognitive stage progression so every animation is clearly visible:
+  // Phase 0: "Steps" (Pensando - 3.2s) -> Phase 1: "Reasoning" (Raciocinando - 4.2s) -> Phase 2+: Action execution ("Coding" or "Search")
+  let currentVariant = "Steps";
+  if (phase === 0) {
+    currentVariant = "Steps";
+  } else if (phase === 1) {
+    currentVariant = "Reasoning";
+  } else {
+    currentVariant = contextVariant === "Steps" ? "Coding" : contextVariant;
+  }
+
+  // In Phase < 3, if no real steps exist yet, we show the initial trace. As soon as steps arrive, we map ALL of them dynamically!
+  const mappedRows = steps.length > 0 ? steps.map(s => ({
+    primary: s.label,
+    secondary: s.detail,
+    mono: contextVariant === "Coding" || s.label.includes('.') || s.label.includes('npm') || s.label.includes('run')
+  })) : undefined;
+
+  const mappedToolSteps = steps.map(s => {
+    let icon = "think";
+    const lowercaseLabel = s.label.toLowerCase();
+    
+    if (lowercaseLabel.includes("escrev") || lowercaseLabel.includes("grav") || lowercaseLabel.includes("salv") || lowercaseLabel.includes("write") || lowercaseLabel.includes("edit") || lowercaseLabel.includes("cri") || lowercaseLabel.includes("alter")) {
+      icon = "write";
+    } else if (lowercaseLabel.includes("execut") || lowercaseLabel.includes("rod") || lowercaseLabel.includes("run") || lowercaseLabel.includes("npm") || lowercaseLabel.includes("check") || lowercaseLabel.includes("test")) {
+      icon = "run";
+    } else if (lowercaseLabel.includes("leit") || lowercaseLabel.includes("ler") || lowercaseLabel.includes("read") || lowercaseLabel.includes("scan") || lowercaseLabel.includes("carreg")) {
+      icon = "read";
+    }
+
+    return {
+      icon,
+      label: s.label,
+      chip: s.detail || "Executando...",
+      mono: icon === "write" || icon === "run",
+      detailMono: icon === "write" || icon === "run",
+      detail: s.detail ? [{ text: s.detail }] : []
+    };
+  });
+
+  const diffs: any[] = [];
+  const diffLines: Record<string, any[]> = {};
+
+  steps.forEach(s => {
+    if (s.label.toLowerCase().includes("write") || s.label.toLowerCase().includes("edit") || s.label.toLowerCase().includes("escrev") || s.label.toLowerCase().includes("grav")) {
+      const match = s.detail.match(/([a-zA-Z0-9_-]+\.[a-zA-Z0-9]+)/);
+      if (match && match[1]) {
+        const file = match[1];
+        if (!diffs.some(d => d.file === file)) {
+          diffs.push({ file, add: 1, del: 0 });
+          diffLines[file] = [
+            { text: s.detail, tone: "add" }
+          ];
+        }
+      }
+    }
+  });
+
   return (
     <div className="w-full max-w-[820px] space-y-4 animate-in fade-in duration-300">
        <div className="flex items-center gap-2.5">
@@ -905,14 +1016,30 @@ function ThinkingState({ elapsedSeconds, step, steps }: { elapsedSeconds: number
           className="size-6 object-contain rounded-md shadow-xs bg-white/5 p-0.5 animate-pulse" 
         />
         <div className="flex items-center gap-2 text-xs font-medium">
-          <span className="text-[#dcdcdc]">manus</span>
-          <span className="text-[9px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-1.5 rounded">
-            Executando
+          <span className="text-text-content-primary">manus</span>
+          <span className="text-[9px] bg-bg-action-hover border border-border-divider-subtle px-1.5 py-0.5 rounded text-text-content-secondary font-mono">
+            Executando · {elapsedSeconds || 1}s
           </span>
         </div>
       </div>
-      <div className="w-full pl-8 bg-transparent">
-        <ExecutionTimeline steps={steps} activeStep={step} elapsedSeconds={elapsedSeconds} />
+      
+      {/* Transitions smoothly between variants with a stable variant key */}
+      <div key={`thinking_trace_${currentVariant}`} className="pl-8 bg-transparent transition-all duration-300 ease-out">
+        {currentVariant === "Coding" ? (
+          <ToolChips 
+            steps={mappedToolSteps.length > 0 ? mappedToolSteps : undefined} 
+            diffs={diffs.length > 0 ? diffs : undefined}
+            diffLines={Object.keys(diffLines).length > 0 ? diffLines : undefined}
+            labels={{ header: `${steps.length} chamadas de ferramentas (${elapsedSeconds || 1}s)` }}
+          />
+        ) : (
+          <ThinkingState 
+            variant={currentVariant} 
+            rows={mappedRows} 
+            elapsedSeconds={elapsedSeconds}
+            active={currentVariant === "Search" ? `Pesquisando: ${step || "fontes relevantes na web"}` : undefined}
+          />
+        )}
       </div>
     </div>
   );
@@ -946,10 +1073,9 @@ function ExecutionTimeline({
   const searchVariant = steps.some((step) => /search|pesquis|google/i.test(`${step.label} ${step.detail}`));
   const codingVariant = steps.some((step) => /edit|c[oó]digo|npm|terminal|arquivo/i.test(`${step.label} ${step.detail}`));
   const working = !completed && stage < sequence.length - 1;
-  const autoExpanded = !completed && stage >= 1 && stage < sequence.length - 1;
+  const autoExpanded = true;
   const expanded = manualExpanded ?? autoExpanded;
-  const visibleCount = stage < 2 ? 0 : stage === 2 ? Math.min(2, steps.length) : steps.length;
-  const visibleSteps = steps.slice(0, visibleCount);
+  const visibleSteps = steps;
   const focusedStep = [...steps].reverse().find((step) => step.status === 'running') || steps.at(-1);
   const activeLabel = searchVariant ? 'Searching the web' : codingVariant ? 'Running tools' : 'Thinking';
   const doneLabel = searchVariant ? 'Searched the web' : codingVariant ? `Ran ${Math.max(1, steps.length)} tools` : 'Thought process settled';
@@ -958,11 +1084,11 @@ function ExecutionTimeline({
     const isRunning = step.status === 'running';
     const isWarning = step.status === 'warning';
     return (
-      <div key={step.id} className={`relative flex min-h-7 w-full items-center gap-2 rounded-md px-1.5 py-0.5 text-left transition-colors duration-200 ${isRunning ? 'bg-white/[0.035]' : 'hover:bg-white/[0.025]'}`} style={{ animation: `thinking-fade-up 320ms cubic-bezier(0.23,1,0.32,1) ${index * 120}ms both` }}>
-        {searchVariant ? <Globe size={13} className={`${isWarning ? 'text-amber-300' : 'text-cyan-300'} shrink-0`} /> : isWarning ? <ShieldWarning size={13} className="shrink-0 text-amber-300" /> : isRunning ? <span className="size-3 shrink-0 rounded-full border-[1.5px] border-white/20 border-t-blue-300 thinking-spinner" /> : <Check size={13} className="shrink-0 text-white/35" />}
-        <span className={`min-w-0 truncate text-[11px] ${searchVariant ? 'text-white/75' : 'text-white/70'} ${codingVariant ? 'font-mono' : 'font-medium'}`}>{step.label}</span>
-        {step.detail && <span className="min-w-0 truncate text-[10px] text-white/35">{step.detail}</span>}
-        {step.timestamp && <span className="ml-auto shrink-0 text-[9px] font-mono text-white/20">{step.timestamp}</span>}
+      <div key={`${step.id}_${index}`} className={`relative flex min-h-7 w-full items-center gap-2 rounded-md px-1.5 py-0.5 text-left transition-colors duration-200 ${isRunning ? 'bg-bg-action-hover/50' : 'hover:bg-bg-action-hover/30'}`} style={{ animation: `thinking-fade-up 320ms cubic-bezier(0.23,1,0.32,1) ${index * 120}ms both` }}>
+        {searchVariant ? <Globe size={13} className={`${isWarning ? 'text-amber-300' : 'text-cyan-300'} shrink-0`} /> : isWarning ? <ShieldWarning size={13} className="shrink-0 text-amber-300" /> : isRunning ? <span className="size-3 shrink-0 rounded-full border-[1.5px] border-border-divider-subtle border-t-blue-300 thinking-spinner" /> : <Check size={13} className="shrink-0 text-text-content-secondary/60" />}
+        <span className={`min-w-0 truncate text-[11px] ${searchVariant ? 'text-text-content-primary/80' : 'text-text-content-primary/70'} ${codingVariant ? 'font-mono' : 'font-medium'}`}>{step.label}</span>
+        {step.detail && <span className="min-w-0 truncate text-[10px] text-text-content-secondary/60">{step.detail}</span>}
+        {step.timestamp && <span className="ml-auto shrink-0 text-[9px] font-mono text-text-content-secondary/40">{step.timestamp}</span>}
       </div>
     );
   };
@@ -970,35 +1096,35 @@ function ExecutionTimeline({
   return (
     <div className={`execution-timeline flex w-full max-w-[780px] flex-col bg-transparent p-0 ${completed ? 'mt-1' : ''}`} style={{ minHeight: working || expanded ? 148 : undefined, transition: 'min-height 400ms cubic-bezier(0.23,1,0.32,1)' }}>
       <div className="flex items-center gap-2">
-        <button type="button" aria-expanded={expanded} onClick={() => setManualExpanded((current) => !(current ?? autoExpanded))} className="-mx-1.5 flex w-fit items-center gap-2 rounded-lg px-1.5 py-1 text-left transition-colors hover:bg-white/[0.05]">
-          <span className={`flex size-4 shrink-0 items-center justify-center transition-colors ${working ? 'text-white/60' : 'text-white/30'}`}><Sparkle size={14} weight="fill" /></span>
+        <button type="button" aria-expanded={expanded} onClick={() => setManualExpanded((current) => !(current ?? autoExpanded))} className="-mx-1.5 flex w-fit items-center gap-2 rounded-lg px-1.5 py-1 text-left transition-colors hover:bg-bg-action-hover">
+          <span className={`flex size-4 shrink-0 items-center justify-center transition-colors ${working ? 'text-text-content-primary/60' : 'text-text-content-secondary/40'}`}><Sparkle size={14} weight="fill" /></span>
           <span role="status" className="text-[13px] font-medium">
-            {working ? <span className="thinking-shimmer">{activeLabel}</span> : <span className="text-white/55">{doneLabel}</span>}
+            {working ? <span className="thinking-shimmer">{activeLabel}</span> : <span className="text-text-content-primary/60">{doneLabel}</span>}
           </span>
-          <CaretDown size={13} className={`text-white/30 transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`} />
+          <CaretDown size={13} className={`text-text-content-secondary/40 transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`} />
         </button>
       </div>
-      <p className="pl-6 text-[10px] text-white/35">{working ? (focusedStep?.detail || focusedStep?.label || activeStep || 'Preparing the next step...') : 'The trace settled and remains expandable.'}</p>
+      <p className="pl-6 text-[10px] text-text-content-secondary/60">{working ? (focusedStep?.detail || focusedStep?.label || activeStep || 'Preparing the next step...') : 'The trace settled and remains expandable.'}</p>
 
       <div className="grid transition-[grid-template-rows,opacity] duration-400" style={{ gridTemplateRows: expanded ? '1fr' : '0fr', opacity: expanded ? 1 : 0, transitionTimingFunction: 'cubic-bezier(0.23,1,0.32,1)' }}>
         <div className="overflow-hidden">
           <div className="relative mt-1 ml-[5px] pl-4">
-            <span aria-hidden className="absolute left-[3px] top-0 bottom-0 w-px bg-white/10" />
+            <span aria-hidden className="absolute left-[3px] top-0 bottom-0 w-px bg-border-divider-subtle" />
             <div className="relative flex flex-col gap-1 py-1">
               {searchVariant && focusedStep && (
-                <div className="flex min-h-7 items-center gap-2 px-1.5 text-[11px] text-white/55" style={{ animation: 'thinking-fade-in 300ms ease-out both' }}>
-                  <Globe size={13} className="shrink-0 text-white/35" />
+                <div className="flex min-h-7 items-center gap-2 px-1.5 text-[11px] text-text-content-primary/60" style={{ animation: 'thinking-fade-in 300ms ease-out both' }}>
+                  <Globe size={13} className="shrink-0 text-text-content-secondary/60" />
                   <span className="truncate">{focusedStep.detail.match(/pesquisando “?([^”"]+)/i)?.[1] || focusedStep.detail}</span>
                 </div>
               )}
               {visibleSteps.map(renderStep)}
-              {visibleSteps.length === 0 && <div className="min-h-7 px-1.5 text-[11px] text-white/35">Preparing the first step...</div>}
+              {visibleSteps.length === 0 && <div className="min-h-7 px-1.5 text-[11px] text-text-content-secondary/60">Preparing the first step...</div>}
             </div>
           </div>
         </div>
       </div>
 
-      {completed && steps.length > 1 && <span className="mt-2 pl-6 text-[10px] text-white/25">{steps.length} etapas registradas · clique no cabeçalho para expandir</span>}
+      {completed && steps.length > 1 && <span className="mt-2 pl-6 text-[10px] text-text-content-secondary/40">{steps.length} etapas registradas · clique no cabeçalho para expandir</span>}
     </div>
   );
 }
@@ -1008,13 +1134,13 @@ function ChatInput({ onSend, onStop, isThinking }: { onSend: (val: string) => vo
 
   return (
     <div className="relative group">
-      <div className="bg-[#1c1c1c] border border-white/10 rounded-2xl focus-within:border-white/20 transition-all shadow-2xl overflow-hidden">
+      <div className="bg-bg-surface-panel border border-border-divider-subtle rounded-2xl focus-within:border-border-control-active transition-all shadow-2xl overflow-hidden">
         <textarea 
           placeholder="Mensagem para o agente Manus..."
           value={value}
           onChange={(e) => setValue(e.target.value)}
           rows={1}
-          className="w-full bg-[#1f1f1f] p-4 pr-16 text-sm outline-none resize-none placeholder:text-[#dcdcdc]/30 min-h-[56px] max-h-[200px] text-[#dcdcdc] font-sans"
+          className="w-full bg-bg-surface-panel p-4 pr-16 text-sm outline-none resize-none placeholder:text-text-content-secondary/30 min-h-[56px] max-h-[200px] text-text-content-primary font-sans"
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
@@ -1025,36 +1151,36 @@ function ChatInput({ onSend, onStop, isThinking }: { onSend: (val: string) => vo
             }
           }}
         />
-        <div className="flex items-center justify-between px-3 py-2 border-t border-white/5 bg-white/[0.02]">
+        <div className="flex items-center justify-between px-3 py-2 border-t border-border-divider-subtle bg-bg-canvas-main/20">
            <div className="flex items-center gap-2">
               <button 
                 title="Anexar arquivo"
-                className="p-1.5 hover:bg-white/5 rounded-md text-[#dcdcdc]/40 hover:text-[#dcdcdc] transition-colors"
+                className="p-1.5 hover:bg-bg-action-hover rounded-md text-text-content-secondary/40 hover:text-text-content-primary transition-colors"
               >
                 <Plus size={16} />
               </button>
               <button 
                 title="Conectar Repositório GitHub"
-                className="p-1.5 hover:bg-white/5 rounded-md text-[#dcdcdc]/40 hover:text-[#dcdcdc] transition-colors"
+                className="p-1.5 hover:bg-bg-action-hover rounded-md text-text-content-secondary/40 hover:text-text-content-primary transition-colors"
               >
                 <GithubLogo size={16} />
               </button>
               <img 
                 src="https://imgdb.io/i/6lwOlmk.png" 
                 alt="Agente" 
-                className="size-5 object-contain rounded bg-white/5 p-0.5" 
+                className="size-5 object-contain rounded bg-bg-action-hover p-0.5" 
                 title="Agente Manus Conectado"
               />
-              <div className="h-4 w-px bg-white/10 mx-1" />
-              <div className="flex items-center gap-1.5 px-2 py-1 hover:bg-white/5 rounded-md text-[#dcdcdc]/40 hover:text-[#dcdcdc] transition-colors cursor-pointer">
+              <div className="h-4 w-px bg-border-divider-subtle mx-1" />
+              <div className="flex items-center gap-1.5 px-2 py-1 hover:bg-bg-action-hover rounded-md text-text-content-secondary/40 hover:text-text-content-primary transition-colors cursor-pointer">
                 <Cloud size={14} />
-                <span className="text-[11px] font-medium text-[#dcdcdc]/60">Nuvem</span>
+                <span className="text-[11px] font-medium text-text-content-secondary/80">Nuvem</span>
               </div>
            </div>
            <div className="flex items-center gap-2">
               <button 
                 title="Entrada por voz"
-                className="p-1.5 hover:bg-white/5 rounded-md text-[#dcdcdc]/40 hover:text-[#dcdcdc] transition-colors"
+                className="p-1.5 hover:bg-bg-action-hover rounded-md text-text-content-secondary/40 hover:text-text-content-primary transition-colors"
               >
                 <Microphone size={16} />
               </button>
@@ -1072,8 +1198,8 @@ function ChatInput({ onSend, onStop, isThinking }: { onSend: (val: string) => vo
                   isThinking 
                     ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' 
                     : value.trim()
-                    ? 'bg-[#dcdcdc] text-black hover:bg-white shadow-xs' 
-                    : 'bg-white/5 text-white/20'
+                    ? 'bg-interactive-cta-bg text-bg-canvas-main hover:opacity-90 shadow-xs' 
+                    : 'bg-bg-action-hover text-text-content-secondary/20'
                 }`}
                 title={isThinking ? 'Interromper agente' : 'Enviar comando'}
               >
