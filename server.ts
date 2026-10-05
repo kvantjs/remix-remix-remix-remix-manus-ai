@@ -19,6 +19,7 @@ import { beginOAuth, clearSession, finishOAuth, getAuthenticatedUser, getCookie,
 import { createDownloadUrl, createUpload, listObjects, softDeleteObject } from './src/server/storage.js';
 import { createProject, createSnapshot, deleteProjectFile, diffProjectFile, getProject, listProjectFiles, listProjects, projectStatus, projectVersions, readProjectFile, restoreProjectFiles, syncProjectToGitHub, writeProjectFile } from './src/server/projects.js';
 import { buildIntentInstruction, classifyAgentIntent, conversationFallback, filterToolDeclarations, isToolAllowed, type AgentIntent } from './src/server/intent-router.js';
+import { auditProjectAction, ensureProjectOwner, getProjectRole, hasProjectRole, listProjectAudit, listProjectMembers, removeProjectMember, upsertProjectMember, type ProjectRole } from './src/server/project-access.js';
 
 const execAsync = promisify(exec);
 
@@ -70,11 +71,15 @@ app.get('/api/platform/routes', async (_req, res) => {
   }
 });
 
-async function requireProjectMutation(req: any, res: any) {
-  if (!process.env.MANUS_JWT_SECRET) return true;
+async function requireProjectRole(req: any, res: any, projectId: string, required: ProjectRole) {
   const user = await getAuthenticatedUser(req);
-  if (user) return true;
-  res.status(401).json({ error: 'Autenticação necessária para alterar projetos.' });
+  const role = await getProjectRole(projectId, user);
+  if (hasProjectRole(role, required)) {
+    (req as any).projectUser = user;
+    req.projectRole = role;
+    return true;
+  }
+  res.status(user ? 403 : 401).json({ error: user ? `Permissão insuficiente: papel ${required} exigido.` : 'Autenticação necessária para acessar este projeto.' });
   return false;
 }
 
@@ -87,17 +92,22 @@ app.get('/api/projects', async (_req, res) => {
 });
 
 app.post('/api/projects', async (req, res) => {
-  if (!await requireProjectMutation(req, res)) return;
+  const user = await getAuthenticatedUser(req);
+  if (process.env.MANUS_JWT_SECRET && !user) return res.status(401).json({ error: 'Autenticação necessária para criar projetos.' });
   try {
     const name = String(req.body?.name || '').trim();
     if (!name) return res.status(400).json({ error: 'name é obrigatório.' });
-    res.status(201).json({ project: await createProject(name, req.body?.repoUrl ? String(req.body.repoUrl) : undefined) });
+    const project = await createProject(name, req.body?.repoUrl ? String(req.body.repoUrl) : undefined);
+    await ensureProjectOwner(project.id, user);
+    await auditProjectAction(project.id, user, 'project.create');
+    res.status(201).json({ project });
   } catch (error: any) {
     res.status(400).json({ error: redactSecrets(error?.message || String(error)) });
   }
 });
 
 app.get('/api/projects/:id', async (req, res) => {
+  if (!await requireProjectRole(req, res, req.params.id, 'viewer')) return;
   try {
     const project = await getProject(req.params.id);
     res.json({ project, status: await projectStatus(project) });
@@ -107,6 +117,7 @@ app.get('/api/projects/:id', async (req, res) => {
 });
 
 app.get('/api/projects/:id/versions', async (req, res) => {
+  if (!await requireProjectRole(req, res, req.params.id, 'viewer')) return;
   try {
     const project = await getProject(req.params.id);
     res.json({ projectId: project.id, versions: await projectVersions(project, Number(req.query.limit) || 50) });
@@ -116,6 +127,7 @@ app.get('/api/projects/:id/versions', async (req, res) => {
 });
 
 app.get('/api/projects/:id/files', async (req, res) => {
+  if (!await requireProjectRole(req, res, req.params.id, 'viewer')) return;
   try {
     const project = await getProject(req.params.id);
     res.json({ projectId: project.id, files: await listProjectFiles(project, typeof req.query.directory === 'string' ? req.query.directory : '') });
@@ -125,6 +137,7 @@ app.get('/api/projects/:id/files', async (req, res) => {
 });
 
 app.get('/api/projects/:id/files/read', async (req, res) => {
+  if (!await requireProjectRole(req, res, req.params.id, 'viewer')) return;
   try {
     const project = await getProject(req.params.id);
     if (typeof req.query.path !== 'string') return res.status(400).json({ error: 'path é obrigatório.' });
@@ -135,26 +148,33 @@ app.get('/api/projects/:id/files/read', async (req, res) => {
 });
 
 app.put('/api/projects/:id/files', async (req, res) => {
-  if (!await requireProjectMutation(req, res)) return;
+  if (!await requireProjectRole(req, res, req.params.id, 'editor')) return;
   try {
     const project = await getProject(req.params.id);
-    res.json(await writeProjectFile(project, String(req.body?.path || ''), String(req.body?.content || '')));
+    const filePath = String(req.body?.path || '');
+    const result = await writeProjectFile(project, filePath, String(req.body?.content || ''));
+    await auditProjectAction(project.id, (req as any).projectUser, 'file.write', filePath, { sizeBytes: result.sizeBytes });
+    res.json(result);
   } catch (error: any) {
     res.status(400).json({ error: redactSecrets(error?.message || String(error)) });
   }
 });
 
 app.delete('/api/projects/:id/files', async (req, res) => {
-  if (!await requireProjectMutation(req, res)) return;
+  if (!await requireProjectRole(req, res, req.params.id, 'editor')) return;
   try {
     const project = await getProject(req.params.id);
-    res.json(await deleteProjectFile(project, String(req.body?.path || '')));
+    const filePath = String(req.body?.path || '');
+    const result = await deleteProjectFile(project, filePath);
+    await auditProjectAction(project.id, (req as any).projectUser, 'file.delete', filePath);
+    res.json(result);
   } catch (error: any) {
     res.status(400).json({ error: redactSecrets(error?.message || String(error)) });
   }
 });
 
 app.get('/api/projects/:id/diff', async (req, res) => {
+  if (!await requireProjectRole(req, res, req.params.id, 'viewer')) return;
   try {
     const project = await getProject(req.params.id);
     if (typeof req.query.path !== 'string') return res.status(400).json({ error: 'path é obrigatório.' });
@@ -165,33 +185,73 @@ app.get('/api/projects/:id/diff', async (req, res) => {
 });
 
 app.post('/api/projects/:id/restore', async (req, res) => {
-  if (!await requireProjectMutation(req, res)) return;
+  if (!await requireProjectRole(req, res, req.params.id, 'editor')) return;
   try {
     const project = await getProject(req.params.id);
-    res.json(await restoreProjectFiles(project, req.body?.revision, req.body?.paths, req.body?.confirm === true));
+    const result = await restoreProjectFiles(project, req.body?.revision, req.body?.paths, req.body?.confirm === true);
+    await auditProjectAction(project.id, (req as any).projectUser, 'file.restore', Array.isArray(req.body?.paths) ? req.body.paths.join(',') : undefined, { revision: req.body?.revision });
+    res.json(result);
   } catch (error: any) {
     res.status(400).json({ error: redactSecrets(error?.message || String(error)) });
   }
 });
 
 app.post('/api/projects/:id/snapshots', async (req, res) => {
-  if (!await requireProjectMutation(req, res)) return;
+  if (!await requireProjectRole(req, res, req.params.id, 'editor')) return;
   try {
     const project = await getProject(req.params.id);
-    res.json(await createSnapshot(project, String(req.body?.message || 'Snapshot do Workspace')));
+    const result = await createSnapshot(project, String(req.body?.message || 'Snapshot do Workspace'));
+    await auditProjectAction(project.id, (req as any).projectUser, 'project.snapshot', undefined, { created: result.created });
+    res.json(result);
   } catch (error: any) {
     res.status(400).json({ error: redactSecrets(error?.message || String(error)) });
   }
 });
 
 app.post('/api/projects/:id/sync-github', async (req, res) => {
-  if (!await requireProjectMutation(req, res)) return;
+  if (!await requireProjectRole(req, res, req.params.id, 'owner')) return;
   try {
     const project = await getProject(req.params.id);
-    res.json(await syncProjectToGitHub(project));
+    const result = await syncProjectToGitHub(project);
+    await auditProjectAction(project.id, (req as any).projectUser, 'project.sync_github');
+    res.json(result);
   } catch (error: any) {
     res.status(502).json({ error: redactSecrets(error?.message || String(error)) });
   }
+});
+
+app.get('/api/projects/:id/members', async (req, res) => {
+  if (!await requireProjectRole(req, res, req.params.id, 'viewer')) return;
+  try { res.json({ projectId: req.params.id, members: await listProjectMembers(req.params.id) }); }
+  catch (error: any) { res.status(500).json({ error: redactSecrets(error?.message || String(error)) }); }
+});
+
+app.put('/api/projects/:id/members', async (req, res) => {
+  if (!await requireProjectRole(req, res, req.params.id, 'owner')) return;
+  try {
+    const openId = String(req.body?.openId || '').trim();
+    const name = String(req.body?.name || openId).trim();
+    const role = String(req.body?.role || 'viewer') as ProjectRole;
+    if (!openId || !['owner', 'editor', 'viewer'].includes(role)) return res.status(400).json({ error: 'openId e role válido são obrigatórios.' });
+    const result = await upsertProjectMember(req.params.id, { openId, name, email: req.body?.email ? String(req.body.email) : undefined }, role);
+    await auditProjectAction(req.params.id, (req as any).projectUser, 'member.upsert', openId, { role });
+    res.json({ member: result, members: await listProjectMembers(req.params.id) });
+  } catch (error: any) { res.status(400).json({ error: redactSecrets(error?.message || String(error)) }); }
+});
+
+app.delete('/api/projects/:id/members/:openId', async (req, res) => {
+  if (!await requireProjectRole(req, res, req.params.id, 'owner')) return;
+  try {
+    const result = await removeProjectMember(req.params.id, req.params.openId);
+    await auditProjectAction(req.params.id, (req as any).projectUser, 'member.remove', req.params.openId);
+    res.json(result);
+  } catch (error: any) { res.status(400).json({ error: redactSecrets(error?.message || String(error)) }); }
+});
+
+app.get('/api/projects/:id/audit', async (req, res) => {
+  if (!await requireProjectRole(req, res, req.params.id, 'viewer')) return;
+  try { res.json({ projectId: req.params.id, entries: await listProjectAudit(req.params.id, Number(req.query.limit) || 100) }); }
+  catch (error: any) { res.status(500).json({ error: redactSecrets(error?.message || String(error)) }); }
 });
 
 app.get('/api/db/status', async (_req, res) => {

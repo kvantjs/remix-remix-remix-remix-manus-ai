@@ -129,6 +129,33 @@ export async function ensureDatabaseSchema() {
       INDEX idx_versions_project (project_id, committed_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+  await activePool.query(`
+    CREATE TABLE IF NOT EXISTS project_members (
+      project_id VARCHAR(96) NOT NULL,
+      open_id VARCHAR(191) NOT NULL,
+      name VARCHAR(255) NOT NULL,
+      email VARCHAR(320) NULL,
+      role ENUM('owner', 'editor', 'viewer') NOT NULL DEFAULT 'viewer',
+      created_at DATETIME NOT NULL,
+      updated_at DATETIME NOT NULL,
+      PRIMARY KEY (project_id, open_id),
+      INDEX idx_project_members_user (open_id),
+      INDEX idx_project_members_role (project_id, role)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+  await activePool.query(`
+    CREATE TABLE IF NOT EXISTS project_audit_log (
+      audit_id CHAR(36) PRIMARY KEY,
+      project_id VARCHAR(96) NOT NULL,
+      open_id VARCHAR(191) NULL,
+      action VARCHAR(96) NOT NULL,
+      target_path VARCHAR(1024) NULL,
+      metadata_json JSON NULL,
+      created_at DATETIME NOT NULL,
+      INDEX idx_project_audit_project (project_id, created_at),
+      INDEX idx_project_audit_user (open_id, created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
 
   return { available: true, migrated: true };
 }

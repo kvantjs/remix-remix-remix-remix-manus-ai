@@ -583,6 +583,10 @@ function ProjectsView() {
   const [selectedFile, setSelectedFile] = useState('');
   const [fileContent, setFileContent] = useState('');
   const [fileDiff, setFileDiff] = useState('');
+  const [members, setMembers] = useState<any[]>([]);
+  const [auditEntries, setAuditEntries] = useState<any[]>([]);
+  const [newMemberId, setNewMemberId] = useState('');
+  const [newMemberRole, setNewMemberRole] = useState('viewer');
   const [newName, setNewName] = useState('');
   const [message, setMessage] = useState('');
 
@@ -595,18 +599,24 @@ function ProjectsView() {
   };
 
   const selectProject = async (id: string) => {
-    const [projectResponse, versionsResponse, filesResponse] = await Promise.all([
+    const [projectResponse, versionsResponse, filesResponse, membersResponse, auditResponse] = await Promise.all([
       fetch(`/api/projects/${encodeURIComponent(id)}`),
       fetch(`/api/projects/${encodeURIComponent(id)}/versions`),
-      fetch(`/api/projects/${encodeURIComponent(id)}/files`)
+      fetch(`/api/projects/${encodeURIComponent(id)}/files`),
+      fetch(`/api/projects/${encodeURIComponent(id)}/members`),
+      fetch(`/api/projects/${encodeURIComponent(id)}/audit`)
     ]);
-    if (!projectResponse.ok || !versionsResponse.ok || !filesResponse.ok) throw new Error('Não foi possível carregar o projeto.');
+    if (!projectResponse.ok || !versionsResponse.ok || !filesResponse.ok || !membersResponse.ok || !auditResponse.ok) throw new Error('Não foi possível carregar o projeto.');
     const projectPayload = await projectResponse.json();
     const versionsPayload = await versionsResponse.json();
     const filesPayload = await filesResponse.json();
+    const membersPayload = await membersResponse.json();
+    const auditPayload = await auditResponse.json();
     setSelected(projectPayload);
     setVersions(versionsPayload.versions || []);
     setFiles(filesPayload.files || []);
+    setMembers(membersPayload.members || []);
+    setAuditEntries(auditPayload.entries || []);
     setSelectedFile('');
     setFileContent('');
     setFileDiff('');
@@ -660,6 +670,21 @@ function ProjectsView() {
     setFileDiff(response.ok ? payload.diff || '(sem alterações)' : (payload.error || 'Falha ao gerar diff.'));
   };
 
+  const saveMember = async () => {
+    if (!newMemberId.trim()) return;
+    const response = await fetch(`/api/projects/${selected.project.id}/members`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ openId: newMemberId.trim(), name: newMemberId.trim(), role: newMemberRole }) });
+    const payload = await response.json();
+    setMessage(response.ok ? 'Permissão atualizada.' : (payload.error || 'Falha ao atualizar permissão.'));
+    if (response.ok) { setNewMemberId(''); await selectProject(selected.project.id); }
+  };
+
+  const removeMember = async (openId: string) => {
+    const response = await fetch(`/api/projects/${selected.project.id}/members/${encodeURIComponent(openId)}`, { method: 'DELETE' });
+    const payload = await response.json();
+    setMessage(response.ok ? 'Membro removido.' : (payload.error || 'Falha ao remover membro.'));
+    if (response.ok) await selectProject(selected.project.id);
+  };
+
   return (
     <div className="h-full overflow-y-auto custom-scrollbar bg-[#141414] p-6">
       <div className="max-w-4xl mx-auto">
@@ -680,6 +705,10 @@ function ProjectsView() {
                 <div className="max-h-52 overflow-y-auto space-y-1">{files.filter((file) => file.type === 'file').map((file) => <button key={file.path} onClick={() => openFile(file.path)} className={`w-full text-left rounded px-2 py-1.5 text-[11px] truncate ${selectedFile === file.path ? 'bg-blue-400/15 text-blue-200' : 'text-white/50 hover:bg-white/5'}`}>{file.path}</button>)}</div>
                 <div className="min-w-0"><div className="flex items-center gap-2 mb-2"><span className="text-[11px] text-white/45 font-mono truncate flex-1">{selectedFile || 'Selecione um arquivo'}</span><button disabled={!selectedFile} onClick={showDiff} className="px-2 py-1 rounded bg-white/8 text-[10px] text-white disabled:opacity-30">Diff</button><button disabled={!selectedFile} onClick={saveFile} className="px-2 py-1 rounded bg-white text-black text-[10px] disabled:opacity-30">Salvar</button></div><textarea value={fileContent} onChange={(event) => setFileContent(event.target.value)} disabled={!selectedFile} className="w-full h-44 resize-y rounded-lg bg-[#121212] border border-white/8 p-3 text-[11px] leading-relaxed font-mono text-white/80 outline-none focus:border-blue-400/50 disabled:opacity-40" spellCheck={false} />{fileDiff && <pre className="mt-2 max-h-44 overflow-auto rounded-lg bg-[#101010] border border-white/7 p-3 text-[10px] leading-relaxed text-white/65">{fileDiff}</pre>}</div>
               </div>
+            </div>
+            <div className="mt-6 grid grid-cols-2 gap-3 border-t border-white/7 pt-4">
+              <div><div className="text-xs font-semibold text-white/70 mb-2">Membros e papéis</div><div className="space-y-1">{members.map((member) => <div key={member.openId} className="flex items-center gap-2 rounded bg-[#151515] px-2 py-1.5"><span className="text-[11px] text-white/70 truncate flex-1">{member.name || member.openId}</span><span className="text-[10px] text-blue-300 font-mono">{member.role}</span>{member.role !== 'owner' && <button onClick={() => removeMember(member.openId)} className="text-[10px] text-red-300/70 hover:text-red-200">Remover</button>}</div>)}</div><div className="flex gap-1 mt-2"><input value={newMemberId} onChange={(event) => setNewMemberId(event.target.value)} placeholder="openId do membro" className="min-w-0 flex-1 rounded bg-[#121212] border border-white/8 px-2 py-1.5 text-[10px] text-white outline-none" /><select value={newMemberRole} onChange={(event) => setNewMemberRole(event.target.value)} className="rounded bg-[#121212] border border-white/8 px-1 text-[10px] text-white"><option value="viewer">viewer</option><option value="editor">editor</option><option value="owner">owner</option></select><button onClick={saveMember} className="rounded bg-white/10 px-2 text-[10px] text-white">Adicionar</button></div></div>
+              <div><div className="text-xs font-semibold text-white/70 mb-2">Auditoria</div><div className="max-h-36 overflow-y-auto space-y-1">{auditEntries.map((entry) => <div key={entry.auditId} className="text-[10px] text-white/45"><span className="text-white/70">{entry.action}</span>{entry.targetPath ? ` · ${entry.targetPath}` : ''}<span className="text-white/25"> · {new Date(entry.createdAt).toLocaleString('pt-BR')}</span></div>)}</div></div>
             </div>
           </div> : <div className="rounded-xl border border-dashed border-white/10 p-8 text-center text-xs text-white/40">Selecione um projeto.</div>}
         </div>
