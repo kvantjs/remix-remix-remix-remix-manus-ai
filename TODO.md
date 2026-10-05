@@ -1,7 +1,8 @@
 
-## [x] Continuidade conversacional entre turnos
+## [x] Timeline profissional de execução ao vivo no chat
 
-- O fallback sem Gemini não repete mais a mensagem fixa; ele usa a mensagem atual e o histórico para responder de forma contextual.
-- O endpoint SSE e o endpoint padrão recebem o histórico no fallback conversacional.
-- Mensagens iniciais, cumprimentos, agradecimentos, perguntas simples e follow-ups recebem respostas distintas; o contexto de pesquisa só é inferido a partir de mensagens anteriores do usuário, não da mensagem inicial de boas-vindas.
-- O fluxo foi reproduzido via API e pela interface pública do navegador Manus com dois turnos consecutivos, sem a resposta repetitiva.
+- Durante cada execução, o chat mostra uma fase inicial, o estado Thinking animado, contador de tempo e cards finos para compreensão do pedido, raciocínio, etapas do plano, chamadas de ferramentas, autorizações e síntese final.
+- Os eventos SSE `status`, `step`, `tool_start`, `tool_finish`, `approval_required` e `complete` atualizam a timeline sem esperar a resposta final.
+- O estado de cada etapa usa sinais visuais distintos para em andamento, concluída e aguardando autorização, com microanimações sutis e suporte a `prefers-reduced-motion`.
+- Após a conclusão, a timeline permanece registrada dentro da mensagem do agente, junto do resumo e das chamadas MCP; o computador da nuvem continua recebendo o estado ao vivo existente.
+- A experiência foi validada no Preview público com uma pesquisa Google real: a UI exibiu Thinking, `browser.search`, a etapa de anti-bot e a síntese final enquanto o painel do computador mostrava a navegação.

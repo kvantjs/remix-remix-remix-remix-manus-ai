@@ -65,6 +65,15 @@ interface ChatMessage {
   artifacts?: Array<{ id: string; name: string; path: string; sizeBytes: number; downloadUrl: string }>;
   files?: Array<{ path: string; code: string; lang?: string }>;
   updatedFile?: { filename: string; code: string };
+  executionSteps?: ExecutionStep[];
+}
+
+interface ExecutionStep {
+  id: string;
+  label: string;
+  detail: string;
+  status: 'running' | 'complete' | 'warning';
+  timestamp?: string;
 }
 
 interface ChatAreaProps {
@@ -124,8 +133,56 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
   const [isThinking, setIsThinking] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [currentStep, setCurrentStep] = useState('Analisando solicitação...');
+  const [executionSteps, setExecutionSteps] = useState<ExecutionStep[]>([]);
+  const executionStepsRef = useRef<ExecutionStep[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  const updateExecutionSteps = (updater: (steps: ExecutionStep[]) => ExecutionStep[]) => {
+    setExecutionSteps((previous) => {
+      const next = updater(previous).slice(-9);
+      executionStepsRef.current = next;
+      return next;
+    });
+  };
+
+  const beginExecutionStep = (label: string, detail: string) => {
+    updateExecutionSteps((previous) => {
+      const next = previous.map((step, index) => (
+        index === previous.length - 1 && step.status === 'running' && step.label !== label
+          ? { ...step, status: 'complete' as const }
+          : step
+      ));
+      const activeIndex = next.findIndex((step) => step.label === label && step.status === 'running');
+      if (activeIndex >= 0) {
+        next[activeIndex] = { ...next[activeIndex], detail };
+        return next;
+      }
+      return [...next, {
+        id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        label,
+        detail,
+        status: 'running',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }];
+    });
+  };
+
+  const completeExecutionStep = (label: string, detail: string, status: ExecutionStep['status'] = 'complete') => {
+    updateExecutionSteps((previous) => {
+      const index = previous.findIndex((step) => step.label === label && step.status === 'running');
+      if (index < 0) return [...previous, {
+        id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        label,
+        detail,
+        status,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }];
+      const next = [...previous];
+      next[index] = { ...next[index], detail, status };
+      return next;
+    });
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -202,11 +259,22 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
 
     setMessages(prev => [...prev, userMsg]);
     setIsThinking(true);
+    const initialSteps: ExecutionStep[] = [
+      {
+        id: `intent_${Date.now()}`,
+        label: 'Compreendendo o pedido',
+        detail: 'Lendo a mensagem, o histórico e o contexto do workspace.',
+        status: 'running',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
+    ];
+    executionStepsRef.current = initialSteps;
+    setExecutionSteps(initialSteps);
 
     if (onAgentStateChange) {
       onAgentStateChange({
         isWorking: true,
-        statusText: 'Agente assumindo o controle do computador...',
+        statusText: 'Agente analisando o pedido...',
         contextText: userPrompt,
         toolCalls: []
       });
@@ -257,8 +325,10 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
                   const data = JSON.parse(line.replace('data: ', '').trim());
                   if (currentEvent === 'status') {
                     setCurrentStep(data.text);
+                    beginExecutionStep('Raciocinando sobre a próxima ação', data.text);
                   } else if (currentEvent === 'step') {
                     setCurrentStep(data.text);
+                    beginExecutionStep('Executando etapa do plano', data.text);
                     if (onAgentStateChange) {
                       onAgentStateChange({
                         isWorking: true,
@@ -269,6 +339,7 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
                     }
                   } else if (currentEvent === 'tool_start') {
                     setCurrentStep(`Executando ${data.toolName}: ${data.reason}`);
+                    beginExecutionStep(data.toolName, data.reason || 'Executando no computador da nuvem.');
                     const activeTrace: ToolCallTrace = {
                       id: `active_${Date.now()}`,
                       toolName: data.toolName,
@@ -293,6 +364,11 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
                     }
                   } else if (currentEvent === 'tool_finish') {
                     liveToolCalls.push(data.toolCall);
+                    completeExecutionStep(
+                      data.toolCall.toolName,
+                      data.toolCall.screenData?.actionDescription || 'Ação concluída; resultado incorporado ao contexto.',
+                      data.toolCall.status === 'warning' ? 'warning' : data.toolCall.status === 'error' ? 'warning' : 'complete'
+                    );
                     if (onAgentStateChange) {
                       onAgentStateChange({
                         isWorking: true,
@@ -303,8 +379,11 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
                     }
                   } else if (currentEvent === 'approval_required') {
                     setCurrentStep(`Aguardando autorização: ${data.approval?.reason || 'Ação destrutiva'}`);
+                    beginExecutionStep('Aguardando sua autorização', data.approval?.reason || 'O agente pausou antes de uma ação sensível.');
+                    completeExecutionStep('Aguardando sua autorização', data.approval?.reason || 'Ação pausada até sua decisão.', 'warning');
                   } else if (currentEvent === 'complete') {
                     payload = data;
+                    setCurrentStep('Organizando resultados e preparando a resposta final...');
                   }
                 } catch {}
               }
@@ -371,6 +450,16 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
         ],
         clarifications: payload.clarifications,
         files: generatedFilesList
+        ,executionSteps: [
+          ...executionStepsRef.current.map((step) => step.status === 'running' ? { ...step, status: 'complete' as const } : step),
+          {
+            id: `summary_${Date.now()}`,
+            label: 'Síntese final',
+            detail: payload.approval ? 'A execução foi pausada para autorização.' : 'Resultados reunidos e resposta pronta para você.',
+            status: payload.approval ? 'warning' : 'complete',
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }
+        ]
       };
 
       setMessages(prev => [...prev, assistantMsg]);
@@ -469,7 +558,8 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
           {isThinking && (
             <ThinkingState 
               elapsedSeconds={elapsedSeconds} 
-              step={currentStep} 
+              step={currentStep}
+              steps={executionSteps}
             />
           )}
 
@@ -580,6 +670,10 @@ function MessageItem({
                </div>
              )}
           </div>
+        )}
+
+        {message.executionSteps && message.executionSteps.length > 0 && (
+          <ExecutionTimeline steps={message.executionSteps} completed />
         )}
 
         {/* MCP & Tool Calls Box (Manus style) */}
@@ -933,7 +1027,7 @@ function MessageItem({
   );
 }
 
-function ThinkingState({ elapsedSeconds, step }: { elapsedSeconds: number; step: string }) {
+function ThinkingState({ elapsedSeconds, step, steps }: { elapsedSeconds: number; step: string; steps: ExecutionStep[] }) {
   return (
     <div className="space-y-4 animate-in fade-in duration-300">
        <div className="flex items-center gap-2.5">
@@ -949,21 +1043,70 @@ function ThinkingState({ elapsedSeconds, step }: { elapsedSeconds: number; step:
           </span>
         </div>
       </div>
-      <div 
-        data-component="thinking-state"
-        style={{ backgroundColor: '#202020' }}
-        className="pl-8 bg-[#202020] border border-white/5 rounded-xl p-4 space-y-2.5"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="size-2 bg-blue-500 rounded-full animate-ping" />
-            <span className="text-xs text-[#dcdcdc] font-medium">{step}</span>
+      <div data-component="thinking-state" className="pl-8">
+        <ExecutionTimeline steps={steps} activeStep={step} elapsedSeconds={elapsedSeconds} />
+      </div>
+    </div>
+  );
+}
+
+function ExecutionTimeline({
+  steps,
+  activeStep,
+  elapsedSeconds,
+  completed = false
+}: {
+  steps: ExecutionStep[];
+  activeStep?: string;
+  elapsedSeconds?: number;
+  completed?: boolean;
+}) {
+  return (
+    <div className={`execution-timeline bg-[#202020] border border-white/[0.07] rounded-2xl p-4 ${completed ? 'mt-1' : ''}`}>
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-[11px] font-semibold text-white/80">
+            <span className={`relative flex size-5 items-center justify-center rounded-full border ${completed ? 'border-emerald-400/30 bg-emerald-400/10' : 'border-blue-400/30 bg-blue-400/10'}`}>
+              {completed ? <Check size={11} className="text-emerald-300" /> : <Sparkle size={11} weight="fill" className="text-blue-300 execution-spark" />}
+            </span>
+            <span>{completed ? 'Linha do tempo da execução' : 'Thinking'}</span>
+            {!completed && <span className="text-white/30 font-normal">· trabalhando ao vivo</span>}
           </div>
-          <span className="text-[11px] font-mono text-[#dcdcdc]/40">{elapsedSeconds}s</span>
+          <p className="mt-1 pl-7 text-[11px] leading-relaxed text-white/45 truncate">
+            {completed ? 'O agente registrou as fases, chamadas e resultados desta execução.' : (activeStep || 'Preparando a próxima ação...')}
+          </p>
         </div>
-        <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
-          <div className="h-full bg-blue-500 rounded-full animate-pulse w-2/3" />
-        </div>
+        {!completed && <span className="shrink-0 text-[10px] font-mono text-white/35 tabular-nums">{elapsedSeconds || 0}s</span>}
+      </div>
+
+      <div className="relative space-y-1.5">
+        <div className="absolute left-[9px] top-2 bottom-3 w-px bg-gradient-to-b from-blue-400/30 via-white/10 to-transparent" />
+        {steps.length === 0 && (
+          <div className="flex items-center gap-3 py-2 text-[11px] text-white/40">
+            <span className="relative z-10 size-[19px] rounded-full border border-blue-400/25 bg-[#202020] execution-dot" />
+            <span>Preparando o primeiro passo...</span>
+          </div>
+        )}
+        {steps.map((step) => {
+          const isRunning = step.status === 'running';
+          const isWarning = step.status === 'warning';
+          return (
+            <div key={step.id} className={`relative flex gap-3 rounded-xl px-2 py-2 transition-all duration-500 ${isRunning ? 'bg-white/[0.035]' : 'hover:bg-white/[0.02]'}`}>
+              <span className={`relative z-10 mt-0.5 flex size-[19px] shrink-0 items-center justify-center rounded-full border ${isWarning ? 'border-amber-300/40 bg-amber-300/10' : isRunning ? 'border-blue-300/50 bg-blue-300/10' : 'border-emerald-300/30 bg-emerald-300/10'}`}>
+                {isWarning ? <ShieldWarning size={10} className="text-amber-300" /> : isRunning ? <span className="size-1.5 rounded-full bg-blue-300 execution-dot" /> : <Check size={10} className="text-emerald-300" />}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className={`truncate text-[11px] font-medium ${isWarning ? 'text-amber-200/85' : isRunning ? 'text-white/85' : 'text-white/65'}`}>{step.label}</span>
+                  {isRunning && <span className="shrink-0 text-[9px] uppercase tracking-[0.16em] text-blue-300/70">agora</span>}
+                  {step.timestamp && <span className="ml-auto shrink-0 text-[9px] font-mono text-white/25">{step.timestamp}</span>}
+                </div>
+                <p className={`mt-0.5 text-[10px] leading-relaxed ${isRunning ? 'text-white/55' : 'text-white/35'}`}>{step.detail}</p>
+                {isRunning && <div className="execution-sheen mt-2 h-px w-full overflow-hidden rounded-full bg-blue-400/10" />}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
