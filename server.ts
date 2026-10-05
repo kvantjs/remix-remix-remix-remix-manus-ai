@@ -2346,48 +2346,34 @@ class PlaywrightBrowserManager {
 
   async extractDomData(page: Page) {
     try {
-      return await page.evaluate(() => {
-        const interactive: any[] = [];
-        
-        // Buttons
-        document.querySelectorAll('button, [role="button"], input[type="submit"], input[type="button"]').forEach((b: any, idx) => {
-          const txt = (b.innerText || b.value || b.getAttribute('aria-label') || '').trim();
-          if (idx < 20 && txt) {
-            interactive.push({
-              type: 'button',
-              text: txt.slice(0, 45),
-              selector: b.id ? `#${b.id}` : (b.className && typeof b.className === 'string' ? `.${b.className.split(' ')[0]}` : `button:has-text("${txt.slice(0, 20)}")`)
-            });
-          }
-        });
+      const interactive: Array<{ type: string; text: string; selector?: string; href?: string }> = [];
+      const buttonLocators = await page.locator('button, [role="button"], input[type="submit"], input[type="button"]').all();
+      for (const button of buttonLocators.slice(0, 20)) {
+        const text = String((await button.innerText().catch(() => '')) || (await button.getAttribute('value').catch(() => '')) || (await button.getAttribute('aria-label').catch(() => '')) || '').trim();
+        if (!text) continue;
+        const id = await button.getAttribute('id').catch(() => null);
+        const className = await button.getAttribute('class').catch(() => null);
+        interactive.push({ type: 'button', text: text.slice(0, 45), selector: id ? `#${id}` : className ? `.${className.split(/\s+/)[0]}` : `button:has-text("${text.slice(0, 20)}")` });
+      }
 
-        // Inputs
-        document.querySelectorAll('input:not([type="hidden"]), textarea').forEach((inp: any, idx) => {
-          if (idx < 15) {
-            interactive.push({
-              type: 'input',
-              text: inp.placeholder || inp.name || inp.type || 'campo de texto',
-              selector: inp.name ? `input[name="${inp.name}"]` : (inp.id ? `#${inp.id}` : 'input')
-            });
-          }
-        });
+      const inputLocators = await page.locator('input:not([type="hidden"]), textarea').all();
+      for (const input of inputLocators.slice(0, 15)) {
+        const text = String((await input.getAttribute('placeholder').catch(() => null)) || (await input.getAttribute('name').catch(() => null)) || (await input.getAttribute('type').catch(() => null)) || 'campo de texto');
+        const id = await input.getAttribute('id').catch(() => null);
+        const name = await input.getAttribute('name').catch(() => null);
+        interactive.push({ type: 'input', text, selector: name ? `input[name="${name}"]` : id ? `#${id}` : 'input' });
+      }
 
-        // Top links
-        document.querySelectorAll('a[href]').forEach((a: any, idx) => {
-          const txt = (a.innerText || a.getAttribute('aria-label') || '').trim();
-          if (idx < 25 && txt) {
-            interactive.push({
-              type: 'link',
-              text: txt.slice(0, 45),
-              href: a.href,
-              selector: `a[href="${a.getAttribute('href')}"]`
-            });
-          }
-        });
+      const linkLocators = await page.locator('a[href]').all();
+      for (const link of linkLocators.slice(0, 25)) {
+        const text = String((await link.innerText().catch(() => '')) || (await link.getAttribute('aria-label').catch(() => '')) || '').trim();
+        const href = await link.getAttribute('href').catch(() => null);
+        if (!text || !href) continue;
+        interactive.push({ type: 'link', text: text.slice(0, 45), href: new URL(href, page.url()).href, selector: `a[href="${href}"]` });
+      }
 
-        const bodyText = (document.body?.innerText || '').replace(/\s+/g, ' ').slice(0, 4000);
-        return { interactive, bodyText };
-      });
+      const bodyText = (await page.locator('body').innerText().catch(() => '')).replace(/\s+/g, ' ').slice(0, 4000);
+      return { interactive, bodyText };
     } catch {
       return { interactive: [], bodyText: '' };
     }
@@ -2399,7 +2385,7 @@ class PlaywrightBrowserManager {
       if (url.includes('.') && !url.includes(' ')) {
         url = 'https://' + url;
       } else {
-        url = `https://pt.wikipedia.org/w/index.php?search=${encodeURIComponent(url)}`;
+        url = `https://www.google.com/search?q=${encodeURIComponent(url)}&hl=pt-BR`;
       }
     }
 
@@ -2444,6 +2430,97 @@ class PlaywrightBrowserManager {
         screenshot: undefined,
         interactiveElements: fallback.links.map(l => ({ type: 'link' as const, text: l.text, href: l.href, selector: `a:has-text("${l.text}")` }))
       };
+    }
+  }
+
+  async searchGoogle(query: string, maxResults = 8) {
+    const searchUrl = buildGoogleSearchUrl(query);
+    const page = await this.ensurePage();
+    const response = await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await page.waitForTimeout(700);
+    const domData = await this.extractDomData(page);
+    const challenge = await this.inspectChallenge(page, domData.bodyText) || (page.url().includes('google.com/sorry') ? {
+      provider: 'Google',
+      reason: 'O Google solicitou uma verificação anti-bot na página de resultados.',
+      url: page.url()
+    } : null);
+    const results: Array<{ title: string; url: string; snippet: string }> = [];
+    const seenUrls = new Set<string>();
+    const anchors = await page.locator('a').all();
+    for (const anchor of anchors) {
+      if (results.length >= maxResults) break;
+      const heading = anchor.locator('h3').first();
+      if (await heading.count().catch(() => 0) === 0) continue;
+      const title = (await heading.innerText().catch(() => '')).trim();
+      const rawHref = await anchor.getAttribute('href').catch(() => null);
+      const url = normaliseGoogleResultUrl(rawHref || '', page.url());
+      if (!title || !/^https?:\/\//.test(url)) continue;
+      try {
+        if (new URL(url).hostname.endsWith('google.com')) continue;
+      } catch { continue; }
+      if (seenUrls.has(url)) continue;
+      seenUrls.add(url);
+      const snippet = (await anchor.locator('xpath=..').innerText().catch(() => title)).replace(/\s+/g, ' ').trim().slice(0, 500);
+      results.push({ title, url, snippet });
+    }
+    const screenshotBuf = await page.screenshot({ type: 'jpeg', quality: 75 }).catch(() => null);
+    return {
+      query,
+      googleSearchUrl: searchUrl,
+      url: page.url(),
+      title: await page.title(),
+      status: response?.status() || 200,
+      results,
+      textContent: domData.bodyText,
+      interactiveElements: domData.interactive,
+      links: results.map((item: any) => ({ text: item.title, href: item.url })),
+      screenshot: screenshotBuf ? 'data:image/jpeg;base64,' + screenshotBuf.toString('base64') : undefined,
+      challenge,
+      requiresUserAction: Boolean(challenge),
+      steps: [
+        { label: 'Google aberto', detail: `Pesquisa real em ${searchUrl}` },
+        { label: 'Resultados inspecionados', detail: `${results.length} resultados orgânicos encontrados no DOM` }
+      ]
+    };
+  }
+
+  async openFirstSearchResult() {
+    try {
+      const page = await this.ensurePage();
+      let target: { url: string; title: string } | null = null;
+      const anchors = await page.locator('a').all();
+      for (const anchor of anchors) {
+        const heading = anchor.locator('h3').first();
+        if (await heading.count().catch(() => 0) === 0) continue;
+        const url = normaliseGoogleResultUrl((await anchor.getAttribute('href').catch(() => null)) || '', page.url());
+        if (!/^https?:\/\//.test(url)) continue;
+        try {
+          if (new URL(url).hostname.endsWith('google.com')) continue;
+        } catch { continue; }
+        target = { url, title: (await heading.innerText().catch(() => '')).trim() };
+        break;
+      }
+      if (!target?.url) return { success: false, error: 'Nenhum resultado orgânico do Google foi encontrado para abrir.' };
+      const response = await page.goto(target.url, { waitUntil: 'domcontentloaded', timeout: 20000 });
+      await page.waitForTimeout(600);
+      const domData = await this.extractDomData(page);
+      const challenge = await this.inspectChallenge(page, domData.bodyText);
+      const screenshotBuf = await page.screenshot({ type: 'jpeg', quality: 75 }).catch(() => null);
+      return {
+        success: !challenge,
+        url: page.url(),
+        title: await page.title(),
+        status: response?.status() || 200,
+        textContent: domData.bodyText,
+        interactiveElements: domData.interactive,
+        links: domData.interactive.filter((item: any) => item.type === 'link').map((item: any) => ({ text: item.text, href: item.href })),
+        screenshot: screenshotBuf ? 'data:image/jpeg;base64,' + screenshotBuf.toString('base64') : undefined,
+        challenge,
+        requiresUserAction: Boolean(challenge),
+        openedResult: target
+      };
+    } catch (error: any) {
+      return { success: false, error: error.message };
     }
   }
 
@@ -2551,12 +2628,22 @@ class PlaywrightBrowserManager {
       const page = await this.ensurePage();
       if (this.challenge) return { success: false, error: challengeMessage(this.challenge), challenge: this.challenge, requiresUserAction: true };
       await page.mouse.wheel(0, deltaY);
-      await page.waitForTimeout(400);
+      await page.waitForTimeout(500);
+      const domData = await this.extractDomData(page);
+      const challenge = await this.inspectChallenge(page, domData.bodyText);
       const screenshotBuf = await page.screenshot({ type: 'jpeg', quality: 75 }).catch(() => null);
       const screenshot = screenshotBuf ? 'data:image/jpeg;base64,' + screenshotBuf.toString('base64') : undefined;
+      const scrollY = await page.evaluate(() => window.scrollY).catch(() => 0);
       return {
-        success: true,
-        screenshot
+        success: !challenge,
+        url: page.url(),
+        title: await page.title(),
+        scrollY,
+        textContent: domData.bodyText,
+        interactiveElements: domData.interactive,
+        screenshot,
+        challenge,
+        requiresUserAction: Boolean(challenge)
       };
     } catch (err: any) {
       return { success: false, error: err.message };
@@ -2606,7 +2693,7 @@ async function executeHttpNavigate(rawUrl: string) {
     if (url.includes('.') && !url.includes(' ')) {
       url = 'https://' + url;
     } else {
-      url = `https://pt.wikipedia.org/w/index.php?search=${encodeURIComponent(url)}`;
+      url = `https://www.google.com/search?q=${encodeURIComponent(url)}&hl=pt-BR`;
     }
   }
 
@@ -2692,27 +2779,19 @@ async function executeHttpNavigate(rawUrl: string) {
   }
 }
 
-// 4. Public API Web Search Helper (no browser, no HTML scraping)
-async function executeBrowserSearch(query: string) {
-  const results: Array<{ title: string; snippet: string; url: string; provider?: string }> = [];
+// Google search URLs are always opened by the real Playwright browser.
+function buildGoogleSearchUrl(query: string) {
+  return `https://www.google.com/search?q=${encodeURIComponent(query)}&hl=pt-BR`;
+}
+
+function normaliseGoogleResultUrl(raw: string, baseUrl: string) {
   try {
-    const wikiUrl = `https://pt.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&srlimit=8&utf8=1&format=json&origin=*`;
-    const response = await fetch(wikiUrl, { headers: { Accept: 'application/json', 'User-Agent': 'KvantResearchAgent/1.0 (public-api-client)' }, signal: AbortSignal.timeout(8000) });
-    if (response.ok) {
-      const data: any = await response.json();
-      for (const item of (data.query?.search || []).slice(0, 8)) {
-        const title = String(item.title || '').trim();
-        if (!title) continue;
-        results.push({ title, snippet: String(item.snippet || '').replace(/<[^>]+>/g, '').slice(0, 300), url: `https://pt.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, '_'))}`, provider: 'Wikimedia' });
-      }
-    }
-  } catch (err: any) {
-    console.warn('[Public Search] Wikimedia API indisponível:', err.message);
+    const url = new URL(raw, baseUrl);
+    if (url.hostname.endsWith('google.com') && url.pathname === '/url') return url.searchParams.get('q') || '';
+    return url.href;
+  } catch {
+    return raw;
   }
-  if (results.length === 0) {
-    results.push({ title: `Pesquisa Wikimedia: ${query}`, snippet: 'Nenhum resultado estruturado foi retornado pelas APIs públicas.', url: `https://pt.wikipedia.org/w/index.php?search=${encodeURIComponent(query)}`, provider: 'Wikimedia' });
-  }
-  return { query, resultsCount: results.length, providers: [...new Set(results.map((r) => r.provider))], results };
 }
 
 // 5. Unified Real Tool Execution Engine for the Agent (With Playwright Automation)
@@ -2822,48 +2901,63 @@ async function runRealTool(toolName: string, args: Record<string, any>): Promise
     };
   }
 
-  // Browser Search via APIs públicas; acessa a fonte superior somente quando aplicável
+  // Browser Search through Google and real Playwright navigation
   if (toolName === 'browser.search' || toolName === 'web.search' || toolName === 'search' || toolName === 'computer.search') {
-    const query = args.query || args.q || 'documentação técnica';
-    const directDomain = String(query).trim().match(/^(?:https?:\/\/)?(?:www\.)?[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.[a-z]{2,}(?:\/[^\s]*)?$/i);
-    const directUrl = directDomain ? (String(query).trim().startsWith('http') ? String(query).trim() : `https://${String(query).trim()}`) : null;
-    const searchRes = directUrl
-      ? { query, resultsCount: 1, providers: ['direct_navigation'], results: [{ title: new URL(directUrl).hostname, snippet: 'Navegação direta solicitada pelo usuário; nenhum mecanismo de busca foi consultado.', url: directUrl }] }
-      : await executeBrowserSearch(query);
-    const topSnippets = searchRes.results.map(r => `• ${r.title}\n  URL: ${r.url}\n  ${r.snippet}`).join('\n\n');
-
-    // Automatically access and load the top resulting real webpage
-    const topDestUrl = searchRes.results[0]?.url;
-    let accessedPageData: any = null;
-    if (topDestUrl && (topDestUrl.startsWith('http://') || topDestUrl.startsWith('https://'))) {
-      try {
-        accessedPageData = await playwrightBrowser.navigate(topDestUrl);
-      } catch (err: any) {
-        console.warn(`[Browser Search] Failed to navigate to ${topDestUrl}:`, err.message);
-      }
-    }
-
-    const finalUrl = accessedPageData?.url || topDestUrl || `https://pt.wikipedia.org/w/index.php?search=${encodeURIComponent(query)}`;
-    const finalTitle = accessedPageData?.title || searchRes.results[0]?.title || `Pesquisa: ${query}`;
-
+    const query = String(args.query || args.q || 'pesquisa web').trim();
+    const searchRes = await playwrightBrowser.searchGoogle(query, 8);
+    const topSnippets = searchRes.results.map((item: any) => `• ${item.title}\n  URL: ${item.url}\n  ${item.snippet}`).join('\n\n');
     return {
       id,
       toolName: 'browser.search',
       server: 'playwright_chromium',
-      arguments: { query, accessedUrl: finalUrl },
-      result: `Busca web e acesso concluídos via Playwright Chromium.\n\n🌐 Página Acessada: ${finalTitle} (${finalUrl})\n\nResultados da pesquisa:\n\n${topSnippets}`,
+      arguments: { query, googleUrl: searchRes.googleSearchUrl },
+      result: `Pesquisa real no Google concluída em etapas.\n\n${topSnippets || 'Nenhum resultado orgânico foi encontrado na página observada.'}`,
+      timestamp: now,
+      status: searchRes.challenge ? 'warning' : 'success',
+      actionType: 'browser',
+      screenData: {
+        url: searchRes.url,
+        title: searchRes.title,
+        pageContent: searchRes.textContent,
+        links: searchRes.links,
+        screenshot: searchRes.screenshot,
+        interactiveElements: searchRes.interactiveElements,
+        challenge: searchRes.challenge,
+        requiresUserAction: searchRes.requiresUserAction,
+        actionDescription: `Agente pesquisou no Google por "${query}" e inspecionou ${searchRes.results.length} resultados reais`,
+        steps: searchRes.steps
+      }
+    };
+  }
+
+  if (toolName === 'browser.inspect') {
+    const page = await playwrightBrowser.ensurePage();
+    const domData = await playwrightBrowser.extractDomData(page);
+    return {
+      id,
+      toolName: 'browser.inspect',
+      server: 'playwright_chromium',
+      arguments: {},
+      result: `DOM inspecionado: ${domData.interactive.length} elementos interativos.\n${domData.bodyText.slice(0, 1800)}`,
       timestamp: now,
       status: 'success',
       actionType: 'browser',
-      screenData: {
-        url: finalUrl,
-        title: finalTitle,
-        pageContent: accessedPageData?.textContent || `Resultados obtidos pelo navegador Playwright do Agente:\n\n${topSnippets}`,
-        links: searchRes.results.map(r => ({ text: r.title, href: r.url })),
-        screenshot: accessedPageData?.screenshot,
-        interactiveElements: accessedPageData?.interactiveElements,
-        actionDescription: `Agente pesquisou por "${query}" e acessou a página: "${finalTitle}"`
-      }
+      screenData: { url: page.url(), title: await page.title(), pageContent: domData.bodyText, interactiveElements: domData.interactive, actionDescription: 'Agente inspecionou o DOM da página atual via Playwright' }
+    };
+  }
+
+  if (toolName === 'browser.open_result') {
+    const opened = await playwrightBrowser.openFirstSearchResult();
+    return {
+      id,
+      toolName: 'browser.open_result',
+      server: 'playwright_chromium',
+      arguments: {},
+      result: opened.success ? `Primeiro resultado orgânico aberto: ${opened.title} (${opened.url}).\n${opened.textContent?.slice(0, 1800) || ''}` : opened.error,
+      timestamp: now,
+      status: opened.success ? 'success' : 'error',
+      actionType: 'browser',
+      screenData: { url: opened.url, title: opened.title, pageContent: opened.textContent, screenshot: opened.screenshot, interactiveElements: opened.interactiveElements, actionDescription: opened.success ? 'Agente abriu o primeiro resultado orgânico e obteve contexto da página real' : opened.error }
     };
   }
 
@@ -3179,8 +3273,8 @@ app.get('/api/browser/proxy', async (req, res) => {
             <p>A página foi acessada na nuvem. Você pode interagir com sites abertos ou navegar para destinos compatíveis com proxy web ao vivo.</p>
             <div style="margin-top: 20px;">
               <a href="/api/browser/proxy?url=https://news.ycombinator.com" class="btn">Hacker News</a>
-              <a href="/api/browser/proxy?url=https://pt.wikipedia.org/w/index.php?search=agent+ai" class="btn">Wikimedia</a>
-              <a href="/api/browser/proxy?url=https://en.wikipedia.org/wiki/Artificial_intelligence" class="btn">Wikipedia AI</a>
+              <a href="/api/browser/proxy?url=https://www.google.com/search?q=agent+ai&amp;hl=pt-BR" class="btn">Google: Agent AI</a>
+              <a href="/api/browser/proxy?url=https://www.google.com/search?q=intelig%C3%AAncia+artificial&amp;hl=pt-BR" class="btn">Google: IA</a>
             </div>
           </div>
           ${bridgeScript}
@@ -3272,8 +3366,7 @@ app.post('/api/computer/browser/screenshot', async (_req, res) => {
 app.post('/api/computer/browser/search', async (req, res) => {
   const { query } = req.body;
   if (!query) return res.status(400).json({ error: 'Termo de busca é obrigatório' });
-  const searchUrl = `https://pt.wikipedia.org/w/index.php?search=${encodeURIComponent(query)}`;
-  const result = await playwrightBrowser.navigate(searchUrl);
+  const result = await playwrightBrowser.searchGoogle(String(query), 8);
   return res.json(result);
 });
 
@@ -3562,8 +3655,8 @@ function extractUserDestinationUrl(message: string): { targetUrl: string | null;
   const searchMatch = cleanMsg.match(/(?:pesquis(?:e|ar)|busqu(?:e|ar)|procur(?:e|ar)|search for|search|procure na web por|pesquise por)\s+["']?([^"'\n\r]+)["']?/i);
   const lower = cleanMsg.toLowerCase();
   if (searchMatch && !lower.includes('endereço') && !lower.includes('endereco') && !lower.includes('acesse') && !lower.includes('abra o site')) {
-    const rawQuery = searchMatch[1].trim();
-    return { targetUrl: `https://pt.wikipedia.org/w/index.php?search=${encodeURIComponent(rawQuery)}`, isExplicitSearch: true, searchQuery: rawQuery };
+    const rawQuery = searchMatch[1].trim().replace(/^(?:sobre|por)\s+/i, '').trim();
+    return { targetUrl: `https://www.google.com/search?q=${encodeURIComponent(rawQuery)}&hl=pt-BR`, isExplicitSearch: true, searchQuery: rawQuery };
   }
 
   // 3. Strip command phrases and conversational boilerplate
@@ -3608,9 +3701,9 @@ function extractUserDestinationUrl(message: string): { targetUrl: string | null;
     }
   }
 
-  // 8. If multiple words remain (e.g. "notícias de tecnologia"), turn into a direct search
+  // 8. If multiple words remain (e.g. "notícias de tecnologia"), turn into a Google search
   return { 
-    targetUrl: `https://pt.wikipedia.org/w/index.php?search=${encodeURIComponent(stripped)}`, 
+    targetUrl: `https://www.google.com/search?q=${encodeURIComponent(stripped)}&hl=pt-BR`, 
     isExplicitSearch: true, 
     searchQuery: stripped 
   };
@@ -3655,11 +3748,15 @@ function planRealAgentActions(message: string): Array<{ toolName: string; args: 
 
   // A. Navigation or Search & Access
   if (destination.isExplicitSearch && destination.searchQuery) {
-    plan.push({
-      toolName: 'browser.search',
-      args: { query: destination.searchQuery },
-      reason: `Pesquisando na web e acessando a página mais relevante sobre "${destination.searchQuery}"`
-    });
+    plan.push(
+      { toolName: 'browser.search', args: { query: destination.searchQuery }, reason: `Etapa 1/7: pesquisando "${destination.searchQuery}" diretamente no Google via Playwright` },
+      { toolName: 'browser.inspect', args: {}, reason: 'Etapa 2/7: inspecionando o DOM dos resultados reais do Google' },
+      { toolName: 'browser.scroll', args: { deltaY: 500 }, reason: 'Etapa 3/7: rolando a página de resultados para observar mais fontes' },
+      { toolName: 'browser.inspect', args: {}, reason: 'Etapa 4/7: obtendo contexto adicional após a rolagem' },
+      { toolName: 'browser.open_result', args: {}, reason: 'Etapa 5/7: abrindo o primeiro resultado orgânico em uma página real' },
+      { toolName: 'browser.scroll', args: { deltaY: 500 }, reason: 'Etapa 6/7: rolando a fonte aberta para obter contexto adicional' },
+      { toolName: 'browser.inspect', args: {}, reason: 'Etapa 7/7: inspecionando o conteúdo e os links da fonte acessada' }
+    );
   } else if (destination.targetUrl) {
     plan.push({
       toolName: 'browser.navigate',
@@ -3745,8 +3842,9 @@ app.post('/api/agent/chat/stream', async (req, res) => {
     const webSources: Array<{ title: string; url: string; snippet: string }> = [];
     let pendingApproval: any = null;
 
-    // 1. If Gemini API key is available, execute real multi-turn function calling
-    if (process.env.GEMINI_API_KEY) {
+    // 1. Research uses the deterministic Playwright plan below so every browser step is streamed live.
+    // Gemini remains available for conversation, computer actions and app creation.
+    if (process.env.GEMINI_API_KEY && intent.mode !== 'web_research') {
       const chatContents: any[] = [];
       if (Array.isArray(history)) {
         for (const h of history) {
@@ -3832,6 +3930,13 @@ app.post('/api/agent/chat/stream', async (req, res) => {
           });
 
           const execResult = await agentToolExecutor.executeTool(toolName, args);
+
+          if (Array.isArray(execResult.result?.steps)) {
+            for (const step of execResult.result.steps) {
+              sendEvent('step', { text: step.detail ? `${step.label}: ${step.detail}` : step.label, toolName });
+              await new Promise(r => setTimeout(r, 250));
+            }
+          }
 
           const traceItem = {
             id: `trace_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -3957,7 +4062,22 @@ app.post('/api/agent/chat/stream', async (req, res) => {
       }
 
       executedToolCalls.push(toolResult);
+      if (action.toolName === 'browser.search' && Array.isArray(toolResult.screenData?.links)) {
+        webSources.push(...toolResult.screenData.links.map((link: any) => ({ title: link.text, url: link.href, snippet: '' })));
+      }
       sendEvent('tool_finish', { toolCall: toolResult });
+      if (toolResult.screenData?.challenge || toolResult.requiresUserAction || toolResult.status === 'warning') {
+        const challenge = toolResult.screenData?.challenge;
+        pendingApproval = {
+          actionName: 'browser_handoff',
+          details: challenge,
+          riskLevel: 'medium',
+          reason: challenge?.reason || 'O navegador apresentou um desafio anti-bot; a continuação exige intervenção humana autorizada.',
+          requestedAt: new Date().toISOString()
+        };
+        sendEvent('approval_required', { approval: pendingApproval, toolName: action.toolName, arguments: action.args });
+        break;
+      }
       await new Promise(r => setTimeout(r, 500));
     }
 
@@ -3976,10 +4096,13 @@ app.post('/api/agent/chat/stream', async (req, res) => {
       
       finalResult = {
         thought: `Ação realizada no computador na nuvem com sucesso: ${actionSummary}`,
-        explanation: `Acessei **${navUrl}** pelo Computador na Nuvem. A página foi carregada e o agente está interagindo ao vivo com o navegador.`,
+        explanation: pendingApproval
+          ? `A pesquisa chegou a **${navUrl}**, mas foi pausada porque o site solicitou uma etapa humana de verificação.`
+          : `Acessei **${navUrl}** pelo Computador na Nuvem. A página foi carregada e o agente está interagindo ao vivo com o navegador.`,
         files: [],
         sources: webSources,
-        toolCalls: executedToolCalls
+        toolCalls: executedToolCalls,
+        approval: pendingApproval
       };
     }
 

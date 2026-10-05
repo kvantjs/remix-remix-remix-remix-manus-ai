@@ -32,13 +32,15 @@ const TOOL_ALIASES: Record<string, string> = {
   browser_inspect: 'browser_inspect',
   browser_click: 'browser_click',
   browser_type: 'browser_type',
+  browser_scroll: 'browser_scroll',
+  browser_open_result: 'browser_open_result',
   job_create: 'job_create',
   job_status: 'job_status',
   job_cancel: 'job_cancel'
 };
 
 const ALL_TOOLS = Object.values(TOOL_ALIASES).filter((name, index, list) => list.indexOf(name) === index);
-const WEB_TOOLS = ['web_search', 'web_fetch', 'browser_navigate', 'browser_inspect'];
+const WEB_TOOLS = ['web_search', 'web_fetch', 'browser_navigate', 'browser_inspect', 'browser_click', 'browser_scroll', 'browser_open_result'];
 const COMPUTER_TOOLS = [...WEB_TOOLS, 'browser_click', 'browser_type', 'bash_exec', 'python_exec', 'file_list', 'file_read', 'file_write', 'file_delete', 'job_create', 'job_status', 'job_cancel'];
 const APP_TOOLS = ['file_list', 'file_read', 'file_write', 'bash_exec', 'python_exec', 'job_create', 'job_status', 'job_cancel'];
 const PROJECT_TOOLS = ['file_list', 'file_read', 'file_write', 'file_delete', 'bash_exec', 'job_create', 'job_status', 'job_cancel'];
@@ -126,7 +128,7 @@ export function filterToolDeclarations(intent: AgentIntent, declarations: any[])
 
 export function buildIntentInstruction(intent: AgentIntent) {
   const tools = intent.allowedTools.length ? intent.allowedTools.join(', ') : 'nenhuma';
-  return `\n\nROTEADOR RIGOROSO DE INTENÇÃO — MODO ATIVO: ${intent.mode.toUpperCase()}\nMotivo: ${intent.reason}\nFerramentas autorizadas neste turno: ${tools}.\nREGRAS INVIOLÁVEIS:\n1. Não confunda conversa com autorização operacional. Em CONVERSATION, responda em linguagem natural e não chame ferramentas, navegador, terminal ou filesystem.\n2. Em WEB_RESEARCH, use somente ferramentas web autorizadas; não clique, preencha formulários, execute shell ou edite arquivos sem novo pedido explícito.\n3. Em CLOUD_COMPUTER, execute somente ações no computador/navegador descritas pelo usuário; não transforme uma pergunta em criação de software.\n4. Em APP_CREATION, trate a mensagem como engenharia de software; leia arquivos atuais antes de editar, escreva código apenas nos arquivos necessários e valide o resultado. Não navegue na web por iniciativa própria.\n5. Em EXPLICIT_TOOL_CALL, chame somente a ferramenta nomeada; se o pedido estiver incompleto, peça esclarecimento em vez de escolher outra ferramenta.\n6. Em PROJECT_OPERATION, trate arquivos, snapshots, diffs e versões como operações de projeto; não publique, restaure ou faça push sem confirmação explícita do usuário.\n7. Nunca alegue que uma ferramenta foi executada se ela não aparecer em toolCalls com resultado real.\n8. Se a intenção mudar no meio da tarefa, pare e peça confirmação antes de trocar de modo.\n`;
+  return `\n\nROTEADOR RIGOROSO DE INTENÇÃO — MODO ATIVO: ${intent.mode.toUpperCase()}\nMotivo: ${intent.reason}\nFerramentas autorizadas neste turno: ${tools}.\nREGRAS INVIOLÁVEIS:\n1. Não confunda conversa com autorização operacional. Em CONVERSATION, responda em linguagem natural e não chame ferramentas, navegador, terminal ou filesystem.\n2. Em WEB_RESEARCH, use o Google pelo navegador Playwright real em etapas de navegação, inspeção, rolagem e abertura de resultados; não execute shell, edite arquivos ou preencha formulários sem novo pedido explícito.\n3. Em CLOUD_COMPUTER, execute somente ações no computador/navegador descritas pelo usuário; não transforme uma pergunta em criação de software.\n4. Em APP_CREATION, trate a mensagem como engenharia de software; leia arquivos atuais antes de editar, escreva código apenas nos arquivos necessários e valide o resultado. Não navegue na web por iniciativa própria.\n5. Em EXPLICIT_TOOL_CALL, chame somente a ferramenta nomeada; se o pedido estiver incompleto, peça esclarecimento em vez de escolher outra ferramenta.\n6. Em PROJECT_OPERATION, trate arquivos, snapshots, diffs e versões como operações de projeto; não publique, restaure ou faça push sem confirmação explícita do usuário.\n7. Nunca alegue que uma ferramenta foi executada se ela não aparecer em toolCalls com resultado real.\n8. Se a intenção mudar no meio da tarefa, pare e peça confirmação antes de trocar de modo.\n`;
 }
 
 export function conversationFallback() {

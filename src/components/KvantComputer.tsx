@@ -122,12 +122,8 @@ export function resolveWebUrl(raw: string): string {
   const searchMatch = clean.match(/(?:pesquis(?:e|ar)|busqu(?:e|ar)|procur(?:e|ar)|search for|search|procure na web por|pesquise por)\s+["']?([^"'\n\r]+)["']?/i);
   const lower = clean.toLowerCase();
   if (searchMatch && !lower.includes('endereço') && !lower.includes('endereco') && !lower.includes('acesse') && !lower.includes('abra o site')) {
-    const searchTerm = searchMatch[1].trim().toLowerCase();
-    const requestedPortal = Object.entries(KNOWN_WEB_PORTALS)
-      .sort(([a], [b]) => b.length - a.length)
-      .find(([brand]) => new RegExp(`(?:^|\\s)${brand.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}(?:$|\\s|[.,!?])`, 'i').test(searchTerm));
-    if (requestedPortal) return requestedPortal[1];
-    return `https://pt.wikipedia.org/w/index.php?search=${encodeURIComponent(searchMatch[1].trim())}`;
+    const query = searchMatch[1].trim().replace(/^(?:sobre|por)\s+/i, '').trim();
+    return `https://www.google.com/search?q=${encodeURIComponent(query)}&hl=pt-BR`;
   }
 
   // 3. Strip command prefixes and boilerplate
@@ -172,8 +168,8 @@ export function resolveWebUrl(raw: string): string {
     }
   }
 
-  // 8. If multiple words remain, search for that exact term
-  return `https://pt.wikipedia.org/w/index.php?search=${encodeURIComponent(clean)}`;
+  // 8. If multiple words remain, search for that exact term on Google
+  return `https://www.google.com/search?q=${encodeURIComponent(clean)}&hl=pt-BR`;
 }
 
 interface NavHistoryItem {

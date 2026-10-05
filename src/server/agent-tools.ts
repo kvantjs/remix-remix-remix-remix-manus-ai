@@ -12,7 +12,7 @@ const execAsync = util.promisify(exec);
 export const AGENT_TOOL_DECLARATIONS = [
   {
     name: 'web_search',
-    description: 'Realiza busca federada por APIs públicas gratuitas (Wikimedia, Stack Exchange e OpenAlex), sem abrir navegador ou fazer scraping HTML, retornando títulos, URLs reais e trechos verificáveis.',
+    description: 'Pesquisa usando o Google em um navegador Playwright Chromium real, acompanha a página em etapas, inspeciona resultados e retorna contexto obtido diretamente das páginas visitadas.',
     parameters: {
       type: 'OBJECT',
       properties: {
@@ -196,6 +196,27 @@ export const AGENT_TOOL_DECLARATIONS = [
     }
   },
   {
+    name: 'browser_scroll',
+    description: 'Rola a página real do navegador Playwright em uma etapa observável e captura o novo contexto e screenshot.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        deltaY: {
+          type: 'INTEGER',
+          description: 'Quantidade de pixels para rolar; padrão 500.'
+        }
+      }
+    }
+  },
+  {
+    name: 'browser_open_result',
+    description: 'Abre o primeiro resultado orgânico encontrado na página de resultados do Google usando a sessão real do navegador.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {}
+    }
+  },
+  {
     name: 'job_create',
     description: 'Cria uma tarefa assíncrona para operações de longa duração, permitindo acompanhamento de progresso, logs e cancelamento.',
     parameters: {
@@ -281,74 +302,15 @@ export class AgentToolExecutor {
           const queryText = String(args.query || '').trim();
           if (!queryText) throw new Error('Parâmetro query é obrigatório.');
           const limit = Math.min(10, Math.max(1, Number(args.maxResults) || 5));
-          const sources: Array<{ title: string; url: string; snippet: string; provider: string }> = [];
-
-          // Wikimedia API: pública, gratuita, sem HTML scraping e sem navegador.
-          try {
-            const wikiUrl = `https://pt.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(queryText)}&srlimit=${limit}&utf8=1&format=json&origin=*`;
-            const wikiResponse = await fetch(wikiUrl, {
-              headers: { 'Accept': 'application/json', 'User-Agent': 'KvantResearchAgent/1.0 (public-api-client)' },
-              signal: AbortSignal.timeout(8000)
-            });
-            if (wikiResponse.ok) {
-              const wikiData: any = await wikiResponse.json();
-              for (const item of (wikiData.query?.search || []).slice(0, limit)) {
-                const title = String(item.title || '').trim();
-                if (!title) continue;
-                sources.push({
-                  title,
-                  url: `https://pt.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, '_'))}`,
-                  snippet: String(item.snippet || '').replace(/<[^>]+>/g, '').replace(/&quot;/g, '"').replace(/&amp;/g, '&').slice(0, 300),
-                  provider: 'Wikimedia'
-                });
-              }
-            }
-          } catch (error) {
-            console.warn('[Public Search] Wikimedia API indisponível:', (error as Error).message);
-          }
-
-          // Stack Exchange API: gratuita e apropriada para dúvidas técnicas.
-          if (sources.length < limit && /\b(code|código|program|javascript|typescript|python|react|api|software|erro|bug|linux|sql)\b/i.test(queryText)) {
-            try {
-              const stackUrl = `https://api.stackexchange.com/2.3/search/advanced?order=desc&sort=relevance&q=${encodeURIComponent(queryText)}&site=stackoverflow&pagesize=${Math.min(limit, 5)}&filter=default`;
-              const stackResponse = await fetch(stackUrl, {
-                headers: { 'Accept': 'application/json', 'User-Agent': 'KvantResearchAgent/1.0 (public-api-client)' },
-                signal: AbortSignal.timeout(8000)
-              });
-              if (stackResponse.ok) {
-                const stackData: any = await stackResponse.json();
-                for (const item of (stackData.items || [])) {
-                  if (sources.length >= limit) break;
-                  sources.push({ title: String(item.title || 'Stack Overflow'), url: String(item.link || ''), snippet: `Pergunta técnica no Stack Overflow; respostas e votação disponíveis na fonte.`, provider: 'Stack Exchange API' });
-                }
-              }
-            } catch (error) {
-              console.warn('[Public Search] Stack Exchange API indisponível:', (error as Error).message);
-            }
-          }
-
-          // OpenAlex: gratuita para literatura científica e metadados acadêmicos.
-          if (sources.length < limit && /\b(paper|artigo|pesquisa|estudo|científico|cientifica|academic|research|doi)\b/i.test(queryText)) {
-            try {
-              const openAlexUrl = `https://api.openalex.org/works?search=${encodeURIComponent(queryText)}&per-page=${Math.min(limit, 5)}`;
-              const openAlexResponse = await fetch(openAlexUrl, { headers: { 'Accept': 'application/json', 'User-Agent': 'KvantResearchAgent/1.0 (mailto:research@localhost)' }, signal: AbortSignal.timeout(8000) });
-              if (openAlexResponse.ok) {
-                const openAlexData: any = await openAlexResponse.json();
-                for (const item of (openAlexData.results || [])) {
-                  if (sources.length >= limit) break;
-                  sources.push({ title: String(item.title || 'OpenAlex work'), url: String(item.doi || item.primary_location?.landing_page_url || `https://openalex.org/${item.id?.split('/').pop() || ''}`), snippet: `Registro acadêmico OpenAlex${item.publication_year ? ` (${item.publication_year})` : ''}.`, provider: 'OpenAlex' });
-                }
-              }
-            } catch (error) {
-              console.warn('[Public Search] OpenAlex indisponível:', (error as Error).message);
-            }
-          }
-
-          const uniqueSources = sources.filter((item, index, list) => item.url && list.findIndex((other) => other.url === item.url) === index).slice(0, limit);
+          const search = await this.browserManager.searchGoogle(queryText, limit);
           return {
-            success: true,
-            result: { query: queryText, totalFound: uniqueSources.length, providers: [...new Set(uniqueSources.map((item) => item.provider))], sources: uniqueSources, browserUsed: false },
-            actionDescription: `Pesquisa federada por APIs públicas sem navegador ou scraping HTML (${uniqueSources.length} fontes)`
+            success: !search.challenge,
+            result: { ...search, browserUsed: true, provider: 'Google', sources: search.results },
+            actionDescription: search.challenge
+              ? `Pesquisa interrompida pelo challenge do Google: ${search.challenge.reason}`
+              : `Pesquisa real no Google concluída em etapas (${search.results.length} resultados observados)`,
+            requiresApproval: Boolean(search.challenge),
+            approvalDetails: search.challenge ? { actionName: 'browser_handoff', details: search.challenge, riskLevel: 'medium', reason: 'O Google apresentou um desafio anti-bot; a continuação exige intervenção humana autorizada.', requestedAt: new Date().toISOString() } : undefined
           };
         }
 
@@ -691,6 +653,31 @@ export class AgentToolExecutor {
               bodySnippet: domData.bodyText.slice(0, 1500)
             },
             actionDescription: `Inspeção do DOM: ${domData.interactive.length} elementos interativos detectados`
+          }
+        }
+
+        case 'browser_scroll': {
+          const deltaY = Number(args.deltaY) || 500;
+          const result = await this.browserManager.scroll(deltaY);
+          return {
+            success: result.success !== false && !result.challenge,
+            result,
+            error: result.error,
+            actionDescription: result.challenge ? `Rolagem interrompida: ${result.challenge.reason}` : `Agente rolou a página real ${deltaY}px e capturou o novo contexto`,
+            requiresApproval: Boolean(result.challenge),
+            approvalDetails: result.challenge ? { actionName: 'browser_handoff', details: result.challenge, riskLevel: 'medium', reason: 'Intervenção humana autorizada necessária.', requestedAt: new Date().toISOString() } : undefined
+          };
+        }
+
+        case 'browser_open_result': {
+          const result = await this.browserManager.openFirstSearchResult();
+          return {
+            success: result.success !== false && !result.challenge,
+            result,
+            error: result.error,
+            actionDescription: result.challenge ? `Abertura interrompida: ${result.challenge.reason}` : `Agente abriu o primeiro resultado orgânico e obteve o contexto da página real`,
+            requiresApproval: Boolean(result.challenge),
+            approvalDetails: result.challenge ? { actionName: 'browser_handoff', details: result.challenge, riskLevel: 'medium', reason: 'Intervenção humana autorizada necessária.', requestedAt: new Date().toISOString() } : undefined
           };
         }
 

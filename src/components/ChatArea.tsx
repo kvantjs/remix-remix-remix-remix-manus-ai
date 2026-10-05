@@ -257,6 +257,16 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
                   const data = JSON.parse(line.replace('data: ', '').trim());
                   if (currentEvent === 'status') {
                     setCurrentStep(data.text);
+                  } else if (currentEvent === 'step') {
+                    setCurrentStep(data.text);
+                    if (onAgentStateChange) {
+                      onAgentStateChange({
+                        isWorking: true,
+                        statusText: data.text,
+                        contextText: data.text,
+                        toolCalls: [...liveToolCalls]
+                      });
+                    }
                   } else if (currentEvent === 'tool_start') {
                     setCurrentStep(`Executando ${data.toolName}: ${data.reason}`);
                     const activeTrace: ToolCallTrace = {
