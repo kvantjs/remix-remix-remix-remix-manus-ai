@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
+import { randomUUID } from 'crypto';
 import os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -13,6 +14,9 @@ import { AGENT_TOOL_DECLARATIONS, AgentToolExecutor, ensureSandboxDir } from './
 import { jobsManager } from './src/server/jobs-manager.js';
 import { resolveSafeSandboxPath, redactSecrets, isSafeUrl, SANDBOX_WORKSPACE_ROOT } from './src/server/security.js';
 import { getPlatformOverview, loadPlatformConfig, savePlatformConfig } from './src/server/platform-state.js';
+import { databaseAvailable, ensureDatabaseSchema, query } from './src/server/database.js';
+import { beginOAuth, clearSession, finishOAuth, getAuthenticatedUser, getCookie, getScheduledClaims, resolveScheduledIdentity } from './src/server/auth.js';
+import { createDownloadUrl, createUpload, listObjects, softDeleteObject } from './src/server/storage.js';
 
 const execAsync = promisify(exec);
 
@@ -61,6 +65,135 @@ app.get('/api/platform/routes', async (_req, res) => {
     res.type('application/json').send(routes);
   } catch (error: any) {
     res.status(404).json({ error: redactSecrets(error?.message || String(error)) });
+  }
+});
+
+app.get('/api/db/status', async (_req, res) => {
+  if (!databaseAvailable()) return res.json({ available: false, connected: false, reason: 'DATABASE_URL ausente no processo atual.' });
+  try {
+    await query('SELECT 1 AS ok');
+    res.json({ available: true, connected: true });
+  } catch (error: any) {
+    res.status(503).json({ available: true, connected: false, error: redactSecrets(error?.message || String(error)) });
+  }
+});
+
+app.get('/api/health/readiness', async (_req, res) => {
+  const config = await loadPlatformConfig();
+  if (config.features.database && !databaseAvailable()) {
+    return res.status(503).json({ ready: false, reason: 'Banco gerenciado ainda não foi injetado neste processo.' });
+  }
+  if (databaseAvailable()) {
+    try {
+      await query('SELECT 1 AS ok');
+    } catch (error: any) {
+      return res.status(503).json({ ready: false, reason: redactSecrets(error?.message || String(error)) });
+    }
+  }
+  return res.json({ ready: true, database: databaseAvailable() ? 'connected' : 'not-required' });
+});
+
+app.get('/api/auth/login', (req, res) => {
+  try {
+    res.redirect(beginOAuth(req, res, typeof req.query.origin === 'string' ? req.query.origin : undefined));
+  } catch (error: any) {
+    res.status(503).json({ error: redactSecrets(error?.message || String(error)) });
+  }
+});
+
+app.get('/api/auth/callback', async (req, res) => {
+  const code = typeof req.query.code === 'string' ? req.query.code : '';
+  const state = typeof req.query.state === 'string' ? req.query.state : '';
+  if (!code || !state) return res.status(400).json({ error: 'code e state são obrigatórios.' });
+  try {
+    await finishOAuth(req, res, code, state);
+    res.redirect('/?auth=success');
+  } catch (error: any) {
+    res.status(400).json({ error: redactSecrets(error?.message || String(error)) });
+  }
+});
+
+app.get('/api/auth/me', async (req, res) => {
+  const user = await getAuthenticatedUser(req);
+  res.json({ authenticated: Boolean(user), user });
+});
+
+app.post('/api/auth/logout', (_req, res) => {
+  clearSession(res);
+  res.json({ ok: true });
+});
+
+app.post('/api/storage/presign', async (req, res) => {
+  const user = await getAuthenticatedUser(req);
+  if (!user) return res.status(401).json({ error: 'Autenticação necessária.' });
+  try {
+    const requestedKey = String(req.body?.key || '').replace(/^\/+/, '');
+    const ownerPrefix = Buffer.from(user.openId).toString('base64url').slice(0, 32);
+    const result = await createUpload(user, `${ownerPrefix}/${requestedKey}`, {
+      name: req.body?.name,
+      mimeType: req.body?.mimeType,
+      sizeBytes: Number.isFinite(Number(req.body?.sizeBytes)) ? Number(req.body.sizeBytes) : undefined
+    });
+    res.json(result);
+  } catch (error: any) {
+    res.status(503).json({ error: redactSecrets(error?.message || String(error)) });
+  }
+});
+
+app.get('/api/storage/objects', async (req, res) => {
+  const user = await getAuthenticatedUser(req);
+  if (!user) return res.status(401).json({ error: 'Autenticação necessária.' });
+  try {
+    res.json({ objects: await listObjects(user) });
+  } catch (error: any) {
+    res.status(503).json({ error: redactSecrets(error?.message || String(error)) });
+  }
+});
+
+app.get('/api/storage/download-url', async (req, res) => {
+  const user = await getAuthenticatedUser(req);
+  if (!user) return res.status(401).json({ error: 'Autenticação necessária.' });
+  try {
+    const requestedKey = String(req.query.key || '').replace(/^\/+/, '');
+    const ownerPrefix = Buffer.from(user.openId).toString('base64url').slice(0, 32);
+    if (!requestedKey.startsWith(`${ownerPrefix}/`)) return res.status(403).json({ error: 'Objeto fora do escopo do usuário.' });
+    res.json(await createDownloadUrl(requestedKey));
+  } catch (error: any) {
+    res.status(503).json({ error: redactSecrets(error?.message || String(error)) });
+  }
+});
+
+app.delete('/api/storage/objects/:id', async (req, res) => {
+  const user = await getAuthenticatedUser(req);
+  if (!user) return res.status(401).json({ error: 'Autenticação necessária.' });
+  try {
+    res.json({ ok: await softDeleteObject(user, req.params.id) });
+  } catch (error: any) {
+    res.status(503).json({ error: redactSecrets(error?.message || String(error)) });
+  }
+});
+
+app.post('/api/scheduled/agent', async (req, res) => {
+  const claims = getScheduledClaims(req);
+  const jwt = getCookie(req, 'app_session_id');
+  if (!claims || !jwt) return res.status(401).json({ error: 'Credencial de scheduler inválida.' });
+  if (!databaseAvailable()) return res.status(503).json({ error: 'Banco gerenciado indisponível para idempotência do scheduler.' });
+  try {
+    const identity = await resolveScheduledIdentity(jwt);
+    const runKey = String(req.body?.runKey || req.header('x-manus-run-uid') || `${identity.taskUid}:${new Date().toISOString().slice(0, 16)}`);
+    const runId = randomUUID();
+    try {
+      await query(`INSERT INTO scheduled_runs (run_id, task_uid, run_key, status) VALUES (?, ?, ?, 'accepted')`, [runId, identity.taskUid, runKey]);
+    } catch (error: any) {
+      if (String(error?.code) === 'ER_DUP_ENTRY') return res.json({ ok: true, duplicate: true, taskUid: identity.taskUid, runKey });
+      throw error;
+    }
+    const job = jobsManager.createJob(String(req.body?.title || 'Tarefa agendada do agente'), 'scheduled_agent');
+    jobsManager.addLog(job.id, `Callback autenticado para taskUid ${identity.taskUid}`);
+    await query(`UPDATE scheduled_runs SET result_json = ?, finished_at = NOW() WHERE run_id = ?`, [JSON.stringify({ jobId: job.id }), runId]);
+    res.status(202).json({ ok: true, accepted: true, taskUid: identity.taskUid, runKey, jobId: job.id });
+  } catch (error: any) {
+    res.status(500).json({ error: redactSecrets(error?.message || String(error)) });
   }
 });
 
@@ -3849,6 +3982,13 @@ app.post('/api/agent/chat', async (req, res) => {
 
 // Setup Vite middleware for development
 async function startServer() {
+  try {
+    const migration = await ensureDatabaseSchema();
+    console.log(`[Kvant Server] Database: ${migration.available ? 'connected and migrated' : 'not available in this runtime'}`);
+  } catch (error: any) {
+    console.error('[Kvant Server] Database migration failed:', redactSecrets(error?.message || String(error)));
+  }
+
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({

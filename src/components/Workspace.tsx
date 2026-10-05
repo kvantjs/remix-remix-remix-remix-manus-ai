@@ -567,6 +567,7 @@ function SettingsView() {
   const [activeSubTab, setActiveSubTab] = useState('Geral');
   const [config, setConfig] = useState<any>(null);
   const [overview, setOverview] = useState<any>(null);
+  const [authUser, setAuthUser] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -586,8 +587,21 @@ function SettingsView() {
   };
 
   useEffect(() => {
-    refresh().catch(() => setMessage('Não foi possível carregar o estado do projeto.'));
+    Promise.all([
+      refresh(),
+      fetch('/api/auth/me').then((response) => response.ok ? response.json() : null).then((payload) => setAuthUser(payload?.user || null))
+    ]).catch(() => setMessage('Não foi possível carregar o estado do projeto.'));
   }, []);
+
+  const startLogin = () => {
+    const origin = encodeURIComponent(window.location.origin);
+    window.location.assign(`/api/auth/login?origin=${origin}`);
+  };
+
+  const logout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    setAuthUser(null);
+  };
 
   const updateConfig = async (patch: Record<string, unknown>) => {
     setSaving(true);
@@ -659,6 +673,18 @@ function SettingsView() {
                   onClick={() => updateConfig({ project: config.project })}
                   className="mt-3 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 disabled:opacity-40 text-xs text-white transition-colors"
                 >Salvar projeto</button>
+              </div>
+              <div className="bg-[#202020] border border-[#333333] rounded-xl p-4 flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-sm font-semibold text-white">Conta da aplicação</div>
+                  <div className="text-[11px] text-white/40 mt-1">Autenticação Manus OAuth com sessão validada no servidor.</div>
+                  {authUser && <div className="text-[11px] text-emerald-400 mt-2">Conectado como {authUser.name || authUser.email || authUser.openId}</div>}
+                </div>
+                {authUser ? (
+                  <button onClick={logout} className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs text-white">Sair</button>
+                ) : (
+                  <button onClick={startLogin} className="px-3 py-1.5 rounded-lg bg-white text-black hover:bg-white/80 text-xs font-medium">Entrar com Manus</button>
+                )}
               </div>
               <div className="bg-[#202020] border border-[#333333] rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3">

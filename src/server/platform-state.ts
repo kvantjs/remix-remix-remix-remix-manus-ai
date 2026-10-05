@@ -40,7 +40,7 @@ const defaultConfig: PlatformConfig = {
   },
   features: {
     server: true,
-    database: false,
+    database: true,
     storage: false,
     authentication: false,
     ai: true,
