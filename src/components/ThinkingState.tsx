@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Favicon, extractCleanDomain } from "@/lib/favicon";
 
 /* ─────────────────────────────────────────────────────────
  * THINKING — expandable agent trace, four variants
@@ -77,57 +78,9 @@ const VARIANTS: Record<
   },
 };
 
-function Dot({ tone }: { tone: string }) {
-  return (
-    <span className={`flex size-3.5 shrink-0 items-center justify-center rounded-full text-white ${tone}`}>
-      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-        <circle cx="12" cy="12" r="9" />
-        <path d="M3.5 12h17M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
-      </svg>
-    </span>
-  );
+export function ThinkingStateGroup({ children }: { children: ReactNode }) {
+  return <div className="flex flex-col gap-2.5 w-full my-1.5">{children}</div>;
 }
-
-function getCleanDomain(urlOrDomain: string): string {
-  if (!urlOrDomain) return "";
-  try {
-    let cleaned = urlOrDomain.trim().toLowerCase();
-    cleaned = cleaned.replace(/^(https?:\/\/)?(www\.)?/, "");
-    cleaned = cleaned.split("/")[0];
-    return cleaned;
-  } catch (e) {
-    return "";
-  }
-}
-
-function Favicon({ urlOrDomain, tone }: { urlOrDomain: string; tone: string }) {
-  const domain = getCleanDomain(urlOrDomain);
-  const [imgSrc, setImgSrc] = useState(`https://vemetric.com/${domain}`);
-  const [failed, setFailed] = useState(false);
-
-  if (!domain || failed) {
-    return <Dot tone={tone} />;
-  }
-
-  return (
-    <span className={`flex size-3.5 shrink-0 items-center justify-center rounded-full bg-white/10 overflow-hidden ${tone}`}>
-      <img
-        src={imgSrc}
-        alt=""
-        className="size-2.5 object-contain"
-        onError={() => {
-          if (imgSrc.includes("vemetric.com")) {
-            setImgSrc(`https://www.google.com/s2/favicons?domain=${domain}&sz=64`);
-          } else {
-            setFailed(true);
-          }
-        }}
-      />
-    </span>
-  );
-}
-
-const TONES = ["bg-accent", "bg-orange", "bg-green"];
 
 export default function ThinkingState({
   variant = "Steps",
@@ -137,6 +90,7 @@ export default function ThinkingState({
   done,
   icon,
   elapsedSeconds = 1,
+  working: propWorking,
 }: {
   variant?: string;
   onSettled?: () => void;
@@ -147,6 +101,8 @@ export default function ThinkingState({
   /** override the header glyph (defaults to the sparkle) */
   icon?: ReactNode;
   elapsedSeconds?: number;
+  /** whether the trace is actively working in real-time */
+  working?: boolean;
 }) {
   const stage = useSequence(STAGES);
   const [manualExpanded, setManualExpanded] = useState<boolean | null>(null);
@@ -158,7 +114,7 @@ export default function ThinkingState({
     done: done ?? base.done,
   };
   const expanded = manualExpanded ?? true;
-  const working = stage < 3;
+  const working = propWorking !== undefined ? propWorking : stage < 3;
 
   /* let embedders sequence content after the trace settles */
   const settledRef = useRef(false);
@@ -175,14 +131,14 @@ export default function ThinkingState({
         type="button"
         aria-expanded={expanded}
         onClick={() => setManualExpanded((current) => !(current ?? true))}
-        className="-mx-1.5 flex w-fit items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-white/5"
+        className="-mx-1.5 flex w-fit items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-white/5 cursor-pointer"
       >
         {icon ? (
-          <span className="flex shrink-0 transition-colors text-text-content-secondary">
+          <span className={`flex shrink-0 transition-colors text-text-content-secondary ${working ? 'animate-pulse' : ''}`}>
             {icon}
           </span>
         ) : (
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-text-content-secondary animate-pulse">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`text-text-content-secondary ${working ? 'animate-spin-slow text-blue-400' : ''}`}>
             <path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z" />
           </svg>
         )}
@@ -232,27 +188,43 @@ export default function ThinkingState({
                 <span className="truncate">{v.query || "Consultando informações na web..."}</span>
               </div>
               <div className="space-y-1">
-                {v.rows.map((row, i) => (
-                  <a
-                    key={`search_${row.primary}_${i}`}
-                    href={row.href || "#"}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center justify-between py-1 text-xs hover:text-text-content-primary transition-colors group"
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <Favicon urlOrDomain={row.href || row.secondary || ""} tone={TONES[i % 3]} />
-                      <span className="font-medium text-text-content-primary/90 text-[12px] truncate group-hover:underline">
-                        {row.primary}
-                      </span>
+                {v.rows.map((row, i) => {
+                  const hasHref = Boolean(row.href && row.href !== "#");
+                  const content = (
+                    <>
+                      <div className="flex items-center gap-2 truncate">
+                        <Favicon urlOrDomain={row.href || row.secondary || ""} size={14} />
+                        <span className={`font-medium text-text-content-primary/90 text-[12px] truncate ${hasHref ? 'group-hover:underline' : ''}`}>
+                          {row.primary}
+                        </span>
+                      </div>
+                      {row.secondary && (
+                        <span className="text-[10px] font-mono text-text-content-secondary/60 shrink-0 ml-2">
+                          {row.secondary}
+                        </span>
+                      )}
+                    </>
+                  );
+
+                  return hasHref ? (
+                    <a
+                      key={`search_${row.primary}_${i}`}
+                      href={row.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center justify-between py-1 text-xs hover:text-text-content-primary transition-colors group cursor-pointer"
+                    >
+                      {content}
+                    </a>
+                  ) : (
+                    <div
+                      key={`search_${row.primary}_${i}`}
+                      className="flex items-center justify-between py-1 text-xs text-text-content-primary/90"
+                    >
+                      {content}
                     </div>
-                    {row.secondary && (
-                      <span className="text-[10px] font-mono text-text-content-secondary/60 shrink-0 ml-2">
-                        {row.secondary}
-                      </span>
-                    )}
-                  </a>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ) : (

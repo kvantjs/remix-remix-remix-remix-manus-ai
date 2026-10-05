@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Favicon } from "@/lib/favicon";
 
 /* ─────────────────────────────────────────────────────────
  * STREAMING TEXT
@@ -54,12 +55,12 @@ function SourceChip({ source }: { source?: StreamingSource }) {
       href={source.href}
       target="_blank"
       rel="noreferrer"
-      className="ml-0.5 mr-1 inline-flex h-5 items-center gap-1 rounded-[5px]
-        bg-[var(--hover-2)] pr-[5px] pl-[5px] align-middle font-mono text-[10.5px] text-[var(--ink-2)] border border-[var(--line)]
+      className="ml-0.5 mr-1 inline-flex h-5 items-center gap-1.5 rounded-[5px]
+        bg-[var(--hover-2)] pr-[6px] pl-[5px] align-middle font-mono text-[10.5px] text-[var(--ink-2)] border border-[var(--line)]
         transition-colors duration-150 hover:bg-[var(--hover)] hover:text-[var(--ink)] cursor-pointer"
       style={{ animation: "pop-in 250ms cubic-bezier(0.23,1,0.32,1) both" }}
     >
-      <img src={source.image} alt="" className="size-3 rounded-[3px]" />
+      <Favicon urlOrDomain={source.domain || source.href} size={11} className="rounded-[2px]" />
       <span>{source.domain}</span>
     </a>
   );
@@ -181,13 +182,13 @@ export default function StreamingText({
               onClick={() => setSourcesOpen((current) => !current)}
               className="ml-2 flex items-center gap-1.5 rounded-[6px] px-2 py-0.5 text-left transition-colors duration-150 hover:bg-[var(--hover)] cursor-pointer"
             >
-              <span className="flex -space-x-1">
+              <span className="flex -space-x-1 items-center">
                 {sources.slice(0, 3).map((source) => (
-                  <img
+                  <Favicon
                     key={source.domain}
-                    src={source.image}
-                    alt=""
-                    className="size-3.5 rounded-full bg-[var(--canvas)] border border-[var(--line)] shadow-sm"
+                    urlOrDomain={source.domain || source.href}
+                    size={14}
+                    containerClassName="rounded-full bg-[var(--canvas)] border border-[var(--line)] shadow-sm"
                   />
                 ))}
               </span>
@@ -211,7 +212,7 @@ export default function StreamingText({
                 rel="noreferrer"
                 className="flex items-center gap-2 rounded-[6px] px-2 py-1.5 text-[12px] text-[var(--ink-2)] transition-colors duration-150 hover:bg-[var(--hover)] hover:text-[var(--ink)]"
               >
-                <img src={source.image} alt="" className="size-4 rounded-[4px] border border-[var(--line)]" />
+                <Favicon urlOrDomain={source.domain || source.href} size={16} containerClassName="rounded-[4px] border border-[var(--line)]" />
                 <span className="hover:underline font-medium">{source.name}</span>
                 <span className="ml-auto font-mono text-[10.5px] text-[var(--ink-3)]">{source.domain}</span>
               </a>

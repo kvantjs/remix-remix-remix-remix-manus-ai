@@ -43,6 +43,8 @@
   --green: #22c55e;
   --red: #ef4444;
   --accent: #3b82f6;
+  --accent-ink: #60a5fa;
+  --accent-tint: rgba(59, 130, 246, 0.15);
   --green-tint: rgba(34, 197, 94, 0.12);
   --red-tint: rgba(239, 68, 68, 0.12);
 }
@@ -443,6 +445,27 @@ body {
 @keyframes pop-in {
   from { opacity: 0; transform: scale(0.96); }
   to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes eq-bounce {
+  0%, 100% { transform: scaleY(0.25); }
+  50% { transform: scaleY(1); }
+}
+
+.shadow-raised {
+  box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.5), 0 6px 16px -2px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.shadow-card {
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.35), 0 2px 6px -1px rgba(0, 0, 0, 0.2);
+}
+
+.shadow-hairline {
+  box-shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.rounded-chip {
+  border-radius: 6px;
 }
 
 .execution-spark { animation: execution-spark 1.8s ease-in-out infinite; }

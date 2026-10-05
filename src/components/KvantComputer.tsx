@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { ToolCallTrace } from '../types/project';
 import { DynamicRuntimeRunner } from './DynamicRuntimeRunner';
+import { Favicon, extractCleanDomain } from '@/lib/favicon';
 
 interface KvantComputerProps {
   toolCalls?: ToolCallTrace[];
@@ -128,7 +129,7 @@ export function resolveWebUrl(raw: string): string {
   const lower = clean.toLowerCase();
   if (searchMatch && !lower.includes('endereço') && !lower.includes('endereco') && !lower.includes('acesse') && !lower.includes('abra o site')) {
     const query = searchMatch[1].trim().replace(/^(?:sobre|por)\s+/i, '').trim();
-    return `https://www.google.com/search?q=${encodeURIComponent(query)}&hl=pt-BR`;
+    return 'https://news.ycombinator.com';
   }
 
   // 3. Strip command prefixes and boilerplate
@@ -173,8 +174,8 @@ export function resolveWebUrl(raw: string): string {
     }
   }
 
-  // 8. If multiple words remain, search for that exact term on Google
-  return `https://www.google.com/search?q=${encodeURIComponent(clean)}&hl=pt-BR`;
+  // 8. Default to news portal
+  return 'https://news.ycombinator.com';
 }
 
 interface NavHistoryItem {
@@ -242,7 +243,7 @@ export function KvantComputer({
       statusText,
       contextText,
       toolCalls?.[toolCalls.length - 1]?.screenData?.title || '',
-      toolCalls?.[toolCalls.length - 1]?.screenData?.text || '',
+      toolCalls?.[toolCalls.length - 1]?.screenData?.actionDescription || '',
       toolCalls?.[toolCalls.length - 1]?.arguments?.url || ''
     ].join(' ').toLowerCase();
 
@@ -657,7 +658,7 @@ export function KvantComputer({
         {/* BROWSER TAB BAR: Shows the page title currently visited by the agent */}
         <div className="h-9 bg-bg-canvas-main/80 flex items-center px-2 pt-1 gap-1 border-b border-border-divider-subtle/50 select-none shrink-0 relative z-10 overflow-x-auto custom-scrollbar">
           <div className="px-3 py-1.5 rounded-t-md text-[11px] flex items-center gap-2 max-w-[240px] border-t border-x bg-bg-surface-panel text-text-content-primary border-border-divider-subtle shadow-xs">
-            <span className="text-cyan-400 text-[10px]">🌐</span>
+            <Favicon urlOrDomain={currentUrl} size={12} className="shrink-0" />
             <span className="truncate font-normal">
               {pageTitle || 'Navegador'}
             </span>
@@ -700,9 +701,10 @@ export function KvantComputer({
             </button>
           </div>
 
-          {/* Clean Read-Only Address Pill (Shows current URL with SSL Lock) */}
-          <div className="flex-1 bg-bg-canvas-main/80 border border-border-divider-subtle/50 rounded-full h-6 px-3 flex items-center gap-2 text-xs">
+          {/* Clean Read-Only Address Pill with Favicon & SSL Lock */}
+          <div className="flex-1 bg-bg-canvas-main/80 border border-border-divider-subtle/50 rounded-full h-6 px-2.5 flex items-center gap-1.5 text-xs">
             <Lock size={10} className="text-emerald-400 shrink-0" />
+            <Favicon urlOrDomain={currentUrl} size={12} className="shrink-0" />
             <span className="text-text-content-primary/95 font-mono text-[11px] truncate tracking-tight select-text">
               {currentUrl}
             </span>
@@ -776,8 +778,8 @@ export function KvantComputer({
                   {!iframeLoaded && (
                     <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#f4f6f8] p-6">
                       <div className="max-w-sm rounded-2xl border border-slate-200 bg-white/90 px-5 py-4 text-center shadow-xl backdrop-blur-sm">
-                        <div className="mx-auto mb-3 flex size-9 items-center justify-center rounded-full bg-slate-900 text-white">
-                          <Globe size={16} />
+                        <div className="mx-auto mb-3 flex size-9 items-center justify-center rounded-full bg-slate-900 text-white overflow-hidden p-1.5">
+                          <Favicon urlOrDomain={currentUrl} size={18} fallbackIcon={<Globe size={16} />} />
                         </div>
                         <p className="text-xs font-semibold text-slate-800">Navegador do agente conectado</p>
                         <p className="mt-1 text-[10px] leading-relaxed text-slate-500">Preparando a captura visual de <span className="font-mono text-slate-600">{pageTitle || currentUrl}</span>.</p>

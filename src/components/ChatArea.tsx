@@ -37,8 +37,10 @@ import { markdownFences } from '@/components/reui/code-block/code-block-highligh
 import { ProfessionalCodeBlock } from './ProfessionalCodeBlock';
 import { SyntaxCodeView, InlineCodeSnippet } from './SyntaxCodeView';
 import ThinkingState, { ThinkingStateGroup } from './ThinkingState';
-import ToolChips from './ToolChips';
+import ToolChips, { getContextualToolIcon, getContextualFileIcon, ToolStep, ToolDiff } from './ToolChips';
 import StreamingText from './StreamingText';
+import { Favicon, extractCleanDomain } from '@/lib/favicon';
+import PromptBar from './PromptBar';
 
 interface ChatMessage {
   id: string;
@@ -568,15 +570,16 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
       </div>
 
       {/* Floating Input Section */}
-      <div className="absolute bottom-5 left-1/2 -translate-x-1/2 w-full max-w-2xl px-6">
-        <ChatInput 
-          onSend={handleSendMessage} 
+      <div className="absolute bottom-5 left-1/2 -translate-x-1/2 w-full max-w-2xl px-6 z-20">
+        <PromptBar 
+          onSend={(text) => handleSendMessage(text)} 
           onStop={handleStop}
           isThinking={isThinking} 
+          placeholder="Mensagem para o agente manus ou digite @ para fontes e / para comandos..."
         />
         
         <p className="mt-2 text-center text-[10px] text-[#dcdcdc]/30">
-          manus (Versão de Desenvolvimento) ativo: executa comandos, gera código na aba Código, renderiza no Runtime e chama ferramentas MCP.
+          manus ativo: digite @ para fontes & arquivos, / para comandos rápidos e selecione o modelo de IA.
         </p>
       </div>
     </div>
@@ -611,6 +614,43 @@ function MessageItem({
     );
   }
 
+  // Map tool calls to ToolStep[] and files to ToolDiff[] for the final response
+  const finalToolSteps: ToolStep[] = (message.toolCalls || []).map((tc) => {
+    let chipText = '';
+    if (tc.arguments?.filePath) chipText = tc.arguments.filePath;
+    else if (tc.arguments?.url) chipText = tc.arguments.url;
+    else if (tc.arguments?.command) chipText = tc.arguments.command;
+    else if (tc.arguments?.query) chipText = tc.arguments.query;
+    else if (tc.screenData?.actionDescription) chipText = tc.screenData.actionDescription;
+    else chipText = tc.server || tc.toolName;
+
+    return {
+      icon: tc.toolName,
+      label: tc.toolName,
+      chip: chipText,
+      mono: tc.toolName.includes('fs') || tc.toolName.includes('cmd') || tc.toolName.includes('exec') || tc.toolName.includes('file') || tc.toolName.includes('shell'),
+      detailMono: true,
+      detail: [
+        { text: `Status: ${tc.status === 'success' ? '✓ Sucesso' : '✗ Erro'}` },
+        ...(tc.arguments ? [{ text: `Argumentos: ${JSON.stringify(tc.arguments)}` }] : []),
+        ...(tc.screenData?.title ? [{ text: `Página: ${tc.screenData.title}` }] : []),
+        ...(tc.screenData?.actionDescription ? [{ text: tc.screenData.actionDescription }] : [])
+      ]
+    };
+  });
+
+  const finalDiffs: ToolDiff[] = (message.files || []).map((f) => ({
+    file: f.path,
+    add: f.code ? f.code.split('\n').length : 1,
+    del: 0
+  }));
+
+  const finalDiffLines: Record<string, any[]> = {};
+  (message.files || []).forEach((f) => {
+    const lines = (f.code || '').split('\n').slice(0, 8);
+    finalDiffLines[f.path] = lines.map((l) => ({ text: l, tone: 'add' }));
+  });
+
   return (
     <div className="space-y-4 animate-in fade-in duration-300">
       {/* Assistant Brand Avatar */}
@@ -619,7 +659,7 @@ function MessageItem({
           src="https://imgdb.io/i/6lwOlmk.png" 
           alt="Logotipo do Agente" 
           className="size-6 object-contain rounded-md shadow-xs bg-bg-surface-panel p-0.5" 
-        />
+          />
         <div className="flex items-center gap-2 text-xs font-medium">
           <span className="text-text-content-primary">manus</span>
           <span className="text-[9px] bg-bg-action-hover border border-border-divider-subtle px-1.5 py-0.5 rounded text-text-content-secondary font-mono">
@@ -629,6 +669,16 @@ function MessageItem({
       </div>
 
       <div className="pl-8 space-y-4">
+        {/* Tool Chips da Resposta Final do Agente */}
+        {finalToolSteps.length > 0 && (
+          <ToolChips
+            steps={finalToolSteps}
+            diffs={finalDiffs.length > 0 ? finalDiffs : undefined}
+            diffLines={Object.keys(finalDiffLines).length > 0 ? finalDiffLines : undefined}
+            labels={{ header: `${finalToolSteps.length} ferramentas executadas pelo agente` }}
+          />
+        )}
+
         {message.executionSteps && message.executionSteps.length > 0 && (
           <ExecutionTimeline steps={message.executionSteps} completed />
         )}
@@ -643,9 +693,9 @@ function MessageItem({
           <div className="bg-bg-surface-panel border border-border-divider-subtle rounded-xl p-3.5 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Code size={15} className="text-blue-400" />
+                <Code size={15} className="text-text-content-secondary" />
                 <span className="text-xs font-semibold text-text-content-primary">Arquivos Gerados & Sincronizados</span>
-                <span className="text-[10px] bg-green-500/10 text-green-400 border border-green-500/20 px-1.5 py-0.5 rounded-full font-mono">
+                <span className="text-[10px] bg-white/5 text-text-content-secondary border border-border-divider-subtle px-1.5 py-0.5 rounded-full font-mono">
                   {message.files.length} arquivo(s)
                 </span>
               </div>
@@ -662,7 +712,7 @@ function MessageItem({
               {message.files.map((file, fIdx) => (
                 <div key={fIdx} className="bg-bg-canvas-main/50 border border-border-divider-subtle rounded-lg px-3 py-2 flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2 font-mono text-[11px]">
-                    <FileText size={14} className="text-blue-400 shrink-0" />
+                    {getContextualFileIcon(file.path)}
                     <span className="text-text-content-primary/90 font-medium">{file.path}</span>
                   </div>
                   <span className="text-[10px] text-text-content-secondary/60">
@@ -693,34 +743,40 @@ function MessageItem({
         {message.sources && message.sources.length > 0 && (
           <div className="bg-bg-surface-panel border border-border-divider-subtle rounded-xl p-3.5 space-y-2.5">
             <div className="flex items-center gap-2 text-xs font-semibold text-text-content-primary">
-              <Globe size={14} className="text-cyan-400" />
+              <Favicon urlOrDomain={message.sources[0]?.url} size={14} fallbackIcon={<Globe size={14} className="text-cyan-400" />} />
               <span>Fontes da Web Consultadas ({message.sources.length})</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1">
-              {message.sources.map((src, sIdx) => (
-                <a
-                  key={sIdx}
-                  href={src.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="bg-bg-canvas-main/40 hover:bg-bg-action-hover border border-border-divider-subtle/50 rounded-lg p-2.5 text-xs space-y-1 block transition-all group cursor-pointer"
-                >
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="font-medium text-blue-400 group-hover:text-blue-300 truncate text-[11px]">
-                      {src.title}
+              {message.sources.map((src, sIdx) => {
+                const domain = extractCleanDomain(src.url);
+                return (
+                  <a
+                    key={sIdx}
+                    href={src.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-bg-canvas-main/40 hover:bg-bg-action-hover border border-border-divider-subtle/50 rounded-lg p-2.5 text-xs space-y-1 block transition-all group cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between gap-1.5">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <Favicon urlOrDomain={src.url} size={13} />
+                        <span className="font-medium text-blue-400 group-hover:text-blue-300 truncate text-[11px]">
+                          {src.title}
+                        </span>
+                      </div>
+                      <ArrowSquareOut size={11} className="text-text-content-secondary/60 group-hover:text-text-content-primary shrink-0" />
+                    </div>
+                    {src.snippet && (
+                      <p className="text-[10px] text-text-content-secondary/85 line-clamp-2 leading-relaxed">
+                        {src.snippet}
+                      </p>
+                    )}
+                    <span className="text-[9px] text-text-content-secondary/40 font-mono truncate block">
+                      {domain || src.url}
                     </span>
-                    <ArrowSquareOut size={11} className="text-text-content-secondary/60 group-hover:text-text-content-primary shrink-0" />
-                  </div>
-                  {src.snippet && (
-                    <p className="text-[10px] text-text-content-secondary/85 line-clamp-2 leading-relaxed">
-                      {src.snippet}
-                    </p>
-                  )}
-                  <span className="text-[9px] text-text-content-secondary/40 font-mono truncate block">
-                    {src.url}
-                  </span>
-                </a>
-              ))}
+                  </a>
+                );
+              })}
             </div>
           </div>
         )}
@@ -1085,7 +1141,19 @@ function ExecutionTimeline({
     const isWarning = step.status === 'warning';
     return (
       <div key={`${step.id}_${index}`} className={`relative flex min-h-7 w-full items-center gap-2 rounded-md px-1.5 py-0.5 text-left transition-colors duration-200 ${isRunning ? 'bg-bg-action-hover/50' : 'hover:bg-bg-action-hover/30'}`} style={{ animation: `thinking-fade-up 320ms cubic-bezier(0.23,1,0.32,1) ${index * 120}ms both` }}>
-        {searchVariant ? <Globe size={13} className={`${isWarning ? 'text-amber-300' : 'text-cyan-300'} shrink-0`} /> : isWarning ? <ShieldWarning size={13} className="shrink-0 text-amber-300" /> : isRunning ? <span className="size-3 shrink-0 rounded-full border-[1.5px] border-border-divider-subtle border-t-blue-300 thinking-spinner" /> : <Check size={13} className="shrink-0 text-text-content-secondary/60" />}
+        {searchVariant ? (
+          <Favicon 
+            urlOrDomain={step.detail || step.label} 
+            size={13} 
+            fallbackIcon={<Globe size={13} className={`${isWarning ? 'text-amber-300' : 'text-cyan-300'} shrink-0`} />} 
+          />
+        ) : isWarning ? (
+          <ShieldWarning size={13} className="shrink-0 text-amber-300" />
+        ) : isRunning ? (
+          <span className="size-3 shrink-0 rounded-full border-[1.5px] border-border-divider-subtle border-t-blue-300 thinking-spinner" />
+        ) : (
+          getContextualToolIcon(step.label, step.label, step.detail)
+        )}
         <span className={`min-w-0 truncate text-[11px] ${searchVariant ? 'text-text-content-primary/80' : 'text-text-content-primary/70'} ${codingVariant ? 'font-mono' : 'font-medium'}`}>{step.label}</span>
         {step.detail && <span className="min-w-0 truncate text-[10px] text-text-content-secondary/60">{step.detail}</span>}
         {step.timestamp && <span className="ml-auto shrink-0 text-[9px] font-mono text-text-content-secondary/40">{step.timestamp}</span>}
@@ -1113,7 +1181,7 @@ function ExecutionTimeline({
             <div className="relative flex flex-col gap-1 py-1">
               {searchVariant && focusedStep && (
                 <div className="flex min-h-7 items-center gap-2 px-1.5 text-[11px] text-text-content-primary/60" style={{ animation: 'thinking-fade-in 300ms ease-out both' }}>
-                  <Globe size={13} className="shrink-0 text-text-content-secondary/60" />
+                  <Favicon urlOrDomain={focusedStep.detail} size={13} fallbackIcon={<Globe size={13} className="shrink-0 text-text-content-secondary/60" />} />
                   <span className="truncate">{focusedStep.detail.match(/pesquisando “?([^”"]+)/i)?.[1] || focusedStep.detail}</span>
                 </div>
               )}
