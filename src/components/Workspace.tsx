@@ -135,10 +135,10 @@ export function Workspace({
     <div className={`workspace-panel ${isMaximized ? 'w-full absolute inset-0 z-30' : ''} border-l border-border-divider-subtle bg-bg-surface-panel flex flex-col h-full min-w-0 min-h-0 animate-in duration-200 select-none`}>
 
       {/* Top Application Tab Bar */}
-      <div className="h-10 flex items-center px-3 bg-bg-canvas-main/60 border-b border-border-divider-subtle shrink-0 relative select-none">
+      <div className="workspace-topbar h-10 flex items-center px-3 bg-bg-canvas-main/60 border-b border-border-divider-subtle shrink-0 relative select-none">
 
         {/* Tabs list of the application */}
-        <div className="flex items-center gap-1 overflow-x-auto custom-scrollbar">
+        <div className="workspace-top-tabs flex items-center gap-1 overflow-x-auto custom-scrollbar">
           {openTabs.map((tab) => {
             const isActive = activeTopTab === tab.id;
             return (
@@ -264,7 +264,7 @@ export function Workspace({
         <div className="flex-1" />
 
         {/* Top Right Window Controls: Fullscreen expand and Sidebar dock toggle */}
-        <div className="flex items-center gap-1.5 text-text-content-secondary">
+        <div className="workspace-top-actions flex items-center gap-1.5 text-text-content-secondary">
           <button
             onClick={() => setIsMaximized(!isMaximized)}
             title={isMaximized ? "Restaurar tamanho" : "Tela cheia"}
@@ -335,8 +335,8 @@ export function Workspace({
       {activeTopTab === 'workspace' && (
         <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg-surface-panel">
           {/* Internal Navigation Bar for Workspace */}
-          <div className="h-11 flex items-center justify-between px-3 border-b border-border-divider-subtle shrink-0 bg-bg-surface-panel">
-            <div className="flex items-center gap-1 p-0.5 border border-border-divider-subtle rounded-lg bg-bg-canvas-main/80 overflow-x-auto">
+          <div className="workspace-subnav h-11 flex items-center justify-between px-3 border-b border-border-divider-subtle shrink-0 bg-bg-surface-panel">
+            <div className="workspace-subnav-tabs flex items-center gap-1 p-0.5 border border-border-divider-subtle rounded-lg bg-bg-canvas-main/80 overflow-x-auto">
               <NavButton
                 active={workspaceSubTab === 'preview'}
                 onClick={() => setWorkspaceSubTab('preview')}
@@ -375,12 +375,12 @@ export function Workspace({
               />
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="workspace-live-action flex items-center gap-2 shrink-0">
                <button
                 onClick={() => {
                   setWorkspaceSubTab('preview');
                 }}
-                className="bg-interactive-cta-bg text-bg-canvas-main px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shadow-xs cursor-pointer"
+                className="workspace-live-button bg-interactive-cta-bg text-bg-canvas-main px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shadow-xs cursor-pointer"
                >
                   <Sparkle size={13} weight="fill" />
                   <span>Preview Vivo</span>

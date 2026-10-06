@@ -894,3 +894,112 @@ body {
     display: none;
   }
 }
+
+/* Workspace chrome keeps tabs and actions in separate, size-safe flex regions. */
+.workspace-topbar,
+.workspace-subnav {
+  min-width: 0;
+  gap: 0.5rem;
+}
+
+.workspace-top-tabs,
+.workspace-subnav-tabs {
+  min-width: 0;
+  flex: 1 1 auto;
+  scrollbar-width: none;
+}
+
+.workspace-top-tabs::-webkit-scrollbar,
+.workspace-subnav-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.workspace-top-actions,
+.workspace-live-action {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 760px) {
+  .workspace-topbar {
+    padding-inline: 0.5rem;
+  }
+
+  .workspace-top-tabs {
+    gap: 0.25rem;
+  }
+
+  .workspace-top-tabs button {
+    flex: 0 0 auto;
+    padding-inline: 0.5rem;
+  }
+
+  .workspace-top-tabs button > span {
+    max-width: 7rem;
+  }
+
+  .workspace-subnav {
+    justify-content: flex-start;
+    padding-inline: 0.5rem;
+  }
+
+  .workspace-subnav-tabs {
+    min-width: 0;
+  }
+
+  .workspace-subnav-tabs button {
+    flex: 0 0 auto;
+    padding-inline: 0.5rem;
+  }
+
+  .workspace-live-button {
+    width: 2rem;
+    height: 1.75rem;
+    padding-inline: 0;
+    justify-content: center;
+    gap: 0;
+  }
+
+  .workspace-live-button > span {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) and (max-height: 560px) and (orientation: landscape) {
+  .workspace-topbar,
+  .workspace-subnav {
+    padding-inline: 0.5rem;
+  }
+
+  .workspace-subnav {
+    justify-content: flex-start;
+  }
+
+  .workspace-live-button {
+    width: 2rem;
+    height: 1.75rem;
+    padding-inline: 0;
+    justify-content: center;
+    gap: 0;
+  }
+
+  .workspace-live-button > span {
+    display: none;
+  }
+}
+
+/* Tablet and mobile browsers in desktop-site mode must not squeeze chat and workspace side by side. */
+@media (max-width: 1180px) {
+  .workspace-panel {
+    left: 0;
+    right: auto;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 1180px) {
+  .app-sidebar nav button > div > span:nth-child(2) {
+    display: none;
+  }
+}
