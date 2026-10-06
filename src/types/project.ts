@@ -30,6 +30,9 @@ export interface ToolCallTrace {
     httpStatus?: number;
     screenshot?: string;
     interactiveElements?: Array<{ type: 'button' | 'link' | 'input'; text: string; selector: string; href?: string }>;
+    mousePosition?: { x: number; y: number; viewportWidth: number; viewportHeight: number };
+    scrollY?: number;
+    liveStatus?: string;
   };
 }
 

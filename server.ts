@@ -2020,6 +2020,43 @@ class PlaywrightBrowserManager {
   private page: Page | null = null;
   private isLaunching = false;
   private challenge: BrowserChallenge | null = null;
+  private progressListener: ((event: Record<string, any>) => void) | null = null;
+  private lastMouse = { x: 640, y: 400 };
+
+  setProgressListener(listener: ((event: Record<string, any>) => void) | null) {
+    this.progressListener = listener;
+  }
+
+  private async emitProgress(page: Page, status: string, actionDescription: string, includeScreenshot = false) {
+    if (!this.progressListener) return;
+    const viewport = page.viewportSize() || { width: 1280, height: 800 };
+    const scrollY = await page.evaluate(() => window.scrollY).catch(() => 0);
+    let screenshot: string | undefined;
+    if (includeScreenshot) {
+      const buffer = await page.screenshot({ type: 'jpeg', quality: 68 }).catch(() => null);
+      if (buffer) screenshot = `data:image/jpeg;base64,${buffer.toString('base64')}`;
+    }
+    this.progressListener({
+      status,
+      actionDescription,
+      url: page.url(),
+      title: await page.title().catch(() => ''),
+      mouse: { ...this.lastMouse, viewportWidth: viewport.width, viewportHeight: viewport.height },
+      scrollY,
+      screenshot
+    });
+  }
+
+  private async moveMouse(page: Page, x: number, y: number, status: string, actionDescription: string, includeScreenshot = false) {
+    await page.mouse.move(x, y, { steps: 8 });
+    this.lastMouse = { x, y };
+    await this.emitProgress(page, status, actionDescription, includeScreenshot);
+  }
+
+  private async settleReadablePage(page: Page) {
+    await page.waitForLoadState('networkidle', { timeout: 2500 }).catch(() => {});
+    await page.waitForFunction(() => document.readyState === 'complete', undefined, { timeout: 1200 }).catch(() => {});
+  }
 
   getChallenge() {
     return this.challenge;
@@ -2151,6 +2188,9 @@ class PlaywrightBrowserManager {
     try {
       const page = await this.ensurePage();
       const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
+      await this.settleReadablePage(page);
+      const viewport = page.viewportSize() || { width: 1280, height: 800 };
+      await this.moveMouse(page, Math.round(viewport.width * 0.52), Math.round(viewport.height * 0.16), 'Página carregada; lendo conteúdo', 'O navegador carregou a página e está posicionando o cursor para leitura.', true);
       const durationMs = Math.round(performance.now() - startTime);
 
       const title = await page.title();
@@ -2304,13 +2344,16 @@ class PlaywrightBrowserManager {
       if (this.challenge) return { success: false, error: challengeMessage(this.challenge), challenge: this.challenge, requiresUserAction: true, browserStatus: 'blocked' };
       const target = selectorOrText.trim();
       
-      if (target.startsWith('#') || target.startsWith('.') || target.includes('[') || target.includes('>')) {
-        await page.click(target, { timeout: 8000 });
-      } else {
-        await page.getByText(target, { exact: false }).first().click({ timeout: 8000 });
-      }
+      const locator = target.startsWith('#') || target.startsWith('.') || target.includes('[') || target.includes('>')
+        ? page.locator(target).first()
+        : page.getByText(target, { exact: false }).first();
+      const box = await locator.boundingBox().catch(() => null);
+      if (box) await this.moveMouse(page, box.x + box.width / 2, box.y + box.height / 2, 'Cursor posicionado; clicando', `O cursor encontrou o alvo "${target.slice(0, 80)}" e está clicando.`);
+      await locator.click({ timeout: 8000 });
 
       await page.waitForLoadState('domcontentloaded', { timeout: 8000 }).catch(() => {});
+      await this.settleReadablePage(page);
+      await this.emitProgress(page, 'Clique concluído; verificando resultado', `Clique concluído em "${target.slice(0, 80)}"; verificando a nova página.`, true);
       const title = await page.title();
       const screenshotBuf = await page.screenshot({ type: 'jpeg', quality: 75 });
       const screenshot = 'data:image/jpeg;base64,' + screenshotBuf.toString('base64');
@@ -2340,11 +2383,16 @@ class PlaywrightBrowserManager {
     try {
       const page = await this.ensurePage();
       if (this.challenge) return { success: false, error: challengeMessage(this.challenge), challenge: this.challenge, requiresUserAction: true, browserStatus: 'blocked' };
-      await page.fill(selector, text, { timeout: 8000 });
+      const input = page.locator(selector).first();
+      const inputBox = await input.boundingBox().catch(() => null);
+      if (inputBox) await this.moveMouse(page, inputBox.x + inputBox.width / 2, inputBox.y + inputBox.height / 2, 'Cursor posicionado; preenchendo campo', `O cursor posicionou-se no campo ${selector} para digitação controlada.`);
+      await input.fill(text, { timeout: 8000 });
       if (pressEnter) {
         await page.keyboard.press('Enter');
         await page.waitForLoadState('domcontentloaded', { timeout: 8000 }).catch(() => {});
+        await this.settleReadablePage(page);
       }
+      await this.emitProgress(page, 'Campo preenchido; lendo atualização', `Campo ${selector} preenchido; verificando o conteúdo atualizado.`, true);
       const title = await page.title();
       const screenshotBuf = await page.screenshot({ type: 'jpeg', quality: 75 });
       const screenshot = 'data:image/jpeg;base64,' + screenshotBuf.toString('base64');
@@ -2404,8 +2452,17 @@ class PlaywrightBrowserManager {
     try {
       const page = await this.ensurePage();
       if (this.challenge) return { success: false, error: challengeMessage(this.challenge), challenge: this.challenge, requiresUserAction: true, browserStatus: 'blocked' };
-      await page.mouse.wheel(0, deltaY);
-      await page.waitForTimeout(500);
+      const viewport = page.viewportSize() || { width: 1280, height: 800 };
+      await this.moveMouse(page, Math.round(viewport.width * 0.55), Math.round(viewport.height * 0.72), 'Cursor posicionado; preparando rolagem', 'O cursor está acompanhando a área de leitura antes da rolagem.');
+      const segments = Math.min(8, Math.max(2, Math.ceil(Math.abs(deltaY) / 140)));
+      const segmentDelta = deltaY / segments;
+      for (let index = 0; index < segments; index++) {
+        await page.mouse.wheel(0, segmentDelta);
+        await this.emitProgress(page, `Rolando página (${index + 1}/${segments})`, `Rolagem real em andamento; lendo o trecho ${index + 1} de ${segments}.`);
+        await page.waitForTimeout(80);
+      }
+      await this.settleReadablePage(page);
+      await this.emitProgress(page, 'Rolagem concluída; lendo conteúdo', 'A rolagem terminou; o agente está extraindo e verificando o conteúdo visível.', true);
       const domData = await this.extractDomData(page);
       const challenge = await this.inspectChallenge(page, domData.bodyText);
       const screenshotBuf = await page.screenshot({ type: 'jpeg', quality: 75 }).catch(() => null);
@@ -3845,7 +3902,10 @@ async function runDeepDeliberation(
     const plan = await call('Planejamento estruturado', 'plan', `Defina objetivo, escopo, dependências, premissas e uma sequência curta de ações. Não escreva código e não chame ferramentas.`);
     const critique = await call('Crítica independente', 'critique', `Avalie o plano abaixo contra o pedido. Procure ambiguidades, riscos técnicos, segurança, regressões e critérios ausentes. Sugira correções objetivas.\nPLANO:\n${JSON.stringify(plan).slice(0, 5000)}`);
     const verification = await call('Verificação e critérios de aceite', 'verify', `Consolide um plano aprovado e uma checklist testável. Só marque decision como aprovado se os riscos críticos estiverem tratados.\nPLANO:\n${JSON.stringify(plan).slice(0, 3500)}\nCRÍTICA:\n${JSON.stringify(critique).slice(0, 4500)}`);
-    const context = `DELIBERAÇÃO INTERNA CONCLUÍDA (não exponha raciocínio privado):\nPlano: ${JSON.stringify(plan)}\nCrítica: ${JSON.stringify(critique)}\nVerificação: ${JSON.stringify(verification)}\nUse estes resultados para executar o pedido. Faça somente ações autorizadas pelo modo ${intent.mode}.`;
+    const browserAudit = intent.mode === 'cloud_computer'
+      ? await call('Análise visual de navegação', 'browser', `Para este pedido de Computer MCP, defina uma sequência verificável de navegação: como posicionar o cursor, qual elemento ou região inspecionar, quando rolar em incrementos, como confirmar que a página mudou e quais sinais indicam bloqueio ou CAPTCHA. Não invente resultados e não chame ferramentas nesta etapa.`)
+      : null;
+    const context = `DELIBERAÇÃO INTERNA CONCLUÍDA (não exponha raciocínio privado):\nPlano: ${JSON.stringify(plan)}\nCrítica: ${JSON.stringify(critique)}\nVerificação: ${JSON.stringify(verification)}${browserAudit ? `\nAnálise visual: ${JSON.stringify(browserAudit)}` : ''}\nUse estes resultados para executar o pedido. Faça somente ações autorizadas pelo modo ${intent.mode}.`;
     emit?.('status', { text: `Deliberação concluída em ${Date.now() - startedAt}ms; iniciando execução validada.` });
     return { context, stages };
   } catch (error: any) {
@@ -3871,6 +3931,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
   const sendEvent = (event: string, data: any) => {
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   };
+  playwrightBrowser.setProgressListener((progress) => sendEvent('browser_progress', progress));
 
   try {
     sendEvent('status', { text: 'Iniciando raciocínio do Agente...', intent });
@@ -3898,6 +3959,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
         status: 'in_background',
         intent
       });
+      playwrightBrowser.setProgressListener(null);
       return res.end();
     }
 
@@ -4166,6 +4228,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
 
       finalResult.intent = intent;
       sendEvent('complete', finalResult);
+      playwrightBrowser.setProgressListener(null);
       return res.end();
     }
 
@@ -4273,9 +4336,11 @@ app.post('/api/agent/chat/stream', async (req, res) => {
     finalResult.explanation = cleanChatResponseOfCodeBlocks(finalResult.explanation);
     finalResult.intent = intent;
     sendEvent('complete', finalResult);
+    playwrightBrowser.setProgressListener(null);
     res.end();
   } catch (err: any) {
     sendEvent('error', { message: err.message });
+    playwrightBrowser.setProgressListener(null);
     res.end();
   }
 });

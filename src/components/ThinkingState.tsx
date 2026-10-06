@@ -211,16 +211,16 @@ export default function ThinkingState({
                   <circle cx="11" cy="11" r="7" />
                   <path d="M21 21l-4.3-4.3" />
                 </svg>
-                <span className="truncate">{v.query || "Consultando informações na web..."}</span>
+                <span className="min-w-0 break-words whitespace-pre-wrap [overflow-wrap:anywhere]">{v.query || "Consultando informações na web..."}</span>
               </div>
               <div className="space-y-1">
                 {v.rows.map((row, i) => {
                   const hasHref = Boolean(row.href && row.href !== "#");
                   const content = (
                     <>
-                      <div className="flex items-center gap-2 truncate">
+                      <div className="min-w-0 flex items-start flex-wrap gap-2">
                         <Favicon urlOrDomain={row.href || row.secondary || ""} size={14} />
-                        <span className={`font-medium text-text-content-primary/90 text-[12px] truncate ${hasHref ? 'group-hover:underline' : ''}`}>
+                        <span className={`font-medium text-text-content-primary/90 text-[12px] break-words whitespace-pre-wrap [overflow-wrap:anywhere] ${hasHref ? 'group-hover:underline' : ''}`}>
                           {row.primary}
                         </span>
                       </div>
@@ -259,9 +259,9 @@ export default function ThinkingState({
               {v.rows.map((row, i) => {
                 const isActive = working && i === v.rows.length - 1;
                 return (
-                  <div key={`step_${row.primary}_${i}`} className="flex items-center gap-2.5 py-1 text-xs text-text-content-primary/80 transition-colors">
+                  <div key={`step_${row.primary}_${i}`} className="min-w-0 flex items-start gap-2.5 py-1 text-xs text-text-content-primary/80 transition-colors">
                     <span className={`size-1.5 rounded-full ${isActive ? 'bg-zinc-400 animate-pulse shadow-[0_0_8px_rgba(161,161,170,0.5)]' : 'bg-text-content-secondary/60'} shrink-0`} />
-                    <span className={`font-medium text-[12px] truncate ${isActive ? 'text-text-content-primary' : ''}`}>{row.primary}</span>
+                    <span className={`min-w-0 break-words whitespace-pre-wrap [overflow-wrap:anywhere] font-medium text-[12px] ${isActive ? 'text-text-content-primary' : ''}`}>{row.primary}</span>
                     {row.secondary && (
                       <span className="text-[11px] font-mono text-text-content-secondary/60 shrink-0 ml-auto">{row.secondary}</span>
                     )}

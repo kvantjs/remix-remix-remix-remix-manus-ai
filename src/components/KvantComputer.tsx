@@ -262,13 +262,15 @@ export function KvantComputer({
   const [isLive, setIsLive] = useState<boolean>(true);
 
   // Realistic Agent Mouse Cursor
-  const [agentCursor, setAgentCursor] = useState({
+  const [agentCursor, setAgentCursor] = useState<{ x: number; y: number; visible: boolean; isClicking: boolean; label: string; status: string; viewportWidth?: number; viewportHeight?: number }>({
     x: 380,
     y: 190,
     visible: true,
     isClicking: false,
     label: 'Manus',
-    status: 'Agente no controle'
+    status: 'Agente no controle',
+    viewportWidth: 1280,
+    viewportHeight: 800
   });
   
   // Agent Keystroke HUD
@@ -279,6 +281,7 @@ export function KvantComputer({
   const [forceLiveIframe, setForceLiveIframe] = useState<boolean>(false);
   const [forceIdle, setForceIdle] = useState<boolean>(false);
   const prevIsWorkingRef = useRef(isWorking);
+  const lastLiveMouseRef = useRef<{ x: number; y: number; viewportWidth: number; viewportHeight: number } | null>(null);
 
   // Check if customFiles has an active React code file
   const customCode = 
@@ -641,6 +644,22 @@ export function KvantComputer({
         }
       }
 
+      const liveMouse = lastTool.screenData?.mousePosition;
+      if (liveMouse && Number.isFinite(liveMouse.x) && Number.isFinite(liveMouse.y)) {
+        lastLiveMouseRef.current = liveMouse;
+        setAgentCursor(prev => ({
+          ...prev,
+          x: liveMouse.x,
+          y: liveMouse.y,
+          viewportWidth: liveMouse.viewportWidth || 1280,
+          viewportHeight: liveMouse.viewportHeight || 800,
+          visible: true,
+          isClicking: /clic|click|pression/i.test(lastTool.screenData?.liveStatus || lastTool.screenData?.actionDescription || ''),
+          status: lastTool.screenData?.liveStatus || lastTool.screenData?.actionDescription || prev.status
+        }));
+      }
+      const hasLiveProgress = Boolean(liveMouse || lastLiveMouseRef.current);
+
       const toolKey = `${lastTool.id}_${lastTool.status}`;
       if (lastProcessedToolRef.current === toolKey) return;
       lastProcessedToolRef.current = toolKey;
@@ -650,7 +669,11 @@ export function KvantComputer({
         const clean = resolveWebUrl(rawUrl);
         setCurrentUrl(clean);
         setIsExternalWeb(true);
-        runAgentLiveActionAnimation('navigate', clean);
+        if (!hasLiveProgress) {
+          runAgentLiveActionAnimation('navigate', clean);
+        } else {
+          setIsLoading(false);
+        }
 
         if (lastTool.screenData?.title) {
           setPageTitle(lastTool.screenData.title);
@@ -670,12 +693,12 @@ export function KvantComputer({
         setIsLive(true);
       } else if (lastTool.toolName.includes('click')) {
         const target = lastTool.arguments?.selector || lastTool.arguments?.target || 'elemento';
-        runAgentLiveActionAnimation('click', target);
+        if (!hasLiveProgress) runAgentLiveActionAnimation('click', target); else setIsLoading(false);
       } else if (lastTool.toolName.includes('scroll')) {
-        runAgentLiveActionAnimation('scroll', 'down');
+        if (!hasLiveProgress) runAgentLiveActionAnimation('scroll', 'down'); else setIsLoading(false);
       } else if (lastTool.toolName.includes('type')) {
         const text = lastTool.arguments?.text || 'texto';
-        runAgentLiveActionAnimation('type', text);
+        if (!hasLiveProgress) runAgentLiveActionAnimation('type', text); else setIsLoading(false);
       } else if (lastTool.toolName.includes('search') || lastTool.toolName.includes('inspect')) {
         const rawUrl = lastTool.screenData?.url || lastTool.arguments?.url || currentUrl;
         setCurrentUrl(rawUrl);
@@ -966,12 +989,12 @@ export function KvantComputer({
         )}
 
         {/* AGENT MOUSE CURSOR: Positioned over the remote desktop */}
-        {agentCursor.visible && isComputerActive && !isLoading && !isIdle && (isWorking || userControlMode || liveScreenshot || customCode) && (
+        {agentCursor.visible && isComputerActive && !isIdle && (isWorking || userControlMode || liveScreenshot || customCode) && (
           <span 
             className="absolute pointer-events-none transition-all duration-300 ease-out z-50 bg-transparent !bg-transparent border-none !border-none shadow-none !shadow-none"
             style={{
-              left: `${agentCursor.x}px`,
-              top: `${agentCursor.y}px`,
+              left: `calc(${Math.min(100, Math.max(0, (agentCursor.x / (agentCursor.viewportWidth || 1280)) * 100))}% - 12px)`,
+              top: `calc(32px + ${Math.min(100, Math.max(0, (agentCursor.y / (agentCursor.viewportHeight || 800)) * 100))}% - 12px)`,
               backgroundColor: 'transparent'
             }}
           >

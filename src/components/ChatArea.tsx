@@ -664,6 +664,36 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                         browserStatus: data.toolName.includes('browser') || data.toolName.includes('navigate') ? 'loading' : undefined
                       });
                     }
+                  } else if (currentEvent === 'browser_progress') {
+                    const progressTrace: ToolCallTrace = {
+                      id: `active_browser_${data.toolName || 'action'}`,
+                      toolName: data.toolName || 'browser_action',
+                      server: 'Computer MCP',
+                      arguments: data.arguments || {},
+                      result: 'Ação do navegador em andamento...',
+                      timestamp: new Date().toLocaleTimeString(),
+                      status: 'running',
+                      screenData: {
+                        url: data.url,
+                        title: data.title,
+                        screenshot: data.screenshot,
+                        mousePosition: data.mouse,
+                        scrollY: data.scrollY,
+                        liveStatus: data.status,
+                        actionDescription: data.actionDescription
+                      }
+                    };
+                    setCurrentStep(data.actionDescription || data.status || 'Navegador do agente trabalhando...');
+                    beginExecutionStep('Interação visual no navegador', data.actionDescription || data.status || 'Acompanhando a página real.');
+                    if (onAgentStateChange) {
+                      onAgentStateChange({
+                        isWorking: true,
+                        statusText: data.status || 'Navegador do agente em ação',
+                        contextText: data.actionDescription || 'Acompanhando mouse, rolagem e conteúdo da página.',
+                        toolCalls: [...liveToolCalls, progressTrace],
+                        browserStatus: 'loading'
+                      });
+                    }
                   } else if (currentEvent === 'tool_finish') {
                     const toolCall = data.toolCall;
                     liveToolCalls.push(toolCall);
@@ -1761,8 +1791,10 @@ function ExecutionTimeline({
         ) : (
           getContextualToolIcon(step.label, step.label, step.detail)
         )}
-        <span className={`min-w-0 flex-1 break-words [overflow-wrap:anywhere] text-[11px] ${searchVariant ? 'text-text-content-primary/80' : 'text-text-content-primary/70'} ${codingVariant ? 'font-mono' : 'font-medium'}`}>{step.label}</span>
-        {step.detail && <span className="min-w-0 flex-1 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[10px] text-text-content-secondary/70">{step.detail}</span>}
+        <div className="min-w-0 flex-1 flex flex-col items-stretch gap-0.5">
+          <span className={`min-w-0 break-words [overflow-wrap:anywhere] text-[11px] ${searchVariant ? 'text-text-content-primary/80' : 'text-text-content-primary/70'} ${codingVariant ? 'font-mono' : 'font-medium'}`}>{step.label}</span>
+          {step.detail && <span className="min-w-0 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[10px] text-text-content-secondary/70">{step.detail}</span>}
+        </div>
         {step.timestamp && <span className="ml-auto shrink-0 text-[9px] font-mono text-text-content-secondary/40">{step.timestamp}</span>}
       </div>
     );
