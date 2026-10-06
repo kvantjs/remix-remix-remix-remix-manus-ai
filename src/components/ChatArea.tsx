@@ -1,20 +1,20 @@
-import { 
-  CaretDown, 
-  ShareNetwork, 
-  ArrowsOut, 
-  Clock, 
-  Play, 
-  Plus, 
-  GithubLogo, 
-  Cloud, 
-  Microphone, 
-  ArrowUp, 
-  StopCircle, 
-  Copy, 
-  Star, 
-  CaretRight, 
-  DotsThree, 
-  ArrowRight, 
+import {
+  CaretDown,
+  ShareNetwork,
+  ArrowsOut,
+  Clock,
+  Play,
+  Plus,
+  GithubLogo,
+  Cloud,
+  Microphone,
+  ArrowUp,
+  StopCircle,
+  Copy,
+  Star,
+  CaretRight,
+  DotsThree,
+  ArrowRight,
   ArrowBendDownRight,
   Lightning,
   ShieldStar,
@@ -142,8 +142,8 @@ function ensureDetailedAgentMessage(
 ): string {
   const trimmed = (rawContent || '').trim();
   const lower = trimmed.toLowerCase();
-  
-  const isGeneric = 
+
+  const isGeneric =
     !trimmed ||
     trimmed.length < 80 ||
     lower.includes('ação executada com sucesso') ||
@@ -220,10 +220,10 @@ function ensureDetailedAgentMessage(
   return `${header}Analisei a solicitação técnica, executei as instruções e sincronizei o ambiente de desenvolvimento. O workspace está pronto com todas as dependências e arquivos disponíveis.${footer}`;
 }
 
-export function ChatArea({ 
-  onFileUpdate, 
-  externalPrompt, 
-  onClearExternalPrompt, 
+export function ChatArea({
+  onFileUpdate,
+  externalPrompt,
+  onClearExternalPrompt,
   currentFiles,
   onAgentStateChange,
   onInspectInComputer
@@ -435,7 +435,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
   const handleResumeFromBackground = (summaryText: string) => {
     setIsAgentInBackground(false);
     setMessages(prev => prev.map(m => m.status === 'in_background' ? { ...m, status: 'completed' } : m));
-    
+
     // Seamless context injection: Continue working without adding a visible user message to the UI
     const injectedContext = `[Contexto Adquirido Autonomamente]: O usuário definiu as preferências: ${summaryText}. O subagente sincronizou os dados. Continue a tarefa agora.`;
     handleSendMessage(injectedContext, true);
@@ -579,8 +579,8 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                     const activeTrace: ToolCallTrace = {
                       id: `active_${Date.now()}`,
                       toolName: data.toolName,
-                      server: data.toolName.includes('fs') || data.toolName.includes('file') || data.toolName.includes('write') || data.toolName.includes('read') 
-                        ? 'WebDev MCP' 
+                      server: data.toolName.includes('fs') || data.toolName.includes('file') || data.toolName.includes('write') || data.toolName.includes('read')
+                        ? 'WebDev MCP'
                         : data.toolName.includes('browser') || data.toolName.includes('navigate') || data.toolName.includes('click') || data.toolName.includes('type') || data.toolName.includes('screenshot')
                           ? 'Computer MCP'
                           : 'Terminal Bash MCP',
@@ -606,7 +606,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                   } else if (currentEvent === 'tool_finish') {
                     const toolCall = data.toolCall;
                     liveToolCalls.push(toolCall);
-                    
+
                     // Live build: If the tool updated a file, sync with workspace immediately
                     if (onFileUpdate && toolCall.arguments?.content && (toolCall.toolName.includes('write') || toolCall.toolName.includes('create') || toolCall.toolName.includes('edit'))) {
                       const filePath = toolCall.arguments.path || toolCall.arguments.filePath || toolCall.arguments.filename;
@@ -700,7 +700,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
         while ((match = codeBlockRegex.exec(assistantContent)) !== null) {
           const lang = match[1].toLowerCase();
           const code = match[2].trim();
-          
+
           // Only extract if it looks like a component or config
           if (code.length > 50) {
             let filename = 'client/src/App.tsx';
@@ -756,7 +756,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
           {
             id: 1,
             type: 'command',
-            content: isBg 
+            content: isBg
               ? 'Agente esperando uma resposta com os parâmetros do usuário'
               : `${(payload.toolCalls || liveToolCalls).length} ferramentas reais executadas no computador da nuvem`,
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -777,10 +777,10 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
           {
             id: `summary_${Date.now()}`,
             label: isBg ? 'Agente esperando uma resposta' : payload.approval ? 'Aguardando autorização' : 'Síntese final',
-            detail: isBg 
+            detail: isBg
               ? 'O agente está aguardando sua resposta para prosseguir a criação.'
-              : payload.approval 
-                ? 'A execução foi pausada para autorização.' 
+              : payload.approval
+                ? 'A execução foi pausada para autorização.'
                 : 'Resultados reunidos e resposta pronta para você.',
             status: isBg ? 'running' : payload.approval ? 'warning' : 'complete',
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -848,11 +848,11 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
   };
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-[#141414] relative">
+    <div className="chat-area flex-1 flex flex-col min-w-0 min-h-0 bg-[#141414] relative">
       {/* Header */}
-      <header className="h-14 flex items-center justify-between px-6 border-b border-white/5 shrink-0 z-10 bg-[#1a1a1a]">
+      <header className="chat-header h-14 flex items-center justify-between px-6 border-b border-white/5 shrink-0 z-10 bg-[#1a1a1a]">
         <div className="flex items-center gap-2.5 cursor-pointer hover:bg-white/5 px-2.5 py-1.5 rounded-lg transition-colors group">
-          <span className="text-sm font-medium text-[#dcdcdc]">Manus 1.0 Lite</span>
+          <span className="text-sm font-medium text-[#dcdcdc]">Kopilot 1.0 Lite</span>
           <CaretDown size={14} className="text-[#dcdcdc]/40 group-hover:text-[#dcdcdc]" />
         </div>
         <div className="flex items-center gap-4 text-[#dcdcdc]/40">
@@ -876,15 +876,15 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
       </header>
 
       {/* Messages Stream */}
-      <div 
+      <div
         ref={scrollAreaRef}
         className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] flex flex-col items-center bg-[#1a1a1a]"
       >
-        <div className="w-full max-w-3xl px-6 py-8 space-y-10 messages-container bg-[#1a1a1a]">
+        <div className="messages-container w-full max-w-3xl px-6 py-8 space-y-10 bg-[#1a1a1a]">
           {messages.map((msg) => (
-            <MessageItem 
-              key={msg.id} 
-              message={msg} 
+            <MessageItem
+              key={msg.id}
+              message={msg}
               isAlreadyStreamed={streamedIds.has(msg.id)}
               onStreamingDone={handleStreamingDone}
               onSelectSuggestion={handleSendMessage}
@@ -906,10 +906,10 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
               }}
             />
           ))}
-          
+
           {isThinking && (
-            <LocalActiveThinkingState 
-              elapsedSeconds={elapsedSeconds} 
+            <LocalActiveThinkingState
+              elapsedSeconds={elapsedSeconds}
               step={currentStep}
               steps={executionSteps}
             />
@@ -941,16 +941,16 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
 
 
       {/* Floating Input Section */}
-      <div className="absolute bottom-5 left-1/2 -translate-x-1/2 w-full max-w-2xl px-6 z-20">
-        <PromptBar 
-          onSend={(text) => handleSendMessage(text)} 
+      <div className="chat-input-dock absolute bottom-5 left-1/2 -translate-x-1/2 w-full max-w-2xl px-6 z-20">
+        <PromptBar
+          onSend={(text) => handleSendMessage(text)}
           onStop={handleStop}
-          isThinking={isThinking} 
-          placeholder="Mensagem para o agente Manus ou digite @ para fontes e / para comandos..."
+          isThinking={isThinking}
+          placeholder="Mensagem para o agente Kopilot ou digite @ para fontes e / para comandos..."
         />
-        
+
         <p className="mt-2 text-center text-[10px] text-[#dcdcdc]/30">
-          Manus ativo: digite @ para fontes & arquivos, / para comandos rápidos e selecione o modelo de IA.
+          Kopilot ativo: digite @ para fontes & arquivos, / para comandos rápidos e selecione o modelo de IA.
         </p>
       </div>
 
@@ -1045,7 +1045,7 @@ function InlineChatQuestionnaire({
             <div className="size-5 rounded-full border border-white/20 flex items-center justify-center bg-[#1f1f1f]">
               <Question size={11} weight="bold" />
             </div>
-            <span className="text-[10px] font-bold uppercase tracking-widest opacity-50">O Manus tem uma pergunta</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest opacity-50">O Kopilot tem uma pergunta</span>
           </div>
           <div className="text-[10px] font-mono text-white/20 bg-white/5 px-2 py-0.5 rounded-full">
             {showTextArea ? 'Final' : `${currentStep + 1} de ${questions.length}`}
@@ -1057,17 +1057,17 @@ function InlineChatQuestionnaire({
           <div key={`step-${currentStep}`} className="space-y-3 animate-in fade-in slide-in-from-right-2 duration-300" style={{ borderRadius: '4px' }}>
             <div className="min-h-[28px]">
               <div className="text-[14px] font-medium text-[#e9e9e9] leading-tight" style={{ fontFamily: 'system-ui' }}>
-                <StreamingText 
-                  content={currentQuestion.title} 
-                  speedMs={8} 
+                <StreamingText
+                  content={currentQuestion.title}
+                  speedMs={8}
                   isStreaming={true}
                 />
               </div>
               {currentQuestion.description && (
                 <div className="text-[11px] text-white/40 mt-1">
-                  <StreamingText 
-                    content={currentQuestion.description} 
-                    speedMs={5} 
+                  <StreamingText
+                    content={currentQuestion.description}
+                    speedMs={5}
                     isStreaming={true}
                   />
                 </div>
@@ -1082,8 +1082,8 @@ function InlineChatQuestionnaire({
                     key={choice.value}
                     onClick={() => handleSelect(currentQuestion.name, choice.value)}
                     className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border text-left transition-all duration-200 group ${
-                      isSelected 
-                        ? 'bg-white/5 border-white/20 shadow-inner' 
+                      isSelected
+                        ? 'bg-white/5 border-white/20 shadow-inner'
                         : 'bg-transparent border-white/5 hover:bg-white/[0.02] hover:border-white/10'
                     }`}
                     style={{ borderRadius: '4px' }}
@@ -1104,9 +1104,9 @@ function InlineChatQuestionnaire({
         ) : (
           <div className="space-y-3 animate-in fade-in slide-in-from-right-2 duration-300" style={{ borderRadius: '4px' }}>
              <div className="min-h-[28px] text-[14px] font-medium text-[#e9e9e9] leading-tight" style={{ fontFamily: 'system-ui' }}>
-              <StreamingText 
-                content="Deseja adicionar mais algum detalhe ou pensamento adicional?" 
-                speedMs={8} 
+              <StreamingText
+                content="Deseja adicionar mais algum detalhe ou pensamento adicional?"
+                speedMs={8}
                 isStreaming={true}
               />
             </div>
@@ -1133,7 +1133,7 @@ function InlineChatQuestionnaire({
           >
             Voltar
           </button>
-          
+
           {!showTextArea ? (
             <button
               onClick={handleNext}
@@ -1160,16 +1160,16 @@ function InlineChatQuestionnaire({
   );
 }
 
-function MessageItem({ 
-  message, 
+function MessageItem({
+  message,
   onSelectSuggestion,
   onInspectInComputer,
   onApprovalDecision,
   onStreamingDone,
   onFinishQuestionnaire,
   isAlreadyStreamed
-}: { 
-  message: ChatMessage; 
+}: {
+  message: ChatMessage;
   onSelectSuggestion: (s: string) => void;
   onInspectInComputer?: () => void;
   onApprovalDecision?: (messageId: string, approved: boolean) => void;
@@ -1275,13 +1275,13 @@ function MessageItem({
     <div className="space-y-4 animate-in fade-in duration-300">
       {/* Assistant Brand Avatar */}
       <div className="flex items-center gap-2.5">
-        <img 
-          src="https://imgdb.io/i/6lwOlmk.png" 
-          alt="Logotipo do Agente" 
-          className="size-6 object-contain rounded-md shadow-xs bg-bg-surface-panel p-0.5" 
+        <img
+          src="https://imgdb.io/i/6lwOlmk.png"
+          alt="Logotipo do Agente"
+          className="size-6 object-contain rounded-md shadow-xs bg-bg-surface-panel p-0.5"
           />
         <div className="flex items-center gap-2 text-xs font-medium">
-          <span className="text-text-content-primary">Manus</span>
+          <span className="text-text-content-primary">Kopilot</span>
           <span className="font-mono px-1.5 py-0.5 border border-solid" style={{ borderRadius: '6px', backgroundColor: '#1a1a1a', borderColor: '#303030', borderWidth: '2.1507px', color: '#c0c0c0', fontSize: '9px' }}>
             Lite
           </span>
@@ -1311,7 +1311,7 @@ function MessageItem({
 
         {/* Clean Executive Response Text with Streaming Text Animation */}
         <div className="text-sm leading-relaxed text-text-content-primary/90 font-sans">
-          <StreamingText 
+          <StreamingText
             content={cleanText}
             isStreaming={Boolean(message.isStreaming && !isAlreadyStreamed)}
             initialDone={!message.isStreaming || Boolean(isAlreadyStreamed)}
@@ -1321,7 +1321,7 @@ function MessageItem({
 
         {/* Inline Selection Questionnaire Component (@reui/c-questionnaire-7) */}
         {isWaiting && (isAlreadyStreamed || !message.isStreaming) && (
-          <InlineChatQuestionnaire 
+          <InlineChatQuestionnaire
             questionnaire={message.questionnaire}
             onSubmit={(answers, summaryText) => {
               onFinishQuestionnaire?.(answers, summaryText);
@@ -1443,23 +1443,23 @@ function MessageItem({
                   <div className="size-3.5 border border-zinc-500/30 rounded-full flex items-center justify-center">
                     <div className="size-1.5 bg-zinc-400 rounded-full animate-pulse" />
                   </div>
-                  <span>Manus continuará após sua resposta</span>
+                  <span>Kopilot continuará após sua resposta</span>
                 </div>
                 <div className="flex items-center gap-1 text-text-content-secondary/40">
-                  <button 
+                  <button
                     onClick={() => {
                       navigator.clipboard?.writeText(message.content);
                       setCopied(true);
                       setTimeout(() => setCopied(false), 2000);
                     }}
-                    className="hover:text-text-content-primary transition-colors flex items-center justify-center size-7 rounded-lg hover:bg-white/5 cursor-pointer" 
+                    className="hover:text-text-content-primary transition-colors flex items-center justify-center size-7 rounded-lg hover:bg-white/5 cursor-pointer"
                     title="Copiar resposta"
                   >
                     {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
                   </button>
-                  <button 
+                  <button
                     onClick={() => onSelectSuggestion("Refazer resposta")}
-                    className="hover:text-text-content-primary transition-colors flex items-center justify-center size-7 rounded-lg hover:bg-white/5 cursor-pointer" 
+                    className="hover:text-text-content-primary transition-colors flex items-center justify-center size-7 rounded-lg hover:bg-white/5 cursor-pointer"
                     title="Gerar nova resposta"
                   >
                     <ArrowClockwise size={14} />
@@ -1483,26 +1483,26 @@ function MessageItem({
                   <span>Tarefa concluída</span>
                 </div>
                 <div className="flex items-center gap-1 text-text-content-secondary/40">
-                  <button 
+                  <button
                     onClick={() => {
                       navigator.clipboard?.writeText(message.content);
                       setCopied(true);
                       setTimeout(() => setCopied(false), 2000);
                     }}
-                    className="hover:text-text-content-primary transition-colors flex items-center justify-center size-7 rounded-lg hover:bg-white/5 cursor-pointer" 
+                    className="hover:text-text-content-primary transition-colors flex items-center justify-center size-7 rounded-lg hover:bg-white/5 cursor-pointer"
                     title="Copiar resposta"
                   >
                     {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
                   </button>
-                  <button 
-                    className="hover:text-text-content-primary transition-colors flex items-center justify-center size-7 rounded-lg hover:bg-white/5 cursor-pointer" 
+                  <button
+                    className="hover:text-text-content-primary transition-colors flex items-center justify-center size-7 rounded-lg hover:bg-white/5 cursor-pointer"
                     title="Compartilhar resultado"
                   >
                     <ShareNetwork size={14} />
                   </button>
-                  <button 
+                  <button
                     onClick={() => onSelectSuggestion("Refazer resposta")}
-                    className="hover:text-text-content-primary transition-colors flex items-center justify-center size-7 rounded-lg hover:bg-white/5 cursor-pointer" 
+                    className="hover:text-text-content-primary transition-colors flex items-center justify-center size-7 rounded-lg hover:bg-white/5 cursor-pointer"
                     title="Gerar nova resposta"
                   >
                     <ArrowClockwise size={14} />
@@ -1611,7 +1611,7 @@ function LocalActiveThinkingState({ elapsedSeconds, step, steps }: { elapsedSeco
   const mappedToolSteps = steps.map(s => {
     let icon = "think";
     const lowercaseLabel = s.label.toLowerCase();
-    
+
     if (lowercaseLabel.includes("escrev") || lowercaseLabel.includes("grav") || lowercaseLabel.includes("salv") || lowercaseLabel.includes("write") || lowercaseLabel.includes("edit") || lowercaseLabel.includes("cri") || lowercaseLabel.includes("alter")) {
       icon = "write";
     } else if (lowercaseLabel.includes("execut") || lowercaseLabel.includes("rod") || lowercaseLabel.includes("run") || lowercaseLabel.includes("npm") || lowercaseLabel.includes("check") || lowercaseLabel.includes("test")) {
@@ -1651,32 +1651,32 @@ function LocalActiveThinkingState({ elapsedSeconds, step, steps }: { elapsedSeco
   return (
     <div className="w-full max-w-[820px] space-y-4 animate-in fade-in duration-300">
        <div className="flex items-center gap-2.5">
-        <img 
-          src="https://imgdb.io/i/6lwOlmk.png" 
-          alt="Logotipo do Agente" 
-          className="size-6 object-contain rounded-md shadow-xs bg-white/5 p-0.5 animate-pulse" 
+        <img
+          src="https://imgdb.io/i/6lwOlmk.png"
+          alt="Logotipo do Agente"
+          className="size-6 object-contain rounded-md shadow-xs bg-white/5 p-0.5 animate-pulse"
         />
         <div className="flex items-center gap-2 text-xs font-medium">
-          <span className="text-text-content-primary">Manus</span>
+          <span className="text-text-content-primary">Kopilot</span>
           <span className="text-[9px] text-text-content-secondary font-mono px-1.5 py-0.5 border border-solid" style={{ borderRadius: '4px', backgroundColor: '#1a1a1a', borderColor: '#303030', borderWidth: '2.1507px' }}>
             Executando · {elapsedSeconds || 1}s
           </span>
         </div>
       </div>
-      
+
       {/* Transitions smoothly between variants with a stable variant key */}
       <div key={`thinking_trace_${currentVariant}`} className="pl-8 bg-transparent transition-all duration-300 ease-out">
         {currentVariant === "Coding" ? (
-          <ToolChips 
-            steps={mappedToolSteps} 
+          <ToolChips
+            steps={mappedToolSteps}
             diffs={diffs}
             diffLines={diffLines}
             labels={{ header: `${mappedToolSteps.length} chamada(s) de ferramenta (${elapsedSeconds || 1}s)` }}
           />
         ) : (
-          <ThinkingState 
-            variant={currentVariant} 
-            rows={mappedRows} 
+          <ThinkingState
+            variant={currentVariant}
+            rows={mappedRows}
             elapsedSeconds={elapsedSeconds}
             active={currentVariant === "Search" ? `Pesquisando: ${step || "fontes relevantes na web"}` : undefined}
           />
@@ -1727,10 +1727,10 @@ function ExecutionTimeline({
     return (
       <div key={`${step.id}_${index}`} className={`relative flex min-h-7 w-full items-center gap-2 rounded-md px-1.5 py-0.5 text-left transition-colors duration-200 ${isRunning ? 'bg-bg-action-hover/50' : 'hover:bg-bg-action-hover/30'}`} style={{ animation: `thinking-fade-up 320ms cubic-bezier(0.23,1,0.32,1) ${index * 120}ms both` }}>
         {searchVariant ? (
-          <Favicon 
-            urlOrDomain={step.detail || step.label} 
-            size={13} 
-            fallbackIcon={<Globe size={13} className={`${isWarning ? 'text-amber-300' : 'text-cyan-300'} shrink-0`} />} 
+          <Favicon
+            urlOrDomain={step.detail || step.label}
+            size={13}
+            fallbackIcon={<Globe size={13} className={`${isWarning ? 'text-amber-300' : 'text-cyan-300'} shrink-0`} />}
           />
         ) : isWarning ? (
           <ShieldWarning size={13} className="shrink-0 text-amber-300" />
@@ -1788,8 +1788,8 @@ function ChatInput({ onSend, onStop, isThinking }: { onSend: (val: string) => vo
   return (
     <div className="relative group">
       <div className="bg-bg-surface-panel border border-border-divider-subtle rounded-2xl focus-within:border-border-control-active transition-all shadow-2xl overflow-hidden">
-        <textarea 
-          placeholder="Mensagem para o agente Manus..."
+        <textarea
+          placeholder="Mensagem para o agente Kopilot..."
           value={value}
           onChange={(e) => setValue(e.target.value)}
           rows={1}
@@ -1806,23 +1806,23 @@ function ChatInput({ onSend, onStop, isThinking }: { onSend: (val: string) => vo
         />
         <div className="flex items-center justify-between px-3 py-2 border-t border-border-divider-subtle bg-bg-canvas-main/20">
            <div className="flex items-center gap-2">
-              <button 
+              <button
                 title="Anexar arquivo"
                 className="p-1.5 hover:bg-bg-action-hover rounded-md text-text-content-secondary/40 hover:text-text-content-primary transition-colors"
               >
                 <Plus size={16} />
               </button>
-              <button 
+              <button
                 title="Conectar Repositório GitHub"
                 className="p-1.5 hover:bg-bg-action-hover rounded-md text-text-content-secondary/40 hover:text-text-content-primary transition-colors"
               >
                 <GithubLogo size={16} />
               </button>
-              <img 
-                src="https://imgdb.io/i/6lwOlmk.png" 
-                alt="Agente" 
-                className="size-5 object-contain rounded bg-bg-action-hover p-0.5" 
-                title="Agente Manus Conectado"
+              <img
+                src="https://imgdb.io/i/6lwOlmk.png"
+                alt="Agente"
+                className="size-5 object-contain rounded bg-bg-action-hover p-0.5"
+                title="Agente Kopilot Conectado"
               />
               <div className="h-4 w-px bg-border-divider-subtle mx-1" />
               <div className="flex items-center gap-1.5 px-2 py-1 hover:bg-bg-action-hover rounded-md text-text-content-secondary/40 hover:text-text-content-primary transition-colors cursor-pointer">
@@ -1831,13 +1831,13 @@ function ChatInput({ onSend, onStop, isThinking }: { onSend: (val: string) => vo
               </div>
            </div>
            <div className="flex items-center gap-2">
-              <button 
+              <button
                 title="Entrada por voz"
                 className="p-1.5 hover:bg-bg-action-hover rounded-md text-text-content-secondary/40 hover:text-text-content-primary transition-colors"
               >
                 <Microphone size={16} />
               </button>
-              <button 
+              <button
                 onClick={() => {
                   if (isThinking) {
                     onStop();
@@ -1848,10 +1848,10 @@ function ChatInput({ onSend, onStop, isThinking }: { onSend: (val: string) => vo
                 }}
                 disabled={!value.trim() && !isThinking}
                 className={`p-1.5 rounded-full transition-all cursor-pointer ${
-                  isThinking 
-                    ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' 
+                  isThinking
+                    ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
                     : value.trim()
-                    ? 'bg-interactive-cta-bg text-bg-canvas-main hover:opacity-90 shadow-xs' 
+                    ? 'bg-interactive-cta-bg text-bg-canvas-main hover:opacity-90 shadow-xs'
                     : 'bg-bg-action-hover text-text-content-secondary/20'
                 }`}
                 title={isThinking ? 'Interromper agente' : 'Enviar comando'}

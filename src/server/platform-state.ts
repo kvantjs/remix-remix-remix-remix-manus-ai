@@ -35,7 +35,7 @@ const defaultConfig: PlatformConfig = {
   version: 1,
   revision: 1,
   project: {
-    name: 'Remix Manus AI',
+    name: 'Kopilot AI',
     description: 'Aplicação full-stack criada no Google AI Studio e integrada ao Webdev.'
   },
   features: {
@@ -51,7 +51,7 @@ const defaultConfig: PlatformConfig = {
     port: Number(process.env.PORT) || 3000,
     healthPath: '/health'
   },
-  routes: [{ path: '/', title: 'Remix Manus AI' }],
+  routes: [{ path: '/', title: 'Kopilot AI' }],
   updatedAt: new Date().toISOString()
 };
 

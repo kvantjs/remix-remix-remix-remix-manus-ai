@@ -38,7 +38,7 @@ const PORT = Number(process.env.PORT) || 3000;
 app.use(express.json({ limit: '10mb' }));
 
 app.get('/health', (_req, res) => {
-  res.status(200).json({ ok: true, service: 'remix-manus-ai' });
+  res.status(200).json({ ok: true, service: 'kopilot-ai' });
 });
 
 app.get('/api/platform/config', async (_req, res) => {
@@ -491,7 +491,7 @@ AS 7 LEIS INVIOLÁVEIS DO AGENTE DE CRIAÇÃO:
   * O agente DEVE PENSAR antes de agir: defina uma estratégia de navegação que imite um humano especialista.
   * O agente DEVE entrar no navegador de verdade, fazer a pesquisa ao vivo ('web_search'), analisar a lista de resultados, identificar os links mais promissores e NAVEGAR ('browser_navigate') entre eles.
   * O agente deve INTERAGIR com as páginas (scroll, click em links internos) até encontrar a informação CORRETA e verificada, antes de entregar o resultado final no chat.
-  * REGRA RIGOROSA DE DOMÍNIOS API: O agente NUNCA, NUNCA, NUNCA deve acessar URLs ou domínios que comecem com "api." no início (ex: api.github.com, api.stripe.com, api.openai.com). 
+  * REGRA RIGOROSA DE DOMÍNIOS API: O agente NUNCA, NUNCA, NUNCA deve acessar URLs ou domínios que comecem com "api." no início (ex: api.github.com, api.stripe.com, api.openai.com).
   * Se precisar de informações de uma API, acesse a DOCUMENTAÇÃO oficial no domínio principal ou em "docs." (ex: docs.github.com), mas NUNCA navegue, faça fetch ou curl em subdomínios "api.". Esta é uma restrição de segurança absoluta. Se o usuário fornecer uma URL "api.", ignore o subdomínio e vá para o domínio principal ou de documentação.
 
 12. OBTENÇÃO DE CONTEXTO E QUESTIONÁRIO INTERATIVO (@reui/c-questionnaire-1):
@@ -521,15 +521,15 @@ DIRETIVA DE FORMATO DE RESPOSTA EM PORTUGUÊS:
 
 // Autonomous cognitive engine fallback when cloud model has 503 high demand or quota
 function generateAutonomousRuleEnforcedFallback(
-  message: string, 
+  message: string,
   history?: Array<{ role: string; content: string }>,
   currentFiles?: Record<string, string>
 ) {
   const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const lower = message.toLowerCase();
 
-  const currentCode = currentFiles?.['client/src/App.tsx'] || 
-    currentFiles?.['App.tsx'] || 
+  const currentCode = currentFiles?.['client/src/App.tsx'] ||
+    currentFiles?.['App.tsx'] ||
     (currentFiles && Object.keys(currentFiles).length > 0 ? Object.values(currentFiles)[0] : '');
 
   const appCreationTerms = [
@@ -546,24 +546,24 @@ function generateAutonomousRuleEnforcedFallback(
   // 0. Context Gathering Questionnaire Trigger (@reui/c-questionnaire-1)
   const hasExplicitContextTag = lower.includes('[contexto') || lower.includes('contexto definido') || lower.includes('contexto selecionado');
   const pureGenericPrompts = [
-    'crie um site', 'criar um site', 'cria um site', 'faça um site', 'fazer um site', 
+    'crie um site', 'criar um site', 'cria um site', 'faça um site', 'fazer um site',
     'crie um app', 'criar um app', 'cria um app', 'faça um app', 'obter contexto', '/context'
   ];
   const isGenericCreationPrompt = pureGenericPrompts.some(p => lower.trim() === p || lower.trim() === `${p}.` || lower.trim() === `${p}!`);
 
-  const hasSpecificNicheOrTech = 
-    lower.includes('fintech') || 
-    lower.includes('banco') || 
-    lower.includes('saas') || 
-    lower.includes('telemetria') || 
-    lower.includes('ecommerce') || 
-    lower.includes('e-commerce') || 
-    lower.includes('loja') || 
-    lower.includes('editorial') || 
-    lower.includes('portfolio') || 
-    lower.includes('portfólio') || 
-    lower.includes('logística') || 
-    lower.includes('delivery') || 
+  const hasSpecificNicheOrTech =
+    lower.includes('fintech') ||
+    lower.includes('banco') ||
+    lower.includes('saas') ||
+    lower.includes('telemetria') ||
+    lower.includes('ecommerce') ||
+    lower.includes('e-commerce') ||
+    lower.includes('loja') ||
+    lower.includes('editorial') ||
+    lower.includes('portfolio') ||
+    lower.includes('portfólio') ||
+    lower.includes('logística') ||
+    lower.includes('delivery') ||
     lower.includes('restaurante') ||
     lower.includes('simulador de juros') ||
     lower.includes('dashboard de logs') ||
@@ -700,16 +700,16 @@ function generateAutonomousRuleEnforcedFallback(
 
   if (isGitHubApiRequest) {
     const gitHubAppCode = `import React, { useState } from 'react';
-import { 
-  Globe, 
-  Terminal, 
-  Cpu, 
-  Play, 
-  ArrowsCounterClockwise, 
-  Camera, 
-  MousePointerClick, 
-  CheckCircle, 
-  Lock, 
+import {
+  Globe,
+  Terminal,
+  Cpu,
+  Play,
+  ArrowsCounterClockwise,
+  Camera,
+  MousePointerClick,
+  CheckCircle,
+  Lock,
   ExternalLink,
   Sparkles,
   Code,
@@ -754,7 +754,7 @@ export default function GitHubApiInspectorApp() {
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           {endpoints.map((ep, idx) => (
-            <div 
+            <div
               key={idx}
               onClick={() => setActiveEndpoint(ep.path)}
               className={\`p-4 rounded-xl border transition-all cursor-pointer \${activeEndpoint === ep.path ? 'bg-purple-950/30 border-purple-500/50 shadow-lg shadow-purple-500/10' : 'bg-[#121420] border-white/5 hover:border-white/20'}\`}
@@ -924,16 +924,16 @@ Todos os passos, links e respostas coletadas podem ser acompanhados em tempo rea
 
   if (isPlaywrightOrBrowserRequest) {
     const activeAppCode = `import React, { useState, useEffect } from 'react';
-import { 
-  Globe, 
-  Terminal, 
-  Cpu, 
-  Play, 
-  ArrowsCounterClockwise, 
-  Camera, 
-  MousePointerClick, 
-  CheckCircle, 
-  Lock, 
+import {
+  Globe,
+  Terminal,
+  Cpu,
+  Play,
+  ArrowsCounterClockwise,
+  Camera,
+  MousePointerClick,
+  CheckCircle,
+  Lock,
   ExternalLink,
   Sparkles,
   Search,
@@ -1084,7 +1084,7 @@ export default function PlaywrightCloudBrowserApp() {
         {/* Browser Navigation Bar */}
         <div className="p-3 rounded-xl bg-[#121420] border border-white/10 flex flex-wrap items-center gap-2 shadow-lg">
           <div className="flex items-center gap-1.5 text-slate-400 shrink-0 px-1">
-            <button 
+            <button
               onClick={() => handleNavigate(url)}
               disabled={isLoading}
               className="p-1.5 rounded hover:bg-white/5 text-slate-300 hover:text-white transition-colors cursor-pointer"
@@ -1094,7 +1094,7 @@ export default function PlaywrightCloudBrowserApp() {
             </button>
           </div>
 
-          <form 
+          <form
             onSubmit={(e) => { e.preventDefault(); handleNavigate(); }}
             className="flex-1 min-w-[280px] flex items-center bg-[#090A0F] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white font-mono gap-2"
           >
@@ -1199,10 +1199,10 @@ export default function PlaywrightCloudBrowserApp() {
                 <div className="w-full flex flex-col items-center justify-center">
                   {screenshot ? (
                     <div className="rounded-xl overflow-hidden border border-white/10 shadow-2xl max-w-full">
-                      <img 
-                        src={screenshot} 
-                        alt="Renderização ao vivo do Playwright Chromium" 
-                        className="w-full h-auto object-contain max-h-[640px]" 
+                      <img
+                        src={screenshot}
+                        alt="Renderização ao vivo do Playwright Chromium"
+                        className="w-full h-auto object-contain max-h-[640px]"
                       />
                     </div>
                   ) : (
@@ -1221,8 +1221,8 @@ export default function PlaywrightCloudBrowserApp() {
                   </span>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     {interactiveElements.map((el, i) => (
-                      <div 
-                        key={i} 
+                      <div
+                        key={i}
                         onClick={() => {
                           setClickTarget(el.selector);
                           handleClickElement(el.selector);
@@ -1316,8 +1316,8 @@ export default function PlaywrightCloudBrowserApp() {
 
   // 0. If asking for Cloud Computer Access or System Control (and NOT app/site creation)
   const isComputerAccessRequest = !hasAppCreation && (
-    lower.includes('painel do computador') || 
-    lower.includes('status do hardware') || 
+    lower.includes('painel do computador') ||
+    lower.includes('status do hardware') ||
     lower.includes('diagnóstico do terminal') ||
     (lower.includes('computador') && (lower.includes('abra o computador') || lower.includes('acesse o computador') || lower.includes('mostrar o computador')))
   );
@@ -1329,14 +1329,14 @@ export default function PlaywrightCloudBrowserApp() {
     const uptime = Math.round(os.uptime());
 
     const activeAppCode = currentCode || `import React, { useState, useEffect } from 'react';
-import { 
-  Terminal, 
-  Globe, 
-  Cpu, 
-  HardDrives, 
-  WifiHigh, 
-  CheckCircle, 
-  Play, 
+import {
+  Terminal,
+  Globe,
+  Cpu,
+  HardDrives,
+  WifiHigh,
+  CheckCircle,
+  Play,
   ArrowsCounterClockwise,
   ShieldCheck,
   Code,
@@ -1375,11 +1375,11 @@ export default function CloudControlDashboard() {
     const now = new Date().toLocaleTimeString();
     setCmdLog(prev => [
       ...prev,
-      { 
-        id: Date.now(), 
-        cmd: quickCmd, 
-        out: \`[Processo remoto finalizado com exit code 0 em 24ms] Saída da sandbox gravada.\`, 
-        time: now 
+      {
+        id: Date.now(),
+        cmd: quickCmd,
+        out: \`[Processo remoto finalizado com exit code 0 em 24ms] Saída da sandbox gravada.\`,
+        time: now
       }
     ]);
     setQuickCmd('');
@@ -2059,7 +2059,7 @@ class PlaywrightBrowserManager {
           locale: 'pt-BR',
           userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
         });
-        
+
         // Anti-CAPTCHA stealth evasion script
         await context.addInitScript(() => {
           Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
@@ -2285,7 +2285,7 @@ class PlaywrightBrowserManager {
       const page = await this.ensurePage();
       if (this.challenge) return { success: false, error: challengeMessage(this.challenge), challenge: this.challenge, requiresUserAction: true, browserStatus: 'blocked' };
       const target = selectorOrText.trim();
-      
+
       if (target.startsWith('#') || target.startsWith('.') || target.includes('[') || target.includes('>')) {
         await page.click(target, { timeout: 8000 });
       } else {
@@ -2597,7 +2597,7 @@ async function runRealTool(toolName: string, args: Record<string, any>): Promise
       toolName: 'browser.click',
       server: 'playwright_chromium',
       arguments: { target },
-      result: clickRes.success 
+      result: clickRes.success
         ? `Playwright clicou em "${target}" com sucesso. Nova URL: ${clickRes.url} (${clickRes.title}).`
         : `Falha ao clicar em "${target}": ${clickRes.error}`,
       timestamp: now,
@@ -2624,7 +2624,7 @@ async function runRealTool(toolName: string, args: Record<string, any>): Promise
       toolName: 'browser.type',
       server: 'playwright_chromium',
       arguments: { selector, text, pressEnter },
-      result: typeRes.success 
+      result: typeRes.success
         ? `Playwright digitou "${text}" no campo "${selector}".`
         : `Falha ao digitar: ${typeRes.error}`,
       timestamp: now,
@@ -2648,8 +2648,8 @@ async function runRealTool(toolName: string, args: Record<string, any>): Promise
       toolName: 'browser.scroll',
       server: 'playwright_chromium',
       arguments: { deltaY },
-      result: scrollRes.success 
-        ? `Playwright rolou a página ${deltaY}px.` 
+      result: scrollRes.success
+        ? `Playwright rolou a página ${deltaY}px.`
         : `Falha ao rolar: ${scrollRes.error}`,
       timestamp: now,
       status: scrollRes.success ? 'success' : 'error',
@@ -2975,7 +2975,7 @@ app.get('/api/browser/proxy', async (req, res) => {
       let html = await response.text();
       // Remove any CSP and X-Frame-Options meta tags
       html = html.replace(/<meta[^>]*http-equiv=["']?(content-security-policy|x-frame-options)["']?[^>]*>/gi, '');
-      
+
       const baseTag = `<base href="${finalUrl}">`;
       if (html.includes('<head>')) {
         html = html.replace('<head>', `<head>${baseTag}${bridgeScript}`);
@@ -3406,7 +3406,7 @@ function extractUserDestinationUrl(message: string): { targetUrl: string | null;
 
   // 1. Direct explicit URL match (http/https, www, or domain with known TLDs or localhost/IP)
   const explicitUrlRegex = /(https?:\/\/[^\s"'<>]+|localhost(?::\d+)?(?:\/[^\s"'<>]*)?|127\.0\.0\.1(?::\d+)?(?:\/[^\s"'<>]*)?|www\.[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+(?::\d+)?(?:\/[^\s"'<>]*)?|[a-zA-Z0-9-]+\.(?:com|org|net|edu|gov|io|ai|tech|co|app|br|uk|de|fr|es|it|me|info|tv|xyz|dev|cloud|page|link|shop|store|online|space|top|club|pro|cc|to|is|gg|live|news|world|agency|studio|global|fm|social|blog|directory|guru|solutions|design|center|life)(?:\.[a-zA-Z]{2,3})*(?::\d+)?(?:\/[^\s"'<>]*)?)/i;
-  
+
   const urlMatch = cleanMsg.match(explicitUrlRegex);
   if (urlMatch) {
     let u = urlMatch[0].replace(/[,;:!?)]+$/, '').trim();
@@ -3660,7 +3660,7 @@ function generateComprehensiveAgentReport(
   }
 
   // 2. Web interactions & research details
-  const webTools = executedToolCalls.filter(t => 
+  const webTools = executedToolCalls.filter(t =>
     t.toolName.includes('browser') || t.toolName.includes('web') || t.toolName.includes('navigate') || t.toolName.includes('fetch') || t.toolName.includes('search')
   );
   if (webTools.length > 0) {
@@ -3688,7 +3688,7 @@ function generateComprehensiveAgentReport(
   }
 
   // 3. Terminal and Bash Executions
-  const bashTools = executedToolCalls.filter(t => 
+  const bashTools = executedToolCalls.filter(t =>
     t.toolName.includes('bash') || t.toolName.includes('exec') || t.toolName.includes('terminal') || t.toolName.includes('python') || t.toolName.includes('shell')
   );
   if (bashTools.length > 0) {
@@ -3710,7 +3710,7 @@ function generateComprehensiveAgentReport(
   }
 
   // 4. File system inspections and operations
-  const fsTools = executedToolCalls.filter(t => 
+  const fsTools = executedToolCalls.filter(t =>
     (t.toolName.includes('file') || t.toolName.includes('fs')) && !t.toolName.includes('write')
   );
   if (fsTools.length > 0) {
@@ -3856,7 +3856,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
         if (!modelResponse) {
           if (!modelTextResponse && executedToolCalls.length === 0) {
             console.warn('[CoreSpark Engine] Activating autonomous engine with realistic execution steps.');
-            
+
             sendEvent('status', { text: 'Analisando a solicitação e planejando a arquitetura...' });
             await new Promise(r => setTimeout(r, 1200));
 
@@ -4047,7 +4047,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
 
       // Final explanation construction with high-quality fallback logic
       let finalExplanation = cleanChatResponseOfCodeBlocks(modelTextResponse);
-      
+
       if (!finalExplanation || isGenericOrInsufficientResponse(finalExplanation)) {
         if (pendingApproval) {
           finalExplanation = 'Aguardando sua autorização para prosseguir com a operação no navegador.';
@@ -4158,7 +4158,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
       const lastTrace = executedToolCalls[executedToolCalls.length - 1];
       const navUrl = lastTrace?.screenData?.url || lastTrace?.arguments?.url || plannedActions[0]?.args?.url || 'https://news.ycombinator.com';
       const actionSummary = executedToolCalls.map(t => t.screenData?.actionDescription || t.toolName).join('; ');
-      
+
       finalResult = {
         thought: `Ação realizada no computador na nuvem com sucesso: ${actionSummary}`,
         explanation: pendingApproval
@@ -4204,8 +4204,8 @@ app.post('/api/agent/chat', async (req, res) => {
     });
   }
 
-  const currentAppCode = currentFiles?.['client/src/App.tsx'] || 
-    currentFiles?.['App.tsx'] || 
+  const currentAppCode = currentFiles?.['client/src/App.tsx'] ||
+    currentFiles?.['App.tsx'] ||
     (currentFiles && Object.keys(currentFiles).length > 0 ? Object.values(currentFiles)[0] : '');
 
   const executedToolCalls: any[] = [];
@@ -4253,7 +4253,7 @@ app.post('/api/agent/chat', async (req, res) => {
             }
           });
 
-          const timeoutPromise = new Promise<never>((_, reject) => 
+          const timeoutPromise = new Promise<never>((_, reject) =>
             setTimeout(() => reject(new Error(`Model timeout after 25s on ${modelCandidate}`)), 25000)
           );
 
@@ -4413,7 +4413,7 @@ app.post('/api/agent/chat', async (req, res) => {
     const lastTrace = executedToolCalls[executedToolCalls.length - 1];
     const navUrl = lastTrace?.screenData?.url || lastTrace?.arguments?.url || plannedActions[0]?.args?.url || 'https://news.ycombinator.com';
     const actionSummary = executedToolCalls.map(t => t.screenData?.actionDescription || t.toolName).join('; ');
-    
+
     fallback = {
       thought: `Ação realizada no computador na nuvem: ${actionSummary}`,
       response: generateComprehensiveAgentReport(executedToolCalls, [], intent, message),

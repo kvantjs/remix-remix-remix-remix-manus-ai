@@ -1,285 +1,192 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  CreditCard, 
-  ArrowUpRight, 
-  ArrowDownLeft, 
+import * as PhosphorIcons from '@phosphor-icons/react';
+import {
+  TrendUp as TrendingUp,
   TrendUp,
-  TrendUp as TrendingUp, 
-  Eye, 
-  EyeSlash, 
-  ShieldCheck, 
-  Plus, 
-  MagnifyingGlass, 
-  Sparkle, 
-  Check, 
-  Wallet,
-  PiggyBank
+  Clock,
+  Calendar,
+  Check,
+  ShoppingCart,
+  ShoppingBag,
+  Cpu,
+  Terminal,
+  ForkKnife,
+  MapPin,
+  User,
+  Star,
+  CaretRight,
+  Plus
 } from '@phosphor-icons/react';
 
-export default function AuraFintechApp() {
-  const [balance, setBalance] = useState(148520.45);
-  const [showBalance, setShowBalance] = useState(true);
-  const [currency, setCurrency] = useState<'BRL' | 'USD' | 'EUR'>('BRL');
-  const [filter, setFilter] = useState<'all' | 'income' | 'expense' | 'invest'>('all');
+export default function App() {
+  const [activeTab, setActiveTab] = useState(['Portfólio', 'Investimentos', 'Transferências'][0]);
+  const [items, setItems] = useState([
+      { id: 1, name: 'Renda Fixa IPCA+ Premium', price: '12.4% a.a.', desc: 'Títulos corporativos indexados à inflação com proteção de capital e liquidez semestral.', tag: 'Seguro' },
+      { id: 2, name: 'Fundo Global Equity Tech', price: '21.8% a.a.', desc: 'Alocação ativa em empresas líderes de tecnologia e IA de ponta com rebalanceamento mensal.', tag: 'Crescimento' },
+      { id: 3, name: 'Ativos Privados Real Estate', price: '9.5% a.a.', desc: 'Aluguéis comerciais AAA em áreas metropolitanas premium com isenção fiscal.', tag: 'Proventos' }, { id: 99, name: 'Novo Item Customizado', price: 'Ativo', desc: 'Novo recurso ou produto adicionado sob demanda em tempo real de acordo com as instruções do usuário.', tag: 'Novidade' }
+    ]);
   const [searchTerm, setSearchTerm] = useState('');
-  
-  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
-  const [transferAmount, setTransferAmount] = useState('');
-  const [transferRecipient, setTransferRecipient] = useState('');
-  const [transferSuccess, setTransferSuccess] = useState(false);
 
-  const [monthlyContribution, setMonthlyContribution] = useState(1500);
-  const [investmentMonths, setInvestmentMonths] = useState(24);
+  // Filtragem dinâmica de lista
+  const filteredItems = useMemo(() => {
+    if (!searchTerm.trim()) return items;
+    return items.filter(item =>
+      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.desc.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [searchTerm, items]);
 
-  const simulatedTotal = useMemo(() => {
-    let total = balance * 0.4;
-    const monthlyRate = Math.pow(1 + 0.125, 1 / 12) - 1;
-    for (let i = 0; i < investmentMonths; i++) {
-      total = (total + monthlyContribution) * (1 + monthlyRate);
-    }
-    return total;
-  }, [balance, monthlyContribution, investmentMonths]);
 
-  const [transactions, setTransactions] = useState([
-    { id: 1, title: 'Dividendo ETF Vanguard All-World', category: 'invest', type: 'income', amount: 3420.00, date: 'Hoje, 14:22' },
-    { id: 2, title: 'Stripe SaaS Payout Global', category: 'income', type: 'income', amount: 18500.00, date: 'Ontem, 09:15' },
-    { id: 3, title: 'Apple Store Inc. (MacBook M3 Max)', category: 'expense', type: 'expense', amount: 24999.00, date: '02 Out, 18:30' },
-    { id: 4, title: 'Aporte Tesouro IPCA+ 2035', category: 'invest', type: 'invest', amount: 5000.00, date: '30 Set, 11:00' }
-  ]);
+      const [contribution, setContribution] = useState(1000);
+      const [term, setTerm] = useState(12);
+      const interestRate = 0.012; // 1.2% ao mês
 
-  const handleSendTransfer = (e: React.FormEvent) => {
-    e.preventDefault();
-    const val = parseFloat(transferAmount);
-    if (!val || val <= 0 || val > balance) return;
+      const totalSimulated = useMemo(() => {
+        let total = 0;
+        for (let i = 0; i < term; i++) {
+          total = (total + contribution) * (1 + interestRate);
+        }
+        return Math.round(total);
+      }, [contribution, term]);
 
-    setBalance(prev => prev - val);
-    const newTx = {
-      id: Date.now(),
-      title: 'Pix para ' + (transferRecipient || 'Beneficiário'),
-      category: 'expense',
-      type: 'expense',
-      amount: val,
-      date: 'Hoje, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-    setTransactions(prev => [newTx, ...prev]);
-    setTransferSuccess(true);
-    setTimeout(() => {
-      setTransferSuccess(false);
-      setIsTransferModalOpen(false);
-      setTransferAmount('');
-      setTransferRecipient('');
-    }, 1200);
-  };
+      const widgetJSX = (
+        <section className="p-6 rounded-3xl bg-white/[0.02] border border-slate-800 space-y-4 shadow-2xl backdrop-blur-md">
+          <h3 className="text-sm font-bold flex items-center gap-2 text-white">
+            <TrendUp size={16} /> Simulador de Acúmulo de Capital
+          </h3>
+          <div className="space-y-4">
+            <div>
+              <div className="flex justify-between text-[10px] mb-1 opacity-75 uppercase tracking-wider font-mono">
+                <span>Aporte Mensal</span>
+                <span className="font-bold text-white">R$ {contribution.toLocaleString('pt-BR')}</span>
+              </div>
+              <input type="range" min="100" max="10000" step="100" value={contribution} onChange={e => setContribution(Number(e.target.value))} className="w-full accent-white cursor-pointer" />
+            </div>
+            <div>
+              <div className="flex justify-between text-[10px] mb-1 opacity-75 uppercase tracking-wider font-mono">
+                <span>Prazo de Simulação</span>
+                <span className="font-bold text-white">{term} meses</span>
+              </div>
+              <input type="range" min="6" max="60" step="6" value={term} onChange={e => setTerm(Number(e.target.value))} className="w-full accent-white cursor-pointer" />
+            </div>
+            <div className="pt-3 border-t border-white/10 flex justify-between items-center">
+              <span className="text-xs opacity-75 uppercase tracking-wider font-mono">Total Estimado:</span>
+              <span className="text-sm font-bold text-emerald-400 font-mono">R$ {totalSimulated.toLocaleString('pt-BR')}</span>
+            </div>
+          </div>
+        </section>
+      );
 
-  const currencySymbol = currency === 'BRL' ? 'R$' : currency === 'USD' ? 'US$' : '€';
 
   return (
-    <div className="min-h-screen bg-[#070D0B] text-[#E1EBE6] font-sans selection:bg-emerald-500/30 p-4 sm:p-6 lg:p-8">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-emerald-900/30">
-          <div className="flex items-center gap-3">
-            <div className="size-11 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 p-0.5 shadow-lg shadow-emerald-500/10">
-              <div className="w-full h-full bg-[#08130F] rounded-[14px] flex items-center justify-center text-emerald-400">
-                <Sparkle size={22} weight="fill" />
+    <div
+      className="min-h-full w-full font-sans p-6 sm:p-10 flex flex-col relative select-none animate-in duration-300"
+      style={{
+        backgroundColor: '#060913',
+        color: '#E2E8F0',
+        backgroundImage: 'radial-gradient(circle at 10% 20%, rgba(255,255,255,0.015) 0%, transparent 40%)'
+      }}
+    >
+      <div className="max-w-5xl mx-auto w-full space-y-8 flex-1 flex flex-col justify-between">
+
+        {/* Header Seção com Design Glassmorphic */}
+        <header className="p-6 rounded-3xl bg-white/[0.02] border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 shadow-2xl backdrop-blur-md">
+          <div className="flex items-center gap-4">
+            <div className="size-12 rounded-2xl bg-gradient-to-tr from-white/10 to-white/5 p-0.5 shadow-xl border border-white/10">
+              <div className="w-full h-full bg-black/40 rounded-[14px] flex items-center justify-center text-white">
+                <PhosphorIcons.CreditCard size={22} />
               </div>
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold tracking-tight text-white">AURA CAPITAL</h1>
-                <span className="text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  Private Banking
+              <div className="flex items-center gap-2.5">
+                <h1 className="text-lg font-bold tracking-tight text-white uppercase font-mono">Nexa Wealth Management</h1>
+                <span className="text-[9px] font-bold uppercase px-2.5 py-1 rounded bg-white/5 text-white border border-white/10 font-mono">
+                  Active Seed #4176141248
                 </span>
               </div>
-              <p className="text-xs text-emerald-400/60 font-mono">Conta Private Global · ID #849-2026</p>
+              <p className="text-xs opacity-75">Gestão avançada de patrimônio e investimentos globais de alta performance</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="flex bg-[#0D1A14] border border-emerald-900/40 rounded-xl p-1 text-xs font-semibold">
-              {(['BRL', 'USD', 'EUR'] as const).map(c => (
-                <button
-                  key={c}
-                  onClick={() => setCurrency(c)}
-                  className={`px-2.5 py-1 rounded-lg transition-all ${
-                    currency === c ? 'bg-emerald-500 text-black shadow-md' : 'text-emerald-300/60 hover:text-white'
-                  }`}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
-
-            <button
-              onClick={() => setIsTransferModalOpen(true)}
-              className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-black font-semibold rounded-xl text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02]"
-            >
-              <Plus size={16} weight="bold" />
-              <span>Novo Pix / TED</span>
-            </button>
+          {/* Menu de Abas */}
+          <div className="flex items-center gap-1.5 p-1.5 bg-black/30 rounded-2xl border border-slate-800">
+            {['Portfólio', 'Investimentos', 'Transferências'].map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-2 rounded-xl text-[10px] uppercase tracking-wider font-bold transition-all cursor-pointer ${
+                  activeTab === tab
+                    ? 'bg-white text-black shadow-lg shadow-white/5'
+                    : 'opacity-60 hover:opacity-100 text-white hover:bg-white/5'
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
           </div>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <div className="lg:col-span-2 relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0B1B15] to-[#06120E] border border-emerald-800/30 p-6 sm:p-7 shadow-2xl flex flex-col justify-between">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium uppercase tracking-wider text-emerald-300/60 flex items-center gap-1.5">
-                  <Wallet size={16} className="text-emerald-400" />
-                  Patrimônio Líquido Disponível
-                </span>
-                <button onClick={() => setShowBalance(!showBalance)} className="p-1.5 rounded-lg bg-emerald-950/40 text-emerald-300">
-                  {showBalance ? <EyeSlash size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
+        {/* Corpo Principal split: Bento Grids & Simulators */}
+        <main className="grid grid-cols-1 lg:grid-cols-12 gap-8 flex-1 items-start">
 
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight font-mono">
-                  {showBalance ? `${currencySymbol} ${balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '••••••••••••'}
-                </span>
-                <span className="text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 flex items-center gap-0.5">
-                  <TrendingUp size={12} /> +18.4% a.a.
-                </span>
+          {/* Seção Esquerda: Catálogo interativo e dinâmico */}
+          <div className="lg:col-span-7 space-y-5">
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-[10px] font-bold uppercase tracking-wider opacity-85 font-mono">Catálogo de Serviços Integrados</h2>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Pesquisar..."
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  className="bg-black/30 border border-white/10 rounded-xl px-4 py-2 text-[11px] text-white placeholder:text-slate-500 focus:outline-none focus:border-white/20 w-32 sm:w-44 transition-all"
+                />
               </div>
             </div>
 
-            <div className="grid grid-cols-4 gap-2 pt-6 mt-4 border-t border-emerald-900/30">
-              <button onClick={() => setIsTransferModalOpen(true)} className="p-3 rounded-2xl bg-[#0F241C] hover:bg-[#153327] border border-emerald-800/40 text-center transition-all flex flex-col items-center gap-1.5">
-                <div className="size-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400">
-                  <ArrowUpRight size={16} weight="bold" />
-                </div>
-                <span className="text-[11px] font-medium text-emerald-200">Transferir</span>
-              </button>
+            <div className="grid grid-cols-1 gap-4">
+              {filteredItems.map(item => (
+                <div key={item.id} className="p-5 rounded-3xl bg-white/[0.01] border border-slate-800 space-y-2.5 hover:border-white/10 transition-all duration-300 relative overflow-hidden group shadow-md hover:-translate-y-0.5">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-[9px] font-bold uppercase bg-white/5 text-white border border-white/10 px-2.5 py-1 rounded-full font-mono">
+                        {item.tag}
+                      </span>
+                      <h3 className="text-sm font-bold text-white mt-2.5">{item.name}</h3>
+                    </div>
+                    {typeof item.price === 'number' ? (
+                      <span className="text-xs font-bold text-white font-mono bg-white/5 px-2.5 py-1 rounded-lg border border-white/10">R$ {item.price}</span>
+                    ) : (
+                      <span className="text-xs font-bold text-white font-mono bg-white/5 px-2.5 py-1 rounded-lg border border-white/10">{item.price}</span>
+                    )}
+                  </div>
+                  <p className="text-xs opacity-70 leading-relaxed">{item.desc}</p>
 
-              <button onClick={() => setBalance(prev => prev + 1000)} className="p-3 rounded-2xl bg-[#0F241C] hover:bg-[#153327] border border-emerald-800/40 text-center transition-all flex flex-col items-center gap-1.5">
-                <div className="size-8 rounded-xl bg-teal-500/10 flex items-center justify-center text-teal-400">
-                  <ArrowDownLeft size={16} weight="bold" />
-                </div>
-                <span className="text-[11px] font-medium text-emerald-200">Depositar</span>
-              </button>
 
-              <button onClick={() => setFilter('invest')} className="p-3 rounded-2xl bg-[#0F241C] hover:bg-[#153327] border border-emerald-800/40 text-center transition-all flex flex-col items-center gap-1.5">
-                <div className="size-8 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-400">
-                  <TrendingUp size={16} weight="bold" />
                 </div>
-                <span className="text-[11px] font-medium text-emerald-200">Investir</span>
-              </button>
-
-              <button onClick={() => setFilter('all')} className="p-3 rounded-2xl bg-[#0F241C] hover:bg-[#153327] border border-emerald-800/40 text-center transition-all flex flex-col items-center gap-1.5">
-                <div className="size-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-300">
-                  <CreditCard size={16} weight="bold" />
-                </div>
-                <span className="text-[11px] font-medium text-emerald-200">Extrato</span>
-              </button>
+              ))}
+              {filteredItems.length === 0 && (
+                <div className="p-12 text-center text-xs opacity-50 bg-black/10 border border-slate-800 rounded-3xl">Nenhum item corresponde aos critérios de pesquisa.</div>
+              )}
             </div>
           </div>
 
-          <div className="rounded-3xl bg-gradient-to-tr from-[#0F241C] via-[#0A1B14] to-[#05110D] border border-emerald-800/40 p-6 shadow-2xl flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-emerald-400 uppercase tracking-widest font-mono">Aura Black Metal</span>
-              <ShieldCheck size={22} className="text-emerald-400" />
-            </div>
-            <div className="my-5 space-y-3 font-mono">
-              <p className="text-base text-white tracking-widest font-semibold">•••• •••• •••• 9842</p>
-              <div className="flex justify-between text-[11px] text-emerald-300/60">
-                <span>VALIDADE: 09/31</span>
-                <span>CVV: 712</span>
-              </div>
-            </div>
-            <div className="pt-3 border-t border-emerald-900/30 flex items-center justify-between text-xs">
-              <span className="text-white font-medium">CLIENTE PRIVATE</span>
-              <span className="font-bold text-emerald-400">Mastercard Black</span>
-            </div>
+          {/* Seção Direita: Widget interativo que simula ações reais */}
+          <div className="lg:col-span-5 space-y-4">
+            <h2 className="text-[10px] font-bold uppercase tracking-wider opacity-85 font-mono">Simulação Interativa Reativa</h2>
+            {widgetJSX}
           </div>
-        </div>
+        </main>
 
-        {/* Compound Interest Simulator */}
-        <div className="rounded-3xl bg-[#091510] border border-emerald-800/30 p-6 space-y-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                <PiggyBank size={18} className="text-emerald-400" />
-                Simulador Dinâmico de Juros Compostos
-              </h2>
-              <p className="text-xs text-emerald-400/50">Projeção a 12.5% a.a. líquida</p>
-            </div>
-            <span className="text-xl font-extrabold text-emerald-300 font-mono">
-              {currencySymbol} {simulatedTotal.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-            <div className="bg-[#0C1E17] p-4 rounded-2xl border border-emerald-900/40 space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-emerald-300/80">Aporte Mensal:</span>
-                <span className="text-emerald-400 font-mono font-bold">{currencySymbol} {monthlyContribution}</span>
-              </div>
-              <input type="range" min="200" max="10000" step="100" value={monthlyContribution} onChange={e => setMonthlyContribution(Number(e.target.value))} className="w-full accent-emerald-500 cursor-pointer" />
-            </div>
-            <div className="bg-[#0C1E17] p-4 rounded-2xl border border-emerald-900/40 space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-emerald-300/80">Horizonte de Tempo:</span>
-                <span className="text-emerald-400 font-mono font-bold">{investmentMonths} meses</span>
-              </div>
-              <input type="range" min="6" max="120" step="6" value={investmentMonths} onChange={e => setInvestmentMonths(Number(e.target.value))} className="w-full accent-emerald-500 cursor-pointer" />
-            </div>
-          </div>
-        </div>
-
-        {/* Transactions List */}
-        <div className="rounded-3xl bg-[#08140F] border border-emerald-900/30 p-6 space-y-3">
-          <h3 className="text-sm font-bold text-white">Extrato em Tempo Real</h3>
-          <div className="divide-y divide-emerald-950/60">
-            {transactions.map(tx => (
-              <div key={tx.id} className="py-3 flex items-center justify-between">
-                <div>
-                  <h4 className="text-xs font-semibold text-white">{tx.title}</h4>
-                  <span className="text-[10px] text-emerald-400/50 font-mono">{tx.date}</span>
-                </div>
-                <span className={`text-xs font-bold font-mono ${tx.type === 'income' ? 'text-emerald-400' : 'text-white/80'}`}>
-                  {tx.type === 'income' ? '+' : '-'} {currencySymbol} {tx.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
+        {/* Footer */}
+        <footer className="p-5 rounded-3xl bg-black/10 border border-slate-800 text-[10px] opacity-60 flex items-center justify-between font-mono">
+          <span>© {new Date().getFullYear()} Nexa Wealth Management · All Rights Reserved</span>
+          <span className="text-emerald-400 flex items-center gap-1.5">
+            <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Kvant Sandbox Execution Mode Active</span>
+          </span>
+        </footer>
       </div>
-
-      {isTransferModalOpen && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-[#091510] border border-emerald-800/40 rounded-3xl p-6 shadow-2xl space-y-4">
-            <div className="flex justify-between items-center border-b border-emerald-900/40 pb-3">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Sparkle size={16} className="text-emerald-400" />
-                Transferência Pix Aura
-              </h3>
-              <button onClick={() => setIsTransferModalOpen(false)} className="text-emerald-400/50 hover:text-white">✕</button>
-            </div>
-            {transferSuccess ? (
-              <div className="py-6 text-center space-y-2">
-                <div className="size-10 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto">
-                  <Check size={20} weight="bold" />
-                </div>
-                <h4 className="text-sm font-bold text-white">Transferência Realizada com Sucesso!</h4>
-              </div>
-            ) : (
-              <form onSubmit={handleSendTransfer} className="space-y-3">
-                <div>
-                  <label className="text-xs text-emerald-300/70 block mb-1">Destinatário (Chave Pix ou Nome)</label>
-                  <input type="text" required placeholder="ex: contato@fintech.io" value={transferRecipient} onChange={e => setTransferRecipient(e.target.value)} className="w-full bg-[#0D1F17] border border-emerald-900/50 rounded-xl px-3 py-2 text-xs text-white" />
-                </div>
-                <div>
-                  <label className="text-xs text-emerald-300/70 block mb-1">Valor ({currencySymbol})</label>
-                  <input type="number" step="0.01" required placeholder="0,00" value={transferAmount} onChange={e => setTransferAmount(e.target.value)} className="w-full bg-[#0D1F17] border border-emerald-900/50 rounded-xl px-3 py-2 text-xs text-white font-mono" />
-                </div>
-                <div className="pt-2 flex gap-2">
-                  <button type="button" onClick={() => setIsTransferModalOpen(false)} className="flex-1 py-2 rounded-xl bg-white/5 text-xs text-white/70">Cancelar</button>
-                  <button type="submit" className="flex-1 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-xs">Confirmar Envio</button>
-                </div>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

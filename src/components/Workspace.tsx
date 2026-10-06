@@ -1,29 +1,29 @@
-import { 
-  X, 
-  ArrowsOut, 
-  CaretRight, 
-  Globe, 
-  Code, 
-  Gear, 
+import {
+  X,
+  ArrowsOut,
+  CaretRight,
+  Globe,
+  Code,
+  Gear,
   Terminal,
   Desktop,
   Plus,
   ArrowSquareOut,
   CaretDown,
   ArrowsCounterClockwise,
-  Lock, 
-  Bell, 
-  GithubLogo, 
-  Calendar, 
-  FileCode, 
-  Folder, 
-  PencilSimple, 
-  Download, 
-  Clock, 
-  DotsThree, 
-  ArrowUp, 
-  PuzzlePiece, 
-  MagnifyingGlass, 
+  Lock,
+  Bell,
+  GithubLogo,
+  Calendar,
+  FileCode,
+  Folder,
+  PencilSimple,
+  Download,
+  Clock,
+  DotsThree,
+  ArrowUp,
+  PuzzlePiece,
+  MagnifyingGlass,
   Browser,
   Trash,
   Check,
@@ -66,9 +66,9 @@ interface TabItem {
   closable: boolean;
 }
 
-export function Workspace({ 
-  onClose, 
-  customFiles = {}, 
+export function Workspace({
+  onClose,
+  customFiles = {},
   onFileUpdate,
   onSendPrompt,
   toolCalls,
@@ -132,11 +132,11 @@ export function Workspace({
   };
 
   return (
-    <div className={`${isMaximized ? 'w-full absolute inset-0 z-30' : 'w-[56%] min-w-[460px]'} border-l border-border-divider-subtle bg-bg-surface-panel flex flex-col h-full animate-in duration-200 select-none`}>
-      
+    <div className={`workspace-panel ${isMaximized ? 'w-full absolute inset-0 z-30' : ''} border-l border-border-divider-subtle bg-bg-surface-panel flex flex-col h-full min-w-0 min-h-0 animate-in duration-200 select-none`}>
+
       {/* Top Application Tab Bar */}
       <div className="h-10 flex items-center px-3 bg-bg-canvas-main/60 border-b border-border-divider-subtle shrink-0 relative select-none">
-        
+
         {/* Tabs list of the application */}
         <div className="flex items-center gap-1 overflow-x-auto custom-scrollbar">
           {openTabs.map((tab) => {
@@ -146,8 +146,8 @@ export function Workspace({
                 key={tab.id}
                 onClick={() => setActiveTopTab(tab.id)}
                 className={`h-7 px-3 rounded-t-md text-xs font-normal transition-all flex items-center gap-2 group relative border-t border-x cursor-pointer ${
-                  isActive 
-                    ? 'bg-bg-surface-panel text-text-content-primary border-border-divider-subtle shadow-xs font-medium' 
+                  isActive
+                    ? 'bg-bg-surface-panel text-text-content-primary border-border-divider-subtle shadow-xs font-medium'
                     : 'text-text-content-secondary hover:text-text-content-primary hover:bg-bg-action-hover border-transparent'
                 }`}
               >
@@ -170,7 +170,7 @@ export function Workspace({
                 <span className="truncate max-w-[150px] text-[11.5px]">{tab.label}</span>
 
                 {tab.closable && (
-                  <X 
+                  <X
                     size={11}
                     className="ml-0.5 text-text-content-secondary hover:text-text-content-primary p-0.5 rounded transition-all cursor-pointer"
                     onClick={(e) => {
@@ -185,14 +185,14 @@ export function Workspace({
 
           {/* Plus and Caret Down buttons to add application tabs */}
           <div className="flex items-center text-text-content-secondary hover:text-text-content-primary px-0.5">
-            <button 
+            <button
               onClick={() => setShowNewTabMenu(!showNewTabMenu)}
               className="p-1 hover:bg-bg-action-hover rounded cursor-pointer transition-colors"
               title="Nova aba na aplicação"
             >
               <Plus size={13} />
             </button>
-            <button 
+            <button
               onClick={() => setShowNewTabMenu(!showNewTabMenu)}
               className="p-0.5 hover:bg-bg-action-hover rounded cursor-pointer transition-colors"
             >
@@ -265,16 +265,16 @@ export function Workspace({
 
         {/* Top Right Window Controls: Fullscreen expand and Sidebar dock toggle */}
         <div className="flex items-center gap-1.5 text-text-content-secondary">
-          <button 
+          <button
             onClick={() => setIsMaximized(!isMaximized)}
-            title={isMaximized ? "Restaurar tamanho" : "Tela cheia"} 
+            title={isMaximized ? "Restaurar tamanho" : "Tela cheia"}
             className="cursor-pointer hover:text-text-content-primary transition-colors p-1"
           >
             <ArrowsOut size={14} />
           </button>
-          <button 
+          <button
             onClick={onClose}
-            title="Fechar painel lateral" 
+            title="Fechar painel lateral"
             className="cursor-pointer hover:text-text-content-primary transition-colors p-1"
           >
             <X size={14} />
@@ -283,11 +283,11 @@ export function Workspace({
       </div>
 
       {/* RENDER ACTIVE APPLICATION TAB */}
-      
+
       {/* 1. Computador na Nuvem do Agente */}
       {activeTopTab === 'computer' && (
         <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-          <KvantComputer 
+          <KvantComputer
             toolCalls={toolCalls}
             isWorking={isWorking}
             workingTime={workingTime}
@@ -304,9 +304,9 @@ export function Workspace({
       {/* 2. Direct Code Tab */}
       {activeTopTab === 'code_tab' && (
         <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg-canvas-main">
-          <InteractiveCodeEditor 
-            activeFile={activeFile} 
-            onFileChange={setActiveFile} 
+          <InteractiveCodeEditor
+            activeFile={activeFile}
+            onFileChange={setActiveFile}
             customFiles={customFiles}
             onFileUpdate={onFileUpdate}
           />
@@ -316,8 +316,8 @@ export function Workspace({
       {/* 3. Direct Preview Tab */}
       {activeTopTab === 'preview_tab' && (
         <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg-surface-panel">
-          <RuntimePreview 
-            activeCode={activeCodeContent} 
+          <RuntimePreview
+            activeCode={activeCodeContent}
             customFiles={customFiles}
             onSendPrompt={onSendPrompt}
           />
@@ -337,46 +337,46 @@ export function Workspace({
           {/* Internal Navigation Bar for Workspace */}
           <div className="h-11 flex items-center justify-between px-3 border-b border-border-divider-subtle shrink-0 bg-bg-surface-panel">
             <div className="flex items-center gap-1 p-0.5 border border-border-divider-subtle rounded-lg bg-bg-canvas-main/80 overflow-x-auto">
-              <NavButton 
-                active={workspaceSubTab === 'preview'} 
+              <NavButton
+                active={workspaceSubTab === 'preview'}
                 onClick={() => setWorkspaceSubTab('preview')}
-                icon={<Desktop size={13} />} 
-                label="Pré-visualização" 
+                icon={<Desktop size={13} />}
+                label="Pré-visualização"
               />
-              <NavButton 
-                active={workspaceSubTab === 'code'} 
+              <NavButton
+                active={workspaceSubTab === 'code'}
                 onClick={() => setWorkspaceSubTab('code')}
-                icon={<Code size={13} />} 
-                label="Editor de Código" 
+                icon={<Code size={13} />}
+                label="Editor de Código"
               />
-              <NavButton 
-                active={workspaceSubTab === 'terminal'} 
+              <NavButton
+                active={workspaceSubTab === 'terminal'}
                 onClick={() => setWorkspaceSubTab('terminal')}
-                icon={<Terminal size={13} />} 
-                label="Terminal" 
+                icon={<Terminal size={13} />}
+                label="Terminal"
               />
-              <NavButton 
-                active={workspaceSubTab === 'projects'} 
+              <NavButton
+                active={workspaceSubTab === 'projects'}
                 onClick={() => setWorkspaceSubTab('projects')}
-                icon={<Folder size={13} />} 
-                label="Projetos & Git" 
+                icon={<Folder size={13} />}
+                label="Projetos & Git"
               />
-              <NavButton 
-                active={workspaceSubTab === 'automations'} 
+              <NavButton
+                active={workspaceSubTab === 'automations'}
                 onClick={() => setWorkspaceSubTab('automations')}
-                icon={<Calendar size={13} />} 
-                label="Execuções" 
+                icon={<Calendar size={13} />}
+                label="Execuções"
               />
-              <NavButton 
-                active={workspaceSubTab === 'settings'} 
+              <NavButton
+                active={workspaceSubTab === 'settings'}
                 onClick={() => setWorkspaceSubTab('settings')}
-                icon={<Gear size={13} />} 
-                label="Configurações" 
+                icon={<Gear size={13} />}
+                label="Configurações"
               />
             </div>
-            
+
             <div className="flex items-center gap-2 shrink-0">
-               <button 
+               <button
                 onClick={() => {
                   setWorkspaceSubTab('preview');
                 }}
@@ -391,16 +391,16 @@ export function Workspace({
           {/* Sub-tab content */}
           <div className="flex-1 overflow-hidden relative">
             {workspaceSubTab === 'preview' && (
-              <RuntimePreview 
-                activeCode={activeCodeContent} 
+              <RuntimePreview
+                activeCode={activeCodeContent}
                 customFiles={customFiles}
                 onSendPrompt={onSendPrompt}
               />
             )}
             {workspaceSubTab === 'code' && (
-              <InteractiveCodeEditor 
-                activeFile={activeFile} 
-                onFileChange={setActiveFile} 
+              <InteractiveCodeEditor
+                activeFile={activeFile}
+                onFileChange={setActiveFile}
                 customFiles={customFiles}
                 onFileUpdate={onFileUpdate}
               />
@@ -421,7 +421,7 @@ export function Workspace({
 
 function NavButton({ active, icon, label, onClick }: any) {
   return (
-    <button 
+    <button
       onClick={onClick}
       className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer whitespace-nowrap ${
         active ? 'bg-white/10 text-white shadow-xs' : 'text-white/40 hover:text-white/70'
@@ -703,11 +703,11 @@ function InteractiveCodeEditor({ activeFile, onFileChange, customFiles, onFileUp
         <div className="p-2 border-b border-white/5 bg-[#252525]">
           <div className="flex items-center gap-1.5 bg-[#252525] border border-[#373737] rounded-lg px-2 py-1 text-xs text-[#d8d8d8]">
             <MagnifyingGlass size={12} className="text-slate-500" />
-            <input 
-              type="text" 
-              value={searchTerm} 
-              onChange={e => setSearchTerm(e.target.value)} 
-              placeholder="Filtrar arquivos..." 
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              placeholder="Filtrar arquivos..."
               className="w-full bg-transparent text-[#5e5e5e] border-[#393939] placeholder:text-slate-600 focus:outline-none text-[11px]"
             />
           </div>
@@ -716,11 +716,11 @@ function InteractiveCodeEditor({ activeFile, onFileChange, customFiles, onFileUp
         {/* Tree Nodes List */}
         <div className="flex-1 overflow-y-auto p-2 space-y-0.5 custom-scrollbar text-xs bg-[#252525]">
           {fileTree.map((node) => (
-            <DynamicFileTreeNode 
-              key={node.path} 
-              node={node} 
-              level={0} 
-              activeFile={activeFile} 
+            <DynamicFileTreeNode
+              key={node.path}
+              node={node}
+              level={0}
+              activeFile={activeFile}
               onFileChange={onFileChange}
               searchTerm={searchTerm}
             />
@@ -753,8 +753,8 @@ function InteractiveCodeEditor({ activeFile, onFileChange, customFiles, onFileUp
             <button
               onClick={handleSave}
               className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ${
-                !isSaved 
-                  ? 'bg-white hover:bg-slate-200 text-black shadow-white/5' 
+                !isSaved
+                  ? 'bg-white hover:bg-slate-200 text-black shadow-white/5'
                   : 'bg-white/10 hover:bg-white/15 text-white/80'
               }`}
               title="Salvar arquivo e sincronizar runtime (Ctrl+S)"
@@ -842,11 +842,11 @@ function InteractiveCodeEditor({ activeFile, onFileChange, customFiles, onFileUp
             <form onSubmit={handleCreateNewFile} className="space-y-3">
               <div>
                 <label className="text-slate-300 block mb-1">Caminho ou Nome do Arquivo</label>
-                <input 
-                  type="text" 
-                  required 
-                  value={newFilePath} 
-                  onChange={e => setNewFilePath(e.target.value)} 
+                <input
+                  type="text"
+                  required
+                  value={newFilePath}
+                  onChange={e => setNewFilePath(e.target.value)}
                   placeholder="ex: client/src/components/Header.tsx ou utils/format.ts"
                   className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-white/20"
                   autoFocus
@@ -875,11 +875,11 @@ function InteractiveCodeEditor({ activeFile, onFileChange, customFiles, onFileUp
             <form onSubmit={handleCreateNewFolder} className="space-y-3">
               <div>
                 <label className="text-slate-300 block mb-1">Nome ou Caminho da Pasta</label>
-                <input 
-                  type="text" 
-                  required 
-                  value={newFolderName} 
-                  onChange={e => setNewFolderName(e.target.value)} 
+                <input
+                  type="text"
+                  required
+                  value={newFolderName}
+                  onChange={e => setNewFolderName(e.target.value)}
                   placeholder="ex: client/src/components ou src/services"
                   className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-white/20"
                   autoFocus
@@ -918,10 +918,10 @@ function DynamicFileTreeNode({ node, level, activeFile, onFileChange, searchTerm
 
   return (
     <div>
-      <div 
+      <div
         className={`flex items-center gap-1.5 py-1 px-2 rounded-lg cursor-pointer transition-all ${
-          isActive 
-            ? 'bg-[#272727] text-[#bdbdbd] font-medium border border-[#363636] rounded-[6px]' 
+          isActive
+            ? 'bg-[#272727] text-[#bdbdbd] font-medium border border-[#363636] rounded-[6px]'
             : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
         }`}
         style={{ paddingLeft: `${level * 12 + 6}px` }}
@@ -932,7 +932,7 @@ function DynamicFileTreeNode({ node, level, activeFile, onFileChange, searchTerm
         ) : (
           <FileCode size={13} className={isActive ? "text-white shrink-0" : "text-slate-500 shrink-0"} />
         )}
-        
+
         {isFolder && (
           <Folder size={13} className={isOpen ? "text-white shrink-0" : "text-slate-500 shrink-0"} />
         )}
@@ -943,11 +943,11 @@ function DynamicFileTreeNode({ node, level, activeFile, onFileChange, searchTerm
       {isFolder && isOpen && node.children && (
         <div className="space-y-0.5">
           {node.children.map((child) => (
-            <DynamicFileTreeNode 
-              key={child.path} 
-              node={child} 
-              level={level + 1} 
-              activeFile={activeFile} 
+            <DynamicFileTreeNode
+              key={child.path}
+              node={child}
+              level={level + 1}
+              activeFile={activeFile}
               onFileChange={onFileChange}
               searchTerm={searchTerm}
             />
@@ -1066,7 +1066,7 @@ function AutomationsView() {
       <div className="max-w-3xl mx-auto space-y-4">
         <h2 className="text-sm font-bold text-white">Execuções e Automações em Segundo Plano</h2>
         <p className="text-[11px] text-slate-400">Histórico de jobs assíncronos e pipelines do agente.</p>
-        
+
         <div className="p-4 rounded-xl bg-[#12131A] border border-white/10 space-y-2">
           <div className="flex items-center justify-between text-xs">
             <span className="font-semibold text-white">WebDev Hot Reload & Compile Worker</span>

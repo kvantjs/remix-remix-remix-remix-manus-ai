@@ -15,7 +15,7 @@ export interface SynthesizedApp {
 
 export function synthesizeBespokeInterface(message: string, currentCode?: string): SynthesizedApp {
   const clean = message.toLowerCase();
-  
+
   // Algoritmo de hash simples para garantir aleatoriedade consistente baseada no prompt
   let hash = 0;
   for (let i = 0; i < message.length; i++) {
@@ -152,7 +152,7 @@ export function synthesizeBespokeInterface(message: string, currentCode?: string
     else if (currentCode.includes('Scissors') || currentCode.includes('Barbearia') || currentCode.includes('Barber')) niche = 'barber';
 
     // Detectar título anterior para evitar mudar o nome da marca na edição
-    const titleMatch = currentCode.match(/h1 className="[^"]*uppercase[^"]*">([^<]+)<\/h1>/i) || 
+    const titleMatch = currentCode.match(/h1 className="[^"]*uppercase[^"]*">([^<]+)<\/h1>/i) ||
                        currentCode.match(/h1 className="[^"]*font-serif[^"]*">([^<]+)<\/h1>/i) ||
                        currentCode.match(/h1[^>]*>([^<]+)<\/h1>/i);
     if (titleMatch) {
@@ -220,7 +220,7 @@ export function synthesizeBespokeInterface(message: string, currentCode?: string
   }
 
   // Detalhes extras com base no nicho
-  let iconName = 'Manus';
+  let iconName = 'Sparkle';
   let tagline = 'Inovação e Experiência Reativa Única';
   let tabs = "['Início', 'Recursos', 'Contato']";
   let itemsData = '';
@@ -239,7 +239,7 @@ export function synthesizeBespokeInterface(message: string, currentCode?: string
       const [guests, setGuests] = useState(2);
       const [bookingSuccess, setBookingSuccess] = useState(false);
       const [bookingName, setBookingName] = useState('');
-      
+
       const handleBooking = (e) => {
         e.preventDefault();
         if (!bookingName.trim()) return;
@@ -249,7 +249,7 @@ export function synthesizeBespokeInterface(message: string, currentCode?: string
           setBookingName('');
         }, 3000);
       };
-      
+
       const widgetJSX = (
         <section className="p-6 rounded-3xl bg-white/[0.02] border ${chosenTheme.border} space-y-4 shadow-2xl backdrop-blur-md">
           <h3 className="text-sm font-bold flex items-center gap-2 text-white">
@@ -292,7 +292,7 @@ export function synthesizeBespokeInterface(message: string, currentCode?: string
       const [contribution, setContribution] = useState(1000);
       const [term, setTerm] = useState(12);
       const interestRate = 0.012; // 1.2% ao mês
-      
+
       const totalSimulated = useMemo(() => {
         let total = 0;
         for (let i = 0; i < term; i++) {
@@ -300,7 +300,7 @@ export function synthesizeBespokeInterface(message: string, currentCode?: string
         }
         return Math.round(total);
       }, [contribution, term]);
-      
+
       const widgetJSX = (
         <section className="p-6 rounded-3xl bg-white/[0.02] border ${chosenTheme.border} space-y-4 shadow-2xl backdrop-blur-md">
           <h3 className="text-sm font-bold flex items-center gap-2 text-white">
@@ -342,7 +342,7 @@ export function synthesizeBespokeInterface(message: string, currentCode?: string
       const [cart, setCart] = useState({});
       const [coupon, setCoupon] = useState('');
       const [appliedDiscount, setAppliedDiscount] = useState(0);
-      
+
       const cartCount = Object.values(cart).reduce((a, b) => a + b, 0);
       const rawSubtotal = Object.entries(cart).reduce((sum, [id, qty]) => {
         const item = [
@@ -353,19 +353,19 @@ export function synthesizeBespokeInterface(message: string, currentCode?: string
         ].find(i => i.id === Number(id));
         return sum + (item ? item.price * qty : 0);
       }, 0);
-      
+
       const finalTotal = Math.round(rawSubtotal * (1 - appliedDiscount));
-      
+
       const addToCart = (id) => {
         setCart(prev => ({ ...prev, [id]: (prev[id] || 0) + 1 }));
       };
-      
+
       const clearCart = () => {
         setCart({});
         setAppliedDiscount(0);
         setCoupon('');
       };
-      
+
       const applyCoupon = () => {
         if (coupon.toUpperCase() === 'DESCONTO10') {
           setAppliedDiscount(0.1);
@@ -373,7 +373,7 @@ export function synthesizeBespokeInterface(message: string, currentCode?: string
           alert('Cupom inválido. Use DESCONTO10 para 10% OFF');
         }
       };
-      
+
       const widgetJSX = (
         <section className="p-6 rounded-3xl bg-white/[0.02] border ${chosenTheme.border} space-y-4 shadow-2xl backdrop-blur-md">
           <div className="flex justify-between items-center">
@@ -437,11 +437,11 @@ export function synthesizeBespokeInterface(message: string, currentCode?: string
     ]`;
     widgetCode = `
       const [serverLoad, setServerLoad] = useState(42);
-      
+
       const simulateLoad = () => {
         setServerLoad(Math.round(15 + Math.random() * 75));
       };
-      
+
       const widgetJSX = (
         <section className="p-6 rounded-3xl bg-white/[0.02] border ${chosenTheme.border} space-y-4 shadow-2xl backdrop-blur-md">
           <div className="flex justify-between items-center">
@@ -475,7 +475,7 @@ export function synthesizeBespokeInterface(message: string, currentCode?: string
     `;
   } else {
     // Default / General
-    iconName = 'Manus';
+    iconName = 'Sparkle';
     tagline = 'Plataforma inovadora integrada para alta produtividade em tempo real';
     tabs = "['Geral', 'Métricas', 'Configurações']";
     itemsData = `[
@@ -490,18 +490,18 @@ export function synthesizeBespokeInterface(message: string, currentCode?: string
         { id: 3, text: 'Configurar simuladores dinâmicos reais', checked: false }
       ]);
       const [newTask, setNewTask] = useState('');
-      
+
       const toggleTask = (id) => {
         setTasks(prev => prev.map(t => t.id === id ? { ...t, checked: !t.checked } : t));
       };
-      
+
       const addTask = (e) => {
         e.preventDefault();
         if (!newTask.trim()) return;
         setTasks(prev => [...prev, { id: Date.now(), text: newTask, checked: false }]);
         setNewTask('');
       };
-      
+
       const widgetJSX = (
         <section className="p-6 rounded-3xl bg-white/[0.02] border ${chosenTheme.border} space-y-4 shadow-2xl backdrop-blur-md">
           <h3 className="text-sm font-bold flex items-center gap-2 text-white">
@@ -529,20 +529,20 @@ export function synthesizeBespokeInterface(message: string, currentCode?: string
   // Montar o código-fonte React completo da aplicação reativa com layout e CSS impecável (Tailwind v4)
   const rawCode = `import React, { useState, useMemo } from 'react';
 import * as PhosphorIcons from '@phosphor-icons/react';
-import { 
-  Manus, 
-  TrendUp as TrendingUp, 
+import {
+  Sparkle,
+  TrendUp as TrendingUp,
   TrendUp,
-  Clock, 
-  Calendar, 
-  Check, 
-  ShoppingCart, 
-  ShoppingBag, 
-  Cpu, 
-  Terminal, 
-  ForkKnife, 
-  MapPin, 
-  User, 
+  Clock,
+  Calendar,
+  Check,
+  ShoppingCart,
+  ShoppingBag,
+  Cpu,
+  Terminal,
+  ForkKnife,
+  MapPin,
+  User,
   Star,
   CaretRight,
   Plus
@@ -552,12 +552,12 @@ export default function App() {
   const [activeTab, setActiveTab] = useState(${tabs}[0]);
   const [items, setItems] = useState(${itemsData});
   const [searchTerm, setSearchTerm] = useState('');
-  
+
   // Filtragem dinâmica de lista
   const filteredItems = useMemo(() => {
     if (!searchTerm.trim()) return items;
-    return items.filter(item => 
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    return items.filter(item =>
+      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.desc.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [searchTerm, items]);
@@ -565,16 +565,16 @@ export default function App() {
   ${widgetCode}
 
   return (
-    <div 
+    <div
       className="min-h-full w-full font-sans p-6 sm:p-10 flex flex-col relative select-none animate-in duration-300"
-      style={{ 
-        backgroundColor: '${chosenTheme.bg}', 
+      style={{
+        backgroundColor: '${chosenTheme.bg}',
         color: '${chosenTheme.textColor}',
         backgroundImage: 'radial-gradient(circle at 10% 20%, rgba(255,255,255,0.015) 0%, transparent 40%)'
       }}
     >
       <div className="max-w-5xl mx-auto w-full space-y-8 flex-1 flex flex-col justify-between">
-        
+
         {/* Header Seção com Design Glassmorphic */}
         <header className="p-6 rounded-3xl bg-white/[0.02] border ${chosenTheme.border} flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 shadow-2xl backdrop-blur-md">
           <div className="flex items-center gap-4">
@@ -593,7 +593,7 @@ export default function App() {
               <p className="text-xs opacity-75">${tagline}</p>
             </div>
           </div>
-          
+
           {/* Menu de Abas */}
           <div className="flex items-center gap-1.5 p-1.5 bg-black/30 rounded-2xl border ${chosenTheme.border}">
             {${tabs}.map(tab => (
@@ -601,8 +601,8 @@ export default function App() {
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={\`px-4 py-2 rounded-xl text-[10px] uppercase tracking-wider font-bold transition-all cursor-pointer \${
-                  activeTab === tab 
-                    ? 'bg-white text-black shadow-lg shadow-white/5' 
+                  activeTab === tab
+                    ? 'bg-white text-black shadow-lg shadow-white/5'
                     : 'opacity-60 hover:opacity-100 text-white hover:bg-white/5'
                 }\`}
               >
@@ -614,22 +614,22 @@ export default function App() {
 
         {/* Corpo Principal split: Bento Grids & Simulators */}
         <main className="grid grid-cols-1 lg:grid-cols-12 gap-8 flex-1 items-start">
-          
+
           {/* Seção Esquerda: Catálogo interativo e dinâmico */}
           <div className="lg:col-span-7 space-y-5">
             <div className="flex items-center justify-between gap-4">
               <h2 className="text-[10px] font-bold uppercase tracking-wider opacity-85 font-mono">Catálogo de Serviços Integrados</h2>
               <div className="relative">
-                <input 
-                  type="text" 
-                  placeholder="Pesquisar..." 
+                <input
+                  type="text"
+                  placeholder="Pesquisar..."
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
                   className="bg-black/30 border border-white/10 rounded-xl px-4 py-2 text-[11px] text-white placeholder:text-slate-500 focus:outline-none focus:border-white/20 w-32 sm:w-44 transition-all"
                 />
               </div>
             </div>
-            
+
             <div className="grid grid-cols-1 gap-4">
               {filteredItems.map(item => (
                 <div key={item.id} className="p-5 rounded-3xl bg-white/[0.01] border ${chosenTheme.border} space-y-2.5 hover:border-white/10 transition-all duration-300 relative overflow-hidden group shadow-md hover:-translate-y-0.5">
@@ -647,9 +647,9 @@ export default function App() {
                     )}
                   </div>
                   <p className="text-xs opacity-70 leading-relaxed">{item.desc}</p>
-                  
+
                   ${niche === 'commerce' ? `(
-                    <button 
+                    <button
                       onClick={() => addToCart(item.id)}
                       className="mt-3 py-2 px-4 bg-white text-black font-semibold rounded-xl text-[10px] uppercase tracking-wider hover:bg-white/90 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
                     >
@@ -724,7 +724,7 @@ Este é um projeto **React + Vite + Tailwind CSS** ultra completo de alta fideli
         version: "1.0.0",
         isBespoke: true,
         niche: niche,
-        author: "Manus AI Recreative Agent",
+        author: "Kopilot AI Recreative Agent",
         timestamp: new Date().toISOString()
       }, null, 2),
       lang: "json"
@@ -794,7 +794,7 @@ export default function Header() {
   return (
     <div className="p-4 bg-white/5 border-b border-white/10 flex items-center justify-between rounded-t-2xl">
       <div className="flex items-center gap-2">
-        <PhosphorIcons.Manus className="text-white animate-pulse" size={16} />
+        <PhosphorIcons.Sparkle className="text-white animate-pulse" size={16} />
         <span className="text-xs font-mono font-bold uppercase tracking-wider text-white">Painel de Controle Integrado</span>
       </div>
       <div className="text-[10px] font-mono text-slate-400">Status: Conectado</div>
