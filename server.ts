@@ -4445,7 +4445,9 @@ async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      // O Express é o dono do listener HTTP no AI Studio; sem um listener
+      // HTTP anexado, o WebSocket HMR falha e impede a inicialização do preview.
+      server: { middlewareMode: true, hmr: false },
       appType: 'spa',
     });
     app.use(vite.middlewares);
