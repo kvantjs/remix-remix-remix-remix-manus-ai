@@ -220,7 +220,7 @@ export function synthesizeBespokeInterface(message: string, currentCode?: string
   }
 
   // Detalhes extras com base no nicho
-  let iconName = 'Sparkle';
+  let iconName = 'Manus';
   let tagline = 'Inovação e Experiência Reativa Única';
   let tabs = "['Início', 'Recursos', 'Contato']";
   let itemsData = '';
@@ -475,7 +475,7 @@ export function synthesizeBespokeInterface(message: string, currentCode?: string
     `;
   } else {
     // Default / General
-    iconName = 'Sparkle';
+    iconName = 'Manus';
     tagline = 'Plataforma inovadora integrada para alta produtividade em tempo real';
     tabs = "['Geral', 'Métricas', 'Configurações']";
     itemsData = `[
@@ -530,7 +530,7 @@ export function synthesizeBespokeInterface(message: string, currentCode?: string
   const rawCode = `import React, { useState, useMemo } from 'react';
 import * as PhosphorIcons from '@phosphor-icons/react';
 import { 
-  Sparkle, 
+  Manus, 
   TrendUp as TrendingUp, 
   TrendUp,
   Clock, 
@@ -724,7 +724,7 @@ Este é um projeto **React + Vite + Tailwind CSS** ultra completo de alta fideli
         version: "1.0.0",
         isBespoke: true,
         niche: niche,
-        author: "Sparkle AI Recreative Agent",
+        author: "Manus AI Recreative Agent",
         timestamp: new Date().toISOString()
       }, null, 2),
       lang: "json"
@@ -794,7 +794,7 @@ export default function Header() {
   return (
     <div className="p-4 bg-white/5 border-b border-white/10 flex items-center justify-between rounded-t-2xl">
       <div className="flex items-center gap-2">
-        <PhosphorIcons.Sparkle className="text-white animate-pulse" size={16} />
+        <PhosphorIcons.Manus className="text-white animate-pulse" size={16} />
         <span className="text-xs font-mono font-bold uppercase tracking-wider text-white">Painel de Controle Integrado</span>
       </div>
       <div className="text-[10px] font-mono text-slate-400">Status: Conectado</div>
