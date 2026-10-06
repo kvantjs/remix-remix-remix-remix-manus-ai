@@ -45,7 +45,7 @@ import { ToolCallTrace, AgentExecutionLog } from '../types/project';
 import { markdownFences } from '@/components/reui/code-block/code-block-highlight';
 import { ProfessionalCodeBlock } from './ProfessionalCodeBlock';
 import { SyntaxCodeView, InlineCodeSnippet } from './SyntaxCodeView';
-import ThinkingState, { ThinkingStateGroup } from './ThinkingState';
+import ThinkingState from './ThinkingState';
 import ToolChips, { getContextualToolIcon, getContextualFileIcon, ToolStep, ToolDiff } from './ToolChips';
 import StreamingText from './StreamingText';
 import { MarkdownRenderer } from './MarkdownRenderer';
@@ -357,7 +357,6 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
   const deliveredFilePathsRef = useRef<Set<string>>(new Set());
   const [showExecutionAnimation, setShowExecutionAnimation] = useState(false);
   const [initialThoughtComplete, setInitialThoughtComplete] = useState(false);
-  const [cycleThinking, setCycleThinking] = useState(false);
   const [finalResponseReceived, setFinalResponseReceived] = useState(false);
   const executionCycleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -376,31 +375,29 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
     const normalizedLabel = String(label || 'Etapa do agente').trim();
     const normalizedText = String(text || '').trim() || 'Processando esta etapa...';
     setProgressNotes(previous => {
-      const existingIndex = previous.findIndex(note => note.label === normalizedLabel);
       const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const next = [...previous];
-      const note = { id: existingIndex >= 0 ? next[existingIndex].id : `note_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, label: normalizedLabel, text: normalizedText, status, timestamp };
-      if (existingIndex >= 0) next[existingIndex] = note;
-      else next.push(note);
-      const bounded = next.slice(-20);
-      progressNotesRef.current = bounded;
-      return bounded;
+      // There is only one live note. Keep a stable id so React updates the
+      // same message instead of replaying a growing list on every event.
+      const note = {
+        id: previous[0]?.id || 'agent-live-note',
+        label: normalizedLabel,
+        text: normalizedText,
+        status,
+        timestamp
+      };
+      progressNotesRef.current = [note];
+      return [note];
     });
   };
 
   const activateExecutionAnimation = () => {
-    if (executionCycleTimerRef.current) clearTimeout(executionCycleTimerRef.current);
     setShowExecutionAnimation(true);
   };
 
   const restartExecutionAnimation = () => {
-    if (executionCycleTimerRef.current) clearTimeout(executionCycleTimerRef.current);
-    setShowExecutionAnimation(false);
-    setCycleThinking(true);
-    executionCycleTimerRef.current = setTimeout(() => {
-      setCycleThinking(false);
-      setShowExecutionAnimation(true);
-    }, 550);
+    // Replace the active row in place. Do not unmount the animation: doing so
+    // made the entire trace replay from its first item after every tool event.
+    setShowExecutionAnimation(true);
   };
 
   const addOpeningProgressNote = (prompt: string) => {
@@ -602,7 +599,6 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
     setInitialThoughtComplete(false);
     executionCycleTimerRef.current = setTimeout(() => {
       setInitialThoughtComplete(true);
-      setCycleThinking(false);
       addOpeningProgressNote(userPrompt);
       setShowExecutionAnimation(true);
     }, 850);
@@ -864,7 +860,6 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                     if (executionCycleTimerRef.current) clearTimeout(executionCycleTimerRef.current);
                     setShowExecutionAnimation(false);
                     setInitialThoughtComplete(false);
-                    setCycleThinking(false);
                     setFinalResponseReceived(true);
                     payload = data;
                     setCurrentStep('Organizando resultados e preparando a resposta final...');
@@ -1140,13 +1135,13 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
 
               {/* Notes are a standalone status stream, not an assistant message
                   and not part of the animated thinking trace. */}
-              {initialThoughtComplete && !cycleThinking && progressNotes.length > 0 && (
+              {initialThoughtComplete && progressNotes.length > 0 && (
                 <AgentProgressNotes notes={progressNotes} />
               )}
 
               {/* The execution animation is deliberately rendered in its own
                   region so it cannot visually merge with the notes above. */}
-              {initialThoughtComplete && !cycleThinking && showExecutionAnimation && (
+              {initialThoughtComplete && showExecutionAnimation && (
                 <LocalActiveThinkingState
                   elapsedSeconds={elapsedSeconds}
                   step={currentStep}
@@ -1779,33 +1774,24 @@ function InitialThinkingAnimation({ elapsedSeconds }: { elapsedSeconds: number }
 }
 
 function AgentProgressNotes({ notes }: { notes: AgentProgressNote[] }) {
+  const note = notes[0];
+  if (!note) return null;
+
   return (
     <section
       aria-label="Notas do agente"
       className="w-full max-w-[820px] pl-8 animate-in fade-in duration-300"
     >
-      <div className="border-l border-white/10 pl-4">
-        <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-text-content-secondary/65">
-          <span className="size-1.5 rounded-full bg-white/35" />
-          Notas
+      <div className="min-w-0 text-left">
+        <div className="mb-1 flex items-center gap-2 text-[10px] font-medium text-text-content-secondary/55">
+          <span className={`size-1.5 rounded-full ${note.status === 'running' ? 'bg-white/60 animate-pulse' : note.status === 'warning' ? 'bg-amber-300/80' : 'bg-white/35'}`} />
+          <span>Nota · {note.label}</span>
+          <span className="font-mono text-[9px] text-text-content-secondary/35">{note.timestamp}</span>
         </div>
-        <div className="space-y-2">
-          {notes.map((note, index) => (
-            <article
-              key={note.id}
-              className="flex min-w-0 items-start gap-2.5 rounded-lg bg-white/[0.025] px-3 py-2 text-left"
-              style={{ animation: `thinking-fade-up 280ms cubic-bezier(0.23,1,0.32,1) ${Math.min(index, 5) * 55}ms both` }}
-            >
-              <span className="mt-0.5 flex size-3.5 shrink-0 items-center justify-center text-text-content-secondary/60">
-                {note.status === 'running' ? <Spinner size={11} className="animate-spin" /> : note.status === 'warning' ? <ShieldWarning size={12} className="text-amber-300/80" /> : <CheckCircle size={12} className="text-text-content-secondary/70" />}
-              </span>
-              <p className="min-w-0 flex-1 break-words text-[12px] leading-relaxed text-text-content-primary/80 [overflow-wrap:anywhere]">
-                <span className="font-medium text-text-content-primary/90">{note.label}: </span>{note.text}
-                <span className="ml-2 whitespace-nowrap text-[9px] font-mono text-text-content-secondary/35">{note.timestamp}</span>
-              </p>
-            </article>
-          ))}
-        </div>
+        <MarkdownRenderer
+          content={note.text}
+          className="text-[15px] leading-relaxed text-text-content-primary/90"
+        />
       </div>
     </section>
   );
@@ -1843,82 +1829,34 @@ function LocalActiveThinkingState({ elapsedSeconds, step, steps }: { elapsedSeco
   // porque isso desmontava a timeline e fazia todas as etapas entrarem novamente.
   const currentVariant = contextVariant;
 
-  const mappedRows = steps.length > 0 ? steps.map(s => ({
-    primary: s.label,
-    secondary: s.detail,
-    mono: contextVariant === "Coding" || s.label.includes('.') || s.label.includes('npm') || s.label.includes('run')
-  })) : undefined;
-
-  const mappedToolSteps = steps.map(s => {
-    let icon = "think";
-    const lowercaseLabel = s.label.toLowerCase();
-    
-    if (lowercaseLabel.includes("escrev") || lowercaseLabel.includes("grav") || lowercaseLabel.includes("salv") || lowercaseLabel.includes("write") || lowercaseLabel.includes("edit") || lowercaseLabel.includes("cri") || lowercaseLabel.includes("alter")) {
-      icon = "write";
-    } else if (lowercaseLabel.includes("execut") || lowercaseLabel.includes("rod") || lowercaseLabel.includes("run") || lowercaseLabel.includes("npm") || lowercaseLabel.includes("check") || lowercaseLabel.includes("test")) {
-      icon = "run";
-    } else if (lowercaseLabel.includes("leit") || lowercaseLabel.includes("ler") || lowercaseLabel.includes("read") || lowercaseLabel.includes("scan") || lowercaseLabel.includes("carreg")) {
-      icon = "read";
-    }
-
-    return {
-      icon,
-      label: s.label,
-      chip: s.detail || "Executando...",
-      mono: icon === "write" || icon === "run",
-      detailMono: icon === "write" || icon === "run",
-      detail: s.detail ? [{ text: s.detail }] : []
-    };
-  });
-
-  const diffs: any[] = [];
-  const diffLines: Record<string, any[]> = {};
-
-  steps.forEach(s => {
-    if (s.label.toLowerCase().includes("write") || s.label.toLowerCase().includes("edit") || s.label.toLowerCase().includes("escrev") || s.label.toLowerCase().includes("grav")) {
-      const match = s.detail.match(/([a-zA-Z0-9_-]+\.[a-zA-Z0-9]+)/);
-      if (match && match[1]) {
-        const file = match[1];
-        if (!diffs.some(d => d.file === file)) {
-          diffs.push({ file, add: 1, del: 0 });
-          diffLines[file] = [
-            { text: s.detail, tone: "add" }
-          ];
-        }
-      }
-    }
-  });
+  // Only the current/running step belongs in the live animation. Keeping the
+  // historical steps here was what made the whole list replay from the top.
+  const activeStep = [...steps].reverse().find(s => s.status === 'running') || steps[steps.length - 1];
+  const mappedRows = activeStep ? [{
+    primary: activeStep.label,
+    secondary: activeStep.detail,
+    mono: contextVariant === "Coding" || activeStep.label.includes('.') || activeStep.label.includes('npm') || activeStep.label.includes('run')
+  }] : [{ primary: step || 'Preparando a próxima etapa...' }];
 
   return (
     <section
       aria-label="Animação de execução do agente"
       className="w-full max-w-[820px] animate-in fade-in duration-300"
     >
-      {/* This is the animation/status lane. It is intentionally separate from
-          the Notes section above and has no assistant-message avatar. */}
-      <div className="ml-8 rounded-lg border border-white/8 bg-white/[0.018] px-3 py-2 transition-all duration-300 ease-out">
-        <div className="mb-2 flex items-center gap-2 text-[10px] font-medium text-text-content-secondary/70">
+      {/* This is a plain status lane: no card, background or border. */}
+      <div className="ml-8 transition-all duration-300 ease-out">
+        <div className="mb-1 flex items-center gap-2 text-[10px] font-medium text-text-content-secondary/70">
           <Sparkle size={12} weight="fill" className="animate-pulse text-text-content-primary/60" />
           <span>Pensando</span>
           <span className="font-mono text-[9px] text-text-content-secondary/45">{elapsedSeconds || 1}s</span>
         </div>
-        {currentVariant === "Coding" ? (
-          <ToolChips 
-            steps={mappedToolSteps} 
-            diffs={diffs}
-            diffLines={diffLines}
-            initialOpen={true}
-            labels={{ header: `${mappedToolSteps.length} chamada(s) de ferramenta em execução (${elapsedSeconds || 1}s)` }}
-          />
-        ) : (
-          <ThinkingState 
-            variant={currentVariant} 
-            rows={mappedRows} 
-            elapsedSeconds={elapsedSeconds}
-            working={true}
-            active={currentVariant === "Search" ? `Pesquisando: ${step || "fontes relevantes na web"}` : undefined}
-          />
-        )}
+        <ThinkingState
+          variant={currentVariant}
+          rows={mappedRows}
+          elapsedSeconds={elapsedSeconds}
+          working={true}
+          active={currentVariant === "Search" ? `Pesquisando: ${step || "fontes relevantes na web"}` : undefined}
+        />
       </div>
     </section>
   );
