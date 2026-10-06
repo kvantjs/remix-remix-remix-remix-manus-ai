@@ -357,6 +357,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
   const [showExecutionAnimation, setShowExecutionAnimation] = useState(false);
   const [initialThoughtComplete, setInitialThoughtComplete] = useState(false);
   const [cycleThinking, setCycleThinking] = useState(false);
+  const [finalResponseReceived, setFinalResponseReceived] = useState(false);
   const executionCycleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -592,6 +593,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
     setIsThinking(true);
     progressNotesRef.current = [];
     setProgressNotes([]);
+    setFinalResponseReceived(false);
     if (executionCycleTimerRef.current) clearTimeout(executionCycleTimerRef.current);
     setShowExecutionAnimation(false);
     setInitialThoughtComplete(false);
@@ -666,6 +668,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                 try {
                   const data = JSON.parse(line.replace('data: ', '').trim());
                   if (currentEvent === 'computer_starting') {
+                    updateProgressNote('Inicialização do computador', 'O Computer MCP está iniciando; nenhuma ação será executada durante o boot.', 'running');
                     setCurrentStep(data.text || 'Inicializando o computador do agente...');
                     beginExecutionStep('Inicializando computador do agente', 'Boot de 5 segundos; nenhuma ação será executada durante a inicialização.');
                     if (onAgentStateChange) {
@@ -678,6 +681,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                       });
                     }
                   } else if (currentEvent === 'computer_ready') {
+                    updateProgressNote('Inicialização do computador', 'Boot concluído; o computador está pronto para executar a próxima etapa.', 'complete');
                     completeExecutionStep('Inicializando computador do agente', data.text || 'Computador iniciado; execução liberada.');
                     setCurrentStep(data.text || 'Computador iniciado; execução liberada.');
                     if (onAgentStateChange) {
@@ -689,8 +693,10 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                         browserStatus: 'interactive'
                       });
                     }
+                  } else if (currentEvent === 'execution_gate') {
+                    updateProgressNote('Transição para execução', data.text || 'Pensamento concluído; preparando a próxima ação.', 'running');
+                    setCurrentStep(data.text || 'Preparando a próxima ação...');
                   } else if (currentEvent === 'deliberation') {
-                    activateExecutionAnimation();
                     const deliberationLabel = data.label || 'Deliberação profunda';
                     const deliberationText = data.text || 'Avaliando critérios verificáveis.';
                     updateProgressNote(deliberationLabel, data.complete ? `Etapa concluída: ${deliberationText}` : deliberationText, data.complete ? 'complete' : 'running');
@@ -709,7 +715,6 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                       });
                     }
                   } else if (currentEvent === 'status') {
-                    activateExecutionAnimation();
                     updateProgressNote('Raciocínio e coordenação', data.text || 'Coordenando a próxima ação do agente.', 'running');
                     setCurrentStep(data.text);
                     beginExecutionStep('Raciocinando sobre a próxima ação', data.text);
@@ -849,6 +854,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                     setShowExecutionAnimation(false);
                     setInitialThoughtComplete(false);
                     setCycleThinking(false);
+                    setFinalResponseReceived(true);
                     payload = data;
                     setCurrentStep('Organizando resultados e preparando a resposta final...');
                   }
@@ -1111,15 +1117,15 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
             />
           ))}
           
-          {isThinking && !messages.some(m => m.isStreaming) && (
+          {isThinking && !finalResponseReceived && (
             <InitialThinkingAnimation elapsedSeconds={elapsedSeconds} />
           )}
 
-          {isThinking && initialThoughtComplete && !cycleThinking && !messages.some(m => m.isStreaming) && progressNotes.length > 0 && (
+          {isThinking && !finalResponseReceived && initialThoughtComplete && !cycleThinking && progressNotes.length > 0 && (
             <AgentProgressNotes notes={progressNotes} />
           )}
 
-          {isThinking && initialThoughtComplete && !cycleThinking && !messages.some(m => m.isStreaming) && showExecutionAnimation && (
+          {isThinking && !finalResponseReceived && initialThoughtComplete && !cycleThinking && showExecutionAnimation && (
             <LocalActiveThinkingState 
               elapsedSeconds={elapsedSeconds} 
               step={currentStep}

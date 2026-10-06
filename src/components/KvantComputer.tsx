@@ -230,6 +230,7 @@ export function KvantComputer({
     if (!/inicializando o computador do agente/i.test(statusText)) return;
     setIsComputerActive(true);
     setBrowserStatus('loading');
+    setIsLoading(true);
     setBootSecondsRemaining(5);
     let remaining = 5;
     const timer = window.setInterval(() => {
@@ -237,6 +238,7 @@ export function KvantComputer({
       setBootSecondsRemaining(Math.max(remaining, 0));
       if (remaining <= 0) {
         window.clearInterval(timer);
+        setIsLoading(false);
         setBrowserStatus('interactive');
       }
     }, 1000);
@@ -847,22 +849,6 @@ export function KvantComputer({
                 Envie uma instrução ao agente no chat para ligar o computador e iniciar as automações.
               </p>
           </div>
-        ) : isBooting ? (
-          <div className="flex-1 bg-[#101820] flex flex-col items-center justify-center p-6 text-center select-none overflow-hidden">
-            <div className="w-full max-w-sm space-y-5">
-              <div className="mx-auto flex size-16 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-300/5">
-                <OrbBloop size={42} audioMode="ambient" demoMode={true} state={BloopState.think} bloopColorMain={BLOOP_PALETTES[BloopPaletteName.blue].main} bloopColorLow={BLOOP_PALETTES[BloopPaletteName.blue].low} bloopColorMid={BLOOP_PALETTES[BloopPaletteName.blue].mid} bloopColorHigh={BLOOP_PALETTES[BloopPaletteName.blue].high} />
-              </div>
-              <div>
-                <h3 className="text-base font-semibold text-white">Inicializando computador do agente</h3>
-                <p className="mt-1 text-xs text-cyan-100/60">Preparando ambiente seguro. Nenhuma ação será executada durante o boot.</p>
-              </div>
-              <div className="space-y-2">
-                <div className="h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-cyan-400 transition-all duration-1000" style={{ width: `${((5 - bootSecondsRemaining) / 5) * 100}%` }} /></div>
-                <div className="flex justify-between text-[10px] font-mono text-white/45"><span>Boot do Computer MCP</span><span>{bootSecondsRemaining}s restantes</span></div>
-              </div>
-            </div>
-          </div>
         ) : isIdle ? (
           /* ACTIVE BUT IDLE COMPUTER SCREEN (NOTHING TO SHOW) */
           <div className="flex-1 bg-bg-canvas-main flex flex-col items-center justify-center p-6 text-center select-none overflow-y-auto space-y-4 animate-in fade-in duration-500">
@@ -925,7 +911,7 @@ export function KvantComputer({
                       Navegação Real do Agente
                     </div>
 
-                    {isLoading && (
+                    {(isLoading || isBooting) && (
                       <div className="absolute inset-0 z-10 bg-[#1a1a1a] backdrop-blur-[1.5px] flex flex-col items-center justify-center animate-in fade-in duration-300">
                         <div className="bg-[#202020] border border-[#404040] rounded-2xl px-6 py-4 shadow-2xl flex items-center gap-4 scale-110">
                           <div className="size-6 flex items-center justify-center bg-[#404040] rounded-lg">
@@ -942,9 +928,9 @@ export function KvantComputer({
                           </div>
                           <div className="flex flex-col bg-[#404040] p-2 rounded-xl">
                             <div className="bg-[#50a2ff] px-2 py-0.5 rounded-md mb-1">
-                              <p className="text-xs font-bold text-[#ffffff] tracking-wide uppercase">{agentCursor.status || 'Interagindo com a página...'}</p>
+                              <p className="text-xs font-bold text-[#ffffff] tracking-wide uppercase">{isBooting ? 'Inicializando ambiente do Computer MCP...' : (agentCursor.status || 'Interagindo com a página...')}</p>
                             </div>
-                            <p className="text-[10px] text-[#cecece] font-mono"><span className="text-[#828282] mr-1">›</span>Agente Manus em controle remoto</p>
+                            <p className="text-[10px] text-[#cecece] font-mono"><span className="text-[#828282] mr-1">›</span>{isBooting ? `Inicializando computador · ${bootSecondsRemaining}s restantes` : 'Agente Manus em controle remoto'}</p>
                           </div>
                         </div>
                       </div>

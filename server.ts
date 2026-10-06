@@ -3939,6 +3939,10 @@ app.post('/api/agent/chat/stream', async (req, res) => {
   const sendEvent = (event: string, data: any) => {
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   };
+  const waitForExecutionPhase = async () => {
+    sendEvent('execution_gate', { text: 'Pensamento concluído; preparando a próxima ação sem executar ferramentas ainda.' });
+    await new Promise(resolve => setTimeout(resolve, 1200));
+  };
   playwrightBrowser.setProgressListener((progress) => sendEvent('browser_progress', progress));
 
   try {
@@ -4050,6 +4054,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
 
             if (fallbackResult.toolCalls) {
               for (const tc of fallbackResult.toolCalls) {
+                await waitForExecutionPhase();
                 sendEvent('tool_start', {
                   toolName: tc.toolName,
                   arguments: tc.arguments,
@@ -4117,6 +4122,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
             continue;
           }
 
+          await waitForExecutionPhase();
           sendEvent('tool_start', {
             toolName,
             arguments: args,
@@ -4253,6 +4259,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
     // 2. Local Fallback Execution when API key is unconfigured or unavailable
     const plannedActions = intent.mode === 'conversation' ? [] : planRealAgentActions(message);
     for (const action of plannedActions) {
+      await waitForExecutionPhase();
       sendEvent('tool_start', {
         toolName: action.toolName,
         arguments: action.args,
