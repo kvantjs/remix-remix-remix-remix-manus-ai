@@ -299,6 +299,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
   const executionStepsRef = useRef<ExecutionStep[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const hasInitializedScrollRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const updateExecutionSteps = (updater: (steps: ExecutionStep[]) => ExecutionStep[]) => {
@@ -348,7 +349,27 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
   };
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const container = scrollAreaRef.current;
+    if (!container) return;
+
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    const isNearBottom = distanceFromBottom < 160;
+    const isAnyStreaming = messages.some(message => message.isStreaming);
+
+    if (!hasInitializedScrollRef.current) {
+      hasInitializedScrollRef.current = true;
+      if (isThinking || isAnyStreaming) {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+      }
+      return;
+    }
+
+    // Do not open an existing conversation halfway through a long answer.
+    // Keep following the bottom only while the agent is actively responding
+    // or when the user was already reading the latest messages.
+    if (isThinking || isAnyStreaming || isNearBottom) {
+      messagesEndRef.current?.scrollIntoView({ behavior: isThinking || isAnyStreaming ? 'smooth' : 'auto' });
+    }
   }, [messages, isThinking]);
 
   // Auto-scroll to bottom while the agent is thinking or streaming response
@@ -878,7 +899,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
       {/* Messages Stream */}
       <div
         ref={scrollAreaRef}
-        className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] flex flex-col items-center bg-[#1a1a1a]"
+        className="chat-messages-scroll flex-1 min-h-0 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] flex flex-col items-center bg-[#1a1a1a]"
       >
         <div className="messages-container w-full max-w-3xl px-6 py-8 space-y-10 bg-[#1a1a1a]">
           {messages.map((msg) => (
@@ -935,13 +956,13 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
 
           <div ref={messagesEndRef} />
         </div>
-        <div className="h-28 shrink-0" />
+        <div className="chat-messages-spacer h-28 shrink-0" aria-hidden="true" />
       </div>
 
 
 
       {/* Floating Input Section */}
-      <div className="chat-input-dock absolute bottom-5 left-1/2 -translate-x-1/2 w-full max-w-2xl px-6 z-20">
+      <div className="chat-input-dock w-full max-w-2xl px-6 z-20">
         <PromptBar
           onSend={(text) => handleSendMessage(text)}
           onStop={handleStop}

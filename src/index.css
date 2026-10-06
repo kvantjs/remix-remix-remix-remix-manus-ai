@@ -1003,3 +1003,96 @@ body {
     display: none;
   }
 }
+
+/* Dynamic viewport sizing prevents mobile browser chrome from cutting the app vertically. */
+.app-shell {
+  height: 100vh;
+  max-height: 100vh;
+}
+
+.chat-area,
+.chat-messages-scroll {
+  height: 100%;
+  min-height: 0;
+}
+
+.chat-messages-scroll {
+  overscroll-behavior: contain;
+  scroll-padding-bottom: 1rem;
+}
+
+.chat-messages-spacer {
+  height: 7rem;
+}
+
+.chat-input-dock {
+  bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+}
+
+@supports (height: 100dvh) {
+  html,
+  body,
+  #root,
+  .app-shell {
+    height: 100dvh;
+    max-height: 100dvh;
+  }
+}
+
+@media (max-width: 760px) {
+  .chat-messages-spacer {
+    height: 9.5rem;
+  }
+
+  .chat-input-dock {
+    bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (max-width: 900px) and (max-height: 560px) and (orientation: landscape) {
+  .chat-messages-spacer {
+    height: 7.5rem;
+  }
+
+  .chat-input-dock {
+    bottom: calc(0.25rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* On touch-sized viewports the composer belongs to the layout flow, never over the transcript. */
+@media (max-width: 1180px) {
+  .chat-input-dock {
+    position: relative;
+    inset: auto;
+    transform: none;
+    width: 100%;
+    max-width: 42rem;
+    margin-inline: auto;
+    flex: 0 0 auto;
+  }
+}
+
+/* Explicit composer geometry: floating on desktop, in-flow on touch layouts. */
+.chat-input-dock {
+  position: absolute;
+  left: 50%;
+  right: auto;
+  top: auto;
+  bottom: 1.25rem;
+  transform: translateX(-50%);
+}
+
+@media (max-width: 1180px) {
+  .chat-input-dock {
+    position: relative;
+    left: auto;
+    right: auto;
+    top: auto;
+    bottom: auto;
+    transform: none;
+    width: min(100%, 42rem);
+    max-width: 42rem;
+    margin-inline: auto;
+    flex: 0 0 auto;
+  }
+}
