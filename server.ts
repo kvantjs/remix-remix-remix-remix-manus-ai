@@ -537,7 +537,17 @@ DIRETIVA DE FORMATO DE RESPOSTA EM PORTUGUÊS:
 - NUNCA retorne JSON no chat. Suas respostas devem ser texto legível por humanos.
 - Descreva mudanças no código em alto nível, sem colocar o código no chat.`;
 
-const APP_CREATION_EXECUTION_CONTRACT = `\n\nCONTRATO DE ENTREGA APP_CREATION (VALIDAÇÃO OBRIGATÓRIA):\n- Em taskMode=new_project, crie uma aplicação nova e única mesmo quando o prompt for repetido; não use currentFiles como template.\n- Em taskMode=edit_existing, leia o código relevante, preserve o restante e altere apenas o escopo solicitado.\n- Antes de concluir, faça um manifesto mental dos arquivos necessários: client/src/App.tsx, componentes/hooks/tipos/estilos quando exigidos, README.md e metadata.json; nenhum arquivo prometido pode ficar vazio ou parcial.\n- Audite o root visual: o site deve definir seu próprio background-color/background-image ou classes bg-* no elemento raiz, sem depender do canvas da aplicação hospedeira.\n- Valide imports de ícones, estados interativos, estados loading/empty/error, responsividade e compilação do preview.\n- No chat entregue apenas síntese executiva; código pertence aos arquivos ou às ferramentas.\n`;
+const APP_CREATION_EXECUTION_CONTRACT = `\n\nCONTRATO DE ENTREGA APP_CREATION (VALIDAÇÃO OBRIGATÓRIA):
+- Em taskMode=new_project, crie uma aplicação nova e única mesmo quando o prompt for repetido; não use currentFiles como template.
+- Em taskMode=edit_existing, leia o código relevante, preserve o restante e altere apenas o escopo solicitado.
+- ENTREGUE UM PROJETO REAL, NÃO UM MOCK: use uma estrutura React + Vite executável e escreva todos os arquivos necessários para instalação e build, sem limite artificial de quantidade. Não pare em 8, 9 ou 10 arquivos e não concentre toda a aplicação em App.tsx quando componentes, hooks, tipos, estilos, dados ou serviços forem necessários.
+- O manifesto mínimo de um novo projeto inclui client/package.json, client/index.html, client/vite.config.ts, client/tsconfig.json, client/src/main.tsx, client/src/index.css e client/src/App.tsx; acrescente livremente componentes, páginas, hooks, tipos, serviços, assets, testes, README.md, metadata.json e documentação conforme a complexidade do pedido.
+- Cada arquivo prometido deve ser realmente criado, ter conteúdo completo e ser importado corretamente. Nunca crie arquivos vazios, placeholders, reticências, funções fake ou telas estáticas quando o pedido exigir funcionamento.
+- Antes de concluir, faça um manifesto dos arquivos, grave todos com fs.writeFile, valide o package.json, imports, rotas, estados loading/empty/error, formulários, interações, responsividade, CSS próprio e compilação do preview Vite.
+- Audite o root visual: o site deve definir seu próprio background-color/background-image ou classes de estilo no elemento raiz, sem depender do canvas da aplicação hospedeira.
+- No chat entregue apenas síntese executiva; código pertence aos arquivos ou às ferramentas.
+`;
+
 
 // Autonomous cognitive engine fallback when cloud model has 503 high demand or quota
 function generateAutonomousRuleEnforcedFallback(
@@ -4066,27 +4076,35 @@ app.post('/api/agent/chat/stream', async (req, res) => {
             }
 
             if (fallbackResult.files && fallbackResult.files.length > 0) {
-              sendEvent('step', { text: 'Etapa 4: Gravando client/src/App.tsx e compilando no preview de runtime...', toolName: 'fs.writeFile' });
-              const codeToWrite = fallbackResult.files[0].code;
-              const execResult = await agentToolExecutor.executeTool('fs.writeFile', {
-                filePath: 'client/src/App.tsx',
-                content: codeToWrite
-              });
-              const fsTrace = {
-                id: `trace_${Date.now()}`,
-                toolName: 'fs.writeFile',
-                server: 'workspace_fs',
-                arguments: { filePath: 'client/src/App.tsx' },
-                result: JSON.stringify(execResult.result),
-                timestamp: new Date().toLocaleTimeString(),
-                status: 'success',
-                screenData: {
-                  filePath: 'client/src/App.tsx',
-                  actionDescription: 'Código-fonte gravado e compilado com sucesso'
-                }
-              };
-              executedToolCalls.push(fsTrace);
-              sendEvent('tool_finish', { toolCall: fsTrace });
+              sendEvent('step', { text: `Etapa 4: Gravando ${fallbackResult.files.length} arquivos do projeto Vite e validando o preview...`, toolName: 'fs.writeFile' });
+              for (const generatedFile of fallbackResult.files) {
+                await waitForExecutionPhase();
+                const filePath = generatedFile.path || 'client/src/App.tsx';
+                sendEvent('tool_start', {
+                  toolName: 'fs.writeFile',
+                  arguments: { filePath, content: generatedFile.code, lang: generatedFile.lang },
+                  reason: `Gravando ${filePath} no projeto React + Vite`
+                });
+                const execResult = await agentToolExecutor.executeTool('fs.writeFile', {
+                  filePath,
+                  content: generatedFile.code
+                });
+                const fsTrace = {
+                  id: `trace_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                  toolName: 'fs.writeFile',
+                  server: 'workspace_fs',
+                  arguments: { filePath, content: generatedFile.code, lang: generatedFile.lang },
+                  result: execResult.success ? JSON.stringify(execResult.result) : `Erro: ${execResult.error}`,
+                  timestamp: new Date().toLocaleTimeString(),
+                  status: execResult.success ? 'success' : 'error',
+                  screenData: {
+                    filePath,
+                    actionDescription: `${filePath} gravado e incluído no projeto Vite`
+                  }
+                };
+                executedToolCalls.push(fsTrace);
+                sendEvent('tool_finish', { toolCall: fsTrace });
+              }
             }
           }
           break;

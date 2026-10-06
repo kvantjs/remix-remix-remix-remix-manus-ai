@@ -530,7 +530,7 @@ export function synthesizeBespokeInterface(message: string, currentCode?: string
   const rawCode = `import React, { useState, useMemo } from 'react';
 import * as PhosphorIcons from '@phosphor-icons/react';
 import { 
-  Manus, 
+  RocketLaunch,
   TrendUp as TrendingUp, 
   TrendUp,
   Clock, 
@@ -768,14 +768,14 @@ const port = 3001;
 
 app.use(express.json());
 
-// API Mock de Simulação para ${title}
-app.get('/api/status', (req, res) => {
+// API de desenvolvimento para ${title}
+app.get('/api/health', (_req, res) => {
   res.json({
-    status: 'online',
+    status: 'ok',
     uptime: process.uptime(),
-    niche: '${niche}',
-    theme: '${chosenTheme.name}',
-    message: 'Mock API operacional para ${title} (React + Vite)'
+    application: '${title}',
+    environment: 'development',
+    theme: '${chosenTheme.name}'
   });
 });
 
@@ -794,7 +794,7 @@ export default function Header() {
   return (
     <div className="p-4 bg-white/5 border-b border-white/10 flex items-center justify-between rounded-t-2xl">
       <div className="flex items-center gap-2">
-        <PhosphorIcons.Manus className="text-white animate-pulse" size={16} />
+        <PhosphorIcons.RocketLaunch className="text-white animate-pulse" size={16} />
         <span className="text-xs font-mono font-bold uppercase tracking-wider text-white">Painel de Controle Integrado</span>
       </div>
       <div className="text-[10px] font-mono text-slate-400">Status: Conectado</div>
@@ -834,6 +834,79 @@ export default function Footer() {
 }
 `,
       lang: "typescript"
+    },
+    {
+      path: "client/package.json",
+      code: JSON.stringify({
+        name: title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'kvant-vite-app',
+        private: true,
+        version: "0.1.0",
+        type: "module",
+        scripts: { dev: "vite", build: "tsc -b && vite build", preview: "vite preview" },
+        dependencies: { "@phosphor-icons/react": "^2.1.7", "react": "^18.3.1", "react-dom": "^18.3.1" },
+        devDependencies: { "@vitejs/plugin-react": "^4.3.4", "@types/react": "^18.3.18", "@types/react-dom": "^18.3.5", "typescript": "^5.6.3", "vite": "^6.0.5" }
+      }, null, 2),
+      lang: "json"
+    },
+    {
+      path: "client/index.html",
+      code: `<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b1020" />
+    <meta name="description" content="${title} — aplicação React + Vite" />
+    <title>${title}</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>`,
+      lang: "html"
+    },
+    {
+      path: "client/src/main.tsx",
+      code: `import React from 'react';
+import { createRoot } from 'react-dom/client';
+import App from './App';
+import './index.css';
+
+createRoot(document.getElementById('root')!).render(
+  <React.StrictMode><App /></React.StrictMode>
+);`,
+      lang: "typescript"
+    },
+    {
+      path: "client/src/index.css",
+      code: `:root { font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: #f8fafc; background: #0b1020; font-synthesis: none; text-rendering: optimizeLegibility; }
+* { box-sizing: border-box; }
+html, body, #root { min-width: 100%; min-height: 100%; margin: 0; }
+body { min-height: 100vh; background: #0b1020; }
+button, input, textarea, select { font: inherit; }
+button { cursor: pointer; }
+::selection { background: #7dd3fc; color: #0b1020; }
+`,
+      lang: "css"
+    },
+    {
+      path: "client/vite.config.ts",
+      code: `import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({ plugins: [react()], server: { port: 5173, strictPort: false }, preview: { port: 4173 } });`,
+      lang: "typescript"
+    },
+    {
+      path: "client/tsconfig.json",
+      code: JSON.stringify({ files: [], references: [{ path: './tsconfig.app.json' }] }, null, 2),
+      lang: "json"
+    },
+    {
+      path: "client/tsconfig.app.json",
+      code: JSON.stringify({ compilerOptions: { target: "ES2020", useDefineForClassFields: true, lib: ["ES2020", "DOM", "DOM.Iterable"], allowJs: false, skipLibCheck: true, esModuleInterop: true, allowSyntheticDefaultImports: true, strict: true, forceConsistentCasingInFileNames: true, module: "ESNext", moduleResolution: "Bundler", resolveJsonModule: true, isolatedModules: true, noEmit: true, jsx: "react-jsx" }, include: ["src"] }, null, 2),
+      lang: "json"
     }
   ];
 
