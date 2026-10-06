@@ -3,17 +3,11 @@ import {
   SkipBack, 
   SkipForward, 
   Check, 
-  ArrowLeft, 
-  ArrowRight, 
-  ArrowClockwise, 
   Lock, 
   Spinner, 
   Globe, 
   Hand, 
-  LockOpen, 
-  ShieldWarning,
-  Power,
-  Path
+  ShieldWarning
 } from '@phosphor-icons/react';
 import { ToolCallTrace } from '../types/project';
 import { DynamicRuntimeRunner } from './DynamicRuntimeRunner';
@@ -238,7 +232,7 @@ export function KvantComputer({
     y: 190,
     visible: true,
     isClicking: false,
-    label: 'Manus',
+    label: 'Sparkle',
     status: 'Agente no controle'
   });
   
@@ -287,7 +281,6 @@ export function KvantComputer({
   // Check if customFiles has an active React code file
   const customCode = 
     customFiles?.['client/src/App.tsx'] || 
-    customFiles?.['Home.tsx'] || 
     customFiles?.['App.tsx'] ||
     (customFiles && Object.keys(customFiles).length > 0 ? Object.values(customFiles)[0] : undefined);
 
@@ -352,7 +345,7 @@ export function KvantComputer({
         y: 45,
         visible: true,
         isClicking: false,
-        label: 'Manus',
+        label: 'Sparkle',
         status: `Acessando ${displayHostname}...`
       });
 
@@ -386,7 +379,7 @@ export function KvantComputer({
           y: 200,
           visible: true,
           isClicking: false,
-          label: 'Manus',
+          label: 'Sparkle',
           status: `Interagindo em ${displayHostname}`
         });
       }, 1400);
@@ -421,7 +414,7 @@ export function KvantComputer({
         y: 240,
         visible: true,
         isClicking: false,
-        label: 'Manus',
+        label: 'Sparkle',
         status: `Clicando em "${targetVal}"...`
       });
 
@@ -444,7 +437,7 @@ export function KvantComputer({
         y: 260,
         visible: true,
         isClicking: false,
-        label: 'Manus',
+        label: 'Sparkle',
         status: 'Rolando a página...'
       });
 
@@ -468,7 +461,7 @@ export function KvantComputer({
         y: 160,
         visible: true,
         isClicking: true,
-        label: 'Manus',
+        label: 'Sparkle',
         status: `Digitando: "${targetVal}"`
       });
       setActiveTypingBanner(targetVal);
@@ -646,7 +639,7 @@ export function KvantComputer({
       <div className="h-8 px-4 bg-bg-surface-panel border-b border-border-divider-subtle flex items-center justify-between text-xs shrink-0 select-none">
         <div className="flex items-center gap-2 overflow-hidden truncate">
           <span className="text-text-content-secondary font-normal text-[11.5px] tracking-tight">
-            {!isComputerActive ? 'Computador do Core Inativo' : 'Manus está usando o Navegador'}
+            {!isComputerActive ? 'Computador do Core Inativo' : 'Sparkle está usando o Navegador'}
           </span>
           <span className="text-border-divider-subtle text-xs">|</span>
           <span className="text-text-content-secondary/80 font-mono text-[11px] truncate tracking-tight">
@@ -654,42 +647,7 @@ export function KvantComputer({
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
-          {isComputerActive && (
-            <button
-              type="button"
-              onClick={handleTurnOffComputer}
-              className="flex items-center gap-1.5 rounded px-2 py-1 text-[10px] font-mono border border-red-400/30 bg-red-400/10 text-red-300 hover:bg-red-400/20 transition-all cursor-pointer"
-              title="Desligar o computador do Core e liberar ambiente"
-            >
-              <Power size={11} className="text-red-400" />
-              <span>Desligar</span>
-            </button>
-          )}
 
-          <button
-            type="button"
-            onClick={() => setForceLiveIframe(prev => !prev)}
-            className={`flex items-center gap-1.5 rounded px-2 py-1 text-[10px] font-mono transition-colors ${forceLiveIframe ? 'border border-emerald-400/30 bg-emerald-400/10 text-emerald-300 hover:bg-emerald-400/15' : 'border border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10'}`}
-            title={forceLiveIframe ? 'Navegador ao vivo em tempo real ativo' : 'Alternar para navegador ao vivo'}
-          >
-            <Globe size={10} className={forceLiveIframe ? 'text-emerald-400 animate-pulse' : ''} />
-            <span>{forceLiveIframe ? 'Transmissão Ao Vivo' : 'Captura de Tela'}</span>
-          </button>
-          <button
-            type="button"
-            onClick={toggleUserControl}
-            className={`flex items-center gap-1.5 rounded px-2 py-1 text-[10px] font-mono transition-colors ${userControlMode ? 'border border-amber-400/30 bg-amber-400/10 text-amber-300 hover:bg-amber-400/15' : 'border border-cyan-400/25 bg-cyan-400/10 text-cyan-300 hover:bg-cyan-400/15'}`}
-            title={userControlMode ? 'Devolver o controle ao agente' : 'Assumir o controle do navegador'}
-          >
-            {userControlMode ? <LockOpen size={10} /> : <Hand size={10} />}
-            <span>{userControlMode ? 'Retomar controle do agente' : 'Assumir controle'}</span>
-          </button>
-          <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded border text-[10px] font-mono ${userControlMode ? 'bg-amber-500/10 border-amber-500/20 text-amber-300' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'}`}>
-            <Lock size={10} className={userControlMode ? 'text-amber-300' : 'text-emerald-400'} />
-            <span>{userControlMode ? 'Controle manual ativo' : 'Controle exclusivo do agente'}</span>
-          </div>
-        </div>
       </div>
 
       {/* 2. CHROMIUM BROWSER WINDOW (AUTHENTIC CLOUD COMPUTER INTERFACE) */}
@@ -697,92 +655,12 @@ export function KvantComputer({
         ref={chromiumWindowRef}
         className="flex-1 flex flex-col bg-bg-canvas-main overflow-hidden relative"
       >
-        {/* BROWSER TAB BAR */}
-        <div className="h-9 bg-bg-canvas-main/80 flex items-center px-2 pt-1 gap-1 border-b border-border-divider-subtle/50 select-none shrink-0 relative z-10 overflow-x-auto custom-scrollbar">
-          <div className="px-3 py-1.5 rounded-t-md text-[11px] flex items-center gap-2 max-w-[240px] border-t border-x bg-bg-surface-panel text-text-content-primary border-border-divider-subtle shadow-xs">
-            {isComputerActive ? (
-              <Favicon urlOrDomain={currentUrl} size={12} className="shrink-0" />
-            ) : (
-              <Power size={12} className="text-zinc-400 shrink-0" />
-            )}
-            <span className="truncate font-normal">
-              {!isComputerActive ? 'Computador Inativo' : (pageTitle || 'Navegador')}
-            </span>
-          </div>
 
-          <div className="ml-auto hidden sm:flex items-center gap-2 text-[10px] text-text-content-secondary font-mono pr-2">
-            <span className={`size-1.5 rounded-full ${isComputerActive ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-600'}`} />
-            <span className="text-text-content-secondary">{isComputerActive ? 'Agente Conectado' : 'Computador Desligado'}</span>
-          </div>
-        </div>
-
-        {/* BROWSER NAVIGATION BAR */}
-        <div className="h-9 bg-bg-surface-panel/90 border-b border-border-divider-subtle flex items-center px-3 gap-2 text-xs shrink-0 select-none relative z-10">
-          <div className="flex items-center gap-1 text-text-content-secondary">
-            <button 
-              onClick={handleBack}
-              disabled={!isComputerActive || historyIndex <= 0}
-              className="p-1 rounded hover:bg-bg-action-hover hover:text-text-content-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors" 
-              title="Voltar histórico"
-            >
-              <ArrowLeft size={13} strokeWidth={2} />
-            </button>
-            <button 
-              onClick={handleForward}
-              disabled={!isComputerActive || historyIndex >= navHistory.length - 1}
-              className="p-1 rounded hover:bg-bg-action-hover hover:text-text-content-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors" 
-              title="Avançar histórico"
-            >
-              <ArrowRight size={13} strokeWidth={2} />
-            </button>
-            <button 
-              onClick={() => {
-                if (!isComputerActive) return;
-                setIsLoading(true);
-                setTimeout(() => setIsLoading(false), 800);
-              }}
-              disabled={!isComputerActive}
-              className="p-1 rounded hover:bg-bg-action-hover hover:text-text-content-primary disabled:opacity-30 transition-colors" 
-              title="Recarregar página"
-            >
-              <ArrowClockwise size={12} strokeWidth={2} className={isLoading ? 'animate-spin text-cyan-400' : ''} />
-            </button>
-          </div>
-
-          {/* Clean Read-Only Address Pill */}
-          <div className="flex-1 bg-bg-canvas-main/80 border border-border-divider-subtle/50 rounded-full h-6 px-2.5 flex items-center gap-1.5 text-xs">
-            {isComputerActive ? (
-              <>
-                <Lock size={10} className="text-emerald-400 shrink-0" />
-                <Favicon urlOrDomain={currentUrl} size={12} className="shrink-0" />
-                <span className="text-text-content-primary/95 font-mono text-[11px] truncate tracking-tight select-text">
-                  {currentUrl}
-                </span>
-              </>
-            ) : (
-              <>
-                <Path size={12} className="text-zinc-400 shrink-0" />
-                <span className="text-zinc-300 font-mono text-xs font-semibold tracking-wide select-text">
-                  /
-                </span>
-              </>
-            )}
-          </div>
-
-          {/* Agent profile indicator */}
-          <div 
-            className="size-5 rounded-full bg-[#1a73e8] border border-white/20 flex items-center justify-center text-white text-[9px] font-semibold select-none" 
-            title="Sessão do Agente Manus"
-          >
-            M
-          </div>
-        </div>
 
         {/* BROWSER WEBPAGE VIEWPORT */}
         {!isComputerActive ? (
           /* INACTIVE COMPUTER SCREEN PER USER REQUEST */
-          <div className="flex-1 bg-[#0b0c0f] flex flex-col items-center justify-center p-6 text-center select-none overflow-y-auto">
-            <div className="max-w-md w-full flex flex-col items-center space-y-4 animate-in fade-in zoom-in-95 duration-200">
+          <div className="flex-1 bg-bg-canvas-main flex flex-col items-center justify-center p-6 text-center select-none overflow-y-auto space-y-4">
               {/* Image requested by user with no background container */}
               <img 
                 src="https://imgdb.io/i/KnGlMFk.png" 
@@ -799,7 +677,6 @@ export function KvantComputer({
               <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed max-w-sm">
                 Envie uma instrução ao agente no chat para ligar o computador e iniciar as automações.
               </p>
-            </div>
           </div>
         ) : (
           <div 
@@ -887,7 +764,7 @@ export function KvantComputer({
                   </div>
                   <div className="text-sm font-semibold text-white">Controle Exclusivo do Agente</div>
                   <p className="text-xs text-zinc-400 leading-relaxed">
-                    Apenas o <strong>Agente Manus</strong> opera este computador na nuvem. Envie instruções pelo chat para navegar ou interagir.
+                    Apenas o <strong>Agente Sparkle</strong> opera este computador na nuvem. Envie instruções pelo chat para navegar ou interagir.
                   </p>
                   <button 
                     onClick={(e) => {

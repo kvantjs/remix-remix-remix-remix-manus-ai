@@ -65,11 +65,11 @@ async function readRegistry(): Promise<ProjectRecord[]> {
   } catch {
     const now = new Date().toISOString();
     const projects: ProjectRecord[] = [{
-      id: 'remix-manus-ai',
-      name: 'Remix Manus AI',
-      slug: 'remix-manus-ai',
+      id: 'remix-sparkle-ai',
+      name: 'Remix Sparkle AI',
+      slug: 'remix-sparkle-ai',
       path: root,
-      repoUrl: 'https://github.com/kvantjs/remix-remix-remix-remix-manus-ai',
+      repoUrl: 'https://github.com/kvantjs/remix-remix-remix-remix-sparkle-ai',
       branch: 'main',
       active: true,
       createdAt: now,
@@ -121,7 +121,7 @@ export async function createProject(name: string, repoUrl?: string) {
   await fs.writeFile(path.join(projectPath, 'README.md'), `# ${name}\n\nProjeto criado pelo Workspace.\n`, 'utf8');
   await git(projectPath, ['init', '-b', 'main']);
   await git(projectPath, ['add', 'README.md']);
-  await git(projectPath, ['-c', 'user.name=Manus AI', '-c', 'user.email=manus-ai@users.noreply.github.com', 'commit', '-m', 'chore: initialize project']);
+  await git(projectPath, ['-c', 'user.name=Sparkle AI', '-c', 'user.email=sparkle-ai@users.noreply.github.com', 'commit', '-m', 'chore: initialize project']);
   const now = new Date().toISOString();
   const project: ProjectRecord = { id: randomUUID(), name, slug, path: projectPath, repoUrl, branch: 'main', active: false, createdAt: now, updatedAt: now };
   await writeRegistry([...projects.map((item) => ({ ...item, active: false })), project]);
@@ -169,7 +169,7 @@ export async function createSnapshot(project: ProjectRecord, message: string) {
   await git(project.path, ['add', '-A']);
   const before = await git(project.path, ['status', '--porcelain']);
   if (!before.stdout.trim()) return { created: false, reason: 'Nenhuma alteração pendente.', versions: await projectVersions(project, 1) };
-  await git(project.path, ['-c', 'user.name=Manus AI', '-c', 'user.email=manus-ai@users.noreply.github.com', 'commit', '-m', cleanMessage]);
+  await git(project.path, ['-c', 'user.name=Sparkle AI', '-c', 'user.email=sparkle-ai@users.noreply.github.com', 'commit', '-m', cleanMessage]);
   const versions = await projectVersions(project, 1);
   return { created: true, version: versions[0] };
 }

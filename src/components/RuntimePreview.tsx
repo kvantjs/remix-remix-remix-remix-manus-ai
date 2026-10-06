@@ -1,38 +1,94 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Monitor, 
   DeviceMobile, 
   Globe, 
   ArrowsCounterClockwise, 
   Terminal, 
-  Cube, 
-  Code
+  Cube,
+  Sparkle,
+  ArrowSquareOut
 } from '@phosphor-icons/react';
 import { DynamicRuntimeRunner } from './DynamicRuntimeRunner';
 import { Favicon } from '@/lib/favicon';
 
 interface RuntimePreviewProps {
   activeCode?: string;
+  customFiles?: Record<string, string>;
   onSendPrompt?: (prompt: string) => void;
+  projectId?: string;
 }
 
-export function RuntimePreview({ activeCode, onSendPrompt }: RuntimePreviewProps) {
+export function RuntimePreview({ activeCode, customFiles, onSendPrompt, projectId = 'remix-manus-ai' }: RuntimePreviewProps) {
   const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop');
-  const [inputUrl] = useState('http://localhost:3000/');
+  const [useDaytona, setUseDaytona] = useState(true);
+  const [daytonaUrl, setDaytonaUrl] = useState<string | null>(null);
+  const [isDaytonaLoading, setIsDaytonaLoading] = useState(false);
+  const [daytonaError, setDaytonaError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [showConsole, setShowConsole] = useState(false);
   const [logs, setLogs] = useState<string[]>([
-    `[${new Date().toLocaleTimeString()}] Vite Dev Server v6.1.1 pronto na porta 3000 (HMR Ativo)`,
-    `[${new Date().toLocaleTimeString()}] Dynamic React Engine: Renderizando aplicação interativa em tempo real`
+    `[${new Date().toLocaleTimeString()}] Conectado ao Sandbox Daytona SDK (@daytona/sdk)...`,
+    `[${new Date().toLocaleTimeString()}] Aguardando criação/execução da aplicação pelo Agente no Daytona`
   ]);
+
+  // Consulta o backend para capturar a URL pública e dinâmica via SDK Daytona sandbox.getPreviewLink() assim que o agente criar/executar o site
+  const fetchDaytonaPreviewUrl = async () => {
+    setIsDaytonaLoading(true);
+    setDaytonaError(null);
+    try {
+      const res = await fetch(`/api/sandbox/daytona/preview-url?projectId=${encodeURIComponent(projectId)}`);
+      const data = await res.json();
+      if (data.success && data.previewUrl) {
+        setDaytonaUrl(data.previewUrl);
+        setLogs(prev => [
+          `[${new Date().toLocaleTimeString()}] Aplicação detectada no Sandbox Daytona. URL pública dinâmica capturada via getPreviewLink(): ${data.previewUrl}`,
+          ...prev
+        ]);
+      } else {
+        setDaytonaUrl(null);
+        if (data.error && (data.error.includes('suspended') || data.error.includes('credits') || data.error.includes('indisponível'))) {
+          setDaytonaError('Organização do Daytona suspensa por término de créditos.');
+          setLogs(prev => [
+            `[${new Date().toLocaleTimeString()}] ⚠️ Daytona indisponível (Créditos esgotados). Alternando para o Engine React Local de alta velocidade.`,
+            ...prev
+          ]);
+          setUseDaytona(false);
+        }
+      }
+    } catch (err: any) {
+      setDaytonaError(err.message || 'Erro ao comunicar com o servidor Daytona.');
+      setUseDaytona(false);
+    } finally {
+      setIsDaytonaLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDaytonaPreviewUrl();
+  }, [projectId, refreshKey]);
+
+  // Keep-alive automático a cada 2 minutos enquanto houver interação do usuário/agente no Daytona
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetch('/api/sandbox/daytona/keep-alive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId })
+      }).catch(() => {});
+    }, 2 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [projectId]);
 
   const handleRefresh = () => {
     setRefreshKey(prev => prev + 1);
     setLogs(prev => [
-      `[${new Date().toLocaleTimeString()}] HMR: Recompilando componente no runtime com Babel...`,
+      `[${new Date().toLocaleTimeString()}] Verificando URL pública via Daytona SDK...`,
       ...prev
     ]);
   };
+
+  const displayUrl = useDaytona && daytonaUrl ? daytonaUrl : (daytonaUrl || 'Aguardando criação do site no Daytona...');
 
   return (
     <div className="h-full flex flex-col bg-[#141414] select-none">
@@ -69,21 +125,58 @@ export function RuntimePreview({ activeCode, onSendPrompt }: RuntimePreviewProps
               <DeviceMobile size={13} />
             </button>
           </div>
+
+          {/* Engine Selector: Daytona Sandbox vs Local React Engine */}
+          <div className="flex items-center bg-white/[0.04] border border-white/5 rounded-md p-0.5 text-[10px]">
+            <button
+              onClick={() => setUseDaytona(true)}
+              className={`px-2 py-0.5 rounded font-mono transition-colors cursor-pointer ${
+                useDaytona ? 'bg-blue-500/20 text-blue-300 font-semibold border border-blue-500/30' : 'text-white/40 hover:text-white/70'
+              }`}
+              title="Executar no Sandbox Isolado Daytona SDK (@daytona/sdk)"
+            >
+              Daytona Sandbox
+            </button>
+            <button
+              onClick={() => setUseDaytona(false)}
+              className={`px-2 py-0.5 rounded font-mono transition-colors cursor-pointer ${
+                !useDaytona ? 'bg-white/15 text-white font-semibold' : 'text-white/40 hover:text-white/70'
+              }`}
+              title="Executar no Engine React Local"
+            >
+              Client Engine
+            </button>
+          </div>
         </div>
 
         {/* Center: Browser Address Bar */}
         <div className="flex-1 max-w-md mx-auto">
           <div className="bg-[#1a1a1a] border border-white/5 rounded-lg px-2.5 py-1 flex items-center gap-2 text-xs text-white/50 focus-within:border-white/20 transition-all">
-            <Favicon urlOrDomain={inputUrl} size={12} fallbackIcon={<Globe size={12} className="text-white/30 shrink-0" />} />
-            <span className="text-white/70 font-mono text-[11px] truncate flex-1">{inputUrl}</span>
-            <span className="text-[9px] bg-green-500/10 text-green-400 border border-green-500/20 px-1.5 py-0.2 rounded font-mono shrink-0 flex items-center gap-1">
-              <span className="size-1.5 rounded-full bg-green-500 animate-pulse" />
-              200 LIVE
+            <Favicon urlOrDomain={displayUrl} size={12} fallbackIcon={<Globe size={12} className="text-white/30 shrink-0" />} />
+            {daytonaUrl || displayUrl.startsWith('http') ? (
+              <a
+                href={daytonaUrl || displayUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-white/80 hover:text-blue-300 font-mono text-[11px] truncate flex-1 transition-colors underline-offset-2 hover:underline cursor-pointer flex items-center gap-1"
+                title="Clique para abrir a URL pública na web"
+              >
+                <span className="truncate">{displayUrl}</span>
+                <ArrowSquareOut size={11} className="shrink-0 opacity-60" />
+              </a>
+            ) : (
+              <span className="text-white/70 font-mono text-[11px] truncate flex-1">{displayUrl}</span>
+            )}
+            <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono shrink-0 flex items-center gap-1 ${
+              daytonaUrl ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+            }`}>
+              <span className={`size-1.5 rounded-full ${daytonaUrl ? 'bg-green-500 animate-pulse' : 'bg-blue-400'}`} />
+              {useDaytona ? (daytonaUrl ? 'DAYTONA LIVE' : 'AGUARDANDO AGENTE') : '200 LIVE'}
             </span>
             <button
               onClick={handleRefresh}
               className="text-white/30 hover:text-white transition-colors cursor-pointer"
-              title="Recarregar aplicação"
+              title="Sincronizar e consultar URL via Daytona SDK"
             >
               <ArrowsCounterClockwise size={11} />
             </button>
@@ -92,12 +185,24 @@ export function RuntimePreview({ activeCode, onSendPrompt }: RuntimePreviewProps
 
         {/* Right Toolbar Actions */}
         <div className="flex items-center gap-2 text-white/40">
+          {(daytonaUrl || displayUrl.startsWith('http')) && (
+            <a
+              href={daytonaUrl || displayUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-2.5 py-1 rounded-md bg-blue-500/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer shadow-xs hover:scale-[1.02] active:scale-[0.98]"
+              title="Abrir URL pública diretamente em uma nova guia do navegador"
+            >
+              <ArrowSquareOut size={13} className="shrink-0 text-blue-400" />
+              <span className="text-[11px] font-mono font-semibold">Abrir na Web</span>
+            </a>
+          )}
           <button
             onClick={() => setShowConsole(!showConsole)}
             className={`p-1.5 rounded-md text-xs flex items-center gap-1.5 transition-colors cursor-pointer ${
               showConsole ? 'bg-blue-500/20 text-blue-400' : 'hover:bg-white/5 text-white/50 hover:text-white'
             }`}
-            title="Abrir Console do Runtime"
+            title="Abrir Console do Runtime Daytona"
           >
             <Terminal size={13} />
             <span className="text-[11px]">Console</span>
@@ -109,7 +214,7 @@ export function RuntimePreview({ activeCode, onSendPrompt }: RuntimePreviewProps
       <div className="flex-1 overflow-hidden relative flex flex-col items-center justify-center p-2 bg-[#171717]">
         {/* Device Frame */}
         <div
-          className={`transition-all duration-300 bg-[#121212] border border-white/5 shadow-2xl overflow-hidden flex flex-col ${
+          className={`transition-all duration-300 bg-transparent border border-white/5 shadow-2xl overflow-hidden flex flex-col ${
             device === 'desktop'
               ? 'w-full h-full rounded-xl'
               : 'w-[375px] h-[667px] my-auto rounded-[36px] ring-8 ring-[#222222] border-4 border-[#333]'
@@ -129,12 +234,63 @@ export function RuntimePreview({ activeCode, onSendPrompt }: RuntimePreviewProps
             </div>
           )}
 
-          {/* DYNAMIC REACT RUNTIME CANVAS */}
-          <div key={`${activeCode}-${refreshKey}`} className="flex-1 overflow-auto bg-[#121212] text-white">
-            {activeCode ? (
-              <DynamicRuntimeRunner code={activeCode} />
+          {/* RUNTIME VIEWPORT */}
+          <div key={`${activeCode}-${refreshKey}`} className="flex-1 overflow-auto w-full h-full relative bg-[#111]">
+            {useDaytona ? (
+              isDaytonaLoading ? (
+                <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-slate-400 font-mono text-xs">
+                  <div className="size-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                  <span>Consultando URL pública via Daytona SDK (@daytona/sdk)...</span>
+                </div>
+              ) : daytonaUrl ? (
+                <div className="w-full h-full relative group">
+                  <iframe
+                    src={daytonaUrl}
+                    title="Preview Daytona Sandbox"
+                    className="w-full h-full border-none bg-white"
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-modals"
+                  />
+                  <div className="absolute top-3 right-3 opacity-80 group-hover:opacity-100 transition-opacity z-10">
+                    <a
+                      href={daytonaUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 rounded-lg bg-[#18181b]/90 hover:bg-[#18181b] text-white text-xs font-mono border border-white/20 shadow-xl backdrop-blur-md flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105"
+                      title="Abrir URL pública em nova guia"
+                    >
+                      <ArrowSquareOut size={13} className="text-blue-400" />
+                      <span>Abrir na Web ↗</span>
+                    </a>
+                  </div>
+                </div>
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center gap-3 p-8 text-center text-slate-300">
+                  <div className="p-3 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400">
+                    <Sparkle size={28} />
+                  </div>
+                  <div className="font-semibold text-sm text-white">Aguardando o Agente criar e executar a aplicação no Daytona</div>
+                  <p className="text-xs text-slate-400 max-w-md leading-relaxed">
+                    Nenhuma URL obtida ainda. Assim que o Agente de IA criar o site e executar os comandos no sandbox Daytona, o SDK capturará a URL pública e atualizará este preview automaticamente.
+                  </p>
+                  <div className="flex items-center gap-2 pt-2">
+                    <button
+                      onClick={handleRefresh}
+                      className="px-3 py-1.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-xs font-mono text-blue-300 border border-blue-500/30 transition-colors cursor-pointer flex items-center gap-1.5"
+                    >
+                      <ArrowsCounterClockwise size={12} />
+                      Consultar Daytona SDK
+                    </button>
+                    <button
+                      onClick={() => setUseDaytona(false)}
+                      className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-mono text-white transition-colors cursor-pointer"
+                    >
+                      Alternar para Engine React Local
+                    </button>
+                  </div>
+                </div>
+              )
             ) : (
-              <EmptyRuntimeState onSendPrompt={onSendPrompt} />
+              <DynamicRuntimeRunner code={activeCode || ''} customFiles={customFiles} />
             )}
           </div>
         </div>
@@ -143,7 +299,7 @@ export function RuntimePreview({ activeCode, onSendPrompt }: RuntimePreviewProps
         {showConsole && (
           <div className="absolute bottom-2 left-2 right-2 h-44 bg-[#141414] border border-white/10 rounded-xl shadow-2xl flex flex-col overflow-hidden z-20 font-mono text-[11px]">
             <div className="h-7 bg-[#1c1c1c] border-b border-white/5 px-3 flex items-center justify-between text-white/40">
-              <span className="font-semibold text-white/70">Console de Runtime & Network</span>
+              <span className="font-semibold text-white/70">Console de Runtime & Network Daytona</span>
               <button
                 onClick={() => setShowConsole(false)}
                 className="hover:text-white cursor-pointer"
@@ -160,46 +316,6 @@ export function RuntimePreview({ activeCode, onSendPrompt }: RuntimePreviewProps
             </div>
           </div>
         )}
-      </div>
-    </div>
-  );
-}
-
-function EmptyRuntimeState({ onSendPrompt }: { onSendPrompt?: (p: string) => void }) {
-  const suggestions = [
-    "Crie uma aplicação SaaS de analytics com gráficos interativos e filtros",
-    "Crie um aplicativo de finanças com carteira de investimentos e transferências Pix",
-    "Crie uma loja de e-commerce moderna com carrinho dinâmico e checkout",
-    "Crie um estúdio criativo editorial com portfólio e calculadora de orçamento"
-  ];
-
-  return (
-    <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-5">
-      <div className="size-14 bg-blue-500/10 border border-blue-500/20 rounded-2xl flex items-center justify-center text-blue-400 shadow-lg">
-        <Cube size={28} className="animate-pulse" />
-      </div>
-
-      <div className="space-y-1.5 max-w-md">
-        <h2 className="text-base font-bold text-white tracking-tight">Preview de Runtime Ativo</h2>
-        <p className="text-xs text-white/50 leading-relaxed">
-          O agente construirá o design e a aplicação do zero a partir do seu comando no chat.
-        </p>
-      </div>
-
-      <div className="w-full max-w-sm space-y-2 pt-2 text-left">
-        <span className="text-[10px] font-bold text-white/30 uppercase tracking-wider block">
-          Sugestões para o agente:
-        </span>
-        {suggestions.map((s, idx) => (
-          <button
-            key={idx}
-            onClick={() => onSendPrompt && onSendPrompt(s)}
-            className="w-full p-2.5 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.06] hover:border-white/10 transition-all text-xs text-white/70 hover:text-white flex items-center justify-between group cursor-pointer"
-          >
-            <span className="truncate">{s}</span>
-            <Code size={12} className="text-white/20 group-hover:text-blue-400 shrink-0 ml-2" />
-          </button>
-        ))}
       </div>
     </div>
   );

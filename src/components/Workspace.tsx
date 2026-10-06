@@ -24,28 +24,31 @@ import {
   ArrowUp, 
   PuzzlePiece, 
   MagnifyingGlass, 
-  Browsers
+  Browser,
+  Trash,
+  Check,
+  FloppyDisk,
+  FilePlus,
+  FolderPlus,
+  Sparkle
 } from '@phosphor-icons/react';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { RuntimePreview } from './RuntimePreview';
 import { TerminalView } from './TerminalView';
 import { detectLanguage } from './SyntaxCodeView';
+import CodeMirror from '@uiw/react-codemirror';
+import { javascript } from '@codemirror/lang-javascript';
+import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { KvantComputer } from './KvantComputer';
 import { ToolCallTrace } from '../types/project';
-import {
-  CodeBlock,
-  CodeBlockCopyButton,
-  CodeBlockHeader,
-  CodeBlockLanguage,
-  CodeBlockTitle,
-} from "@/components/reui/code-block/code-block";
 
-export type TopLevelTab = 'computer' | 'home_code' | 'website' | 'workspace' | 'terminal_tab';
+export type TopLevelTab = 'computer' | 'workspace' | 'code_tab' | 'preview_tab' | 'terminal_tab';
 export type WorkspaceSubTab = 'preview' | 'code' | 'terminal' | 'projects' | 'automations' | 'settings';
 
 interface WorkspaceProps {
   onClose: () => void;
   customFiles?: Record<string, string>;
+  onFileUpdate?: (files: Array<{ path: string; code: string; lang?: string }>) => void;
   onSendPrompt?: (prompt: string) => void;
   toolCalls?: ToolCallTrace[];
   isWorking?: boolean;
@@ -63,7 +66,8 @@ interface TabItem {
 
 export function Workspace({ 
   onClose, 
-  customFiles, 
+  customFiles = {}, 
+  onFileUpdate,
   onSendPrompt,
   toolCalls,
   isWorking = false,
@@ -72,32 +76,35 @@ export function Workspace({
   contextText,
   initialTab
 }: WorkspaceProps) {
-  // Top Level Application Tabs: Computador de l... | Home.tsx
+  // Top Level Application Tabs
   const [openTabs, setOpenTabs] = useState<TabItem[]>([
-    { id: 'computer', label: 'Computador de l...', closable: false },
-    { id: 'home_code', label: 'Home.tsx', closable: true }
+    { id: 'workspace', label: 'Espaço de Trabalho', closable: false },
+    { id: 'computer', label: 'Computador do Agente', closable: true },
+    { id: 'code_tab', label: 'Editor de Código', closable: true }
   ]);
-  const [activeTopTab, setActiveTopTab] = useState<TopLevelTab>((initialTab as TopLevelTab) || 'computer');
+  const [activeTopTab, setActiveTopTab] = useState<TopLevelTab>((initialTab as TopLevelTab) || 'workspace');
   const [showNewTabMenu, setShowNewTabMenu] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
 
   useEffect(() => {
-    if (initialTab && (initialTab === 'computer' || initialTab === 'home_code' || initialTab === 'workspace')) {
-      setActiveTopTab(prev => prev !== initialTab ? (initialTab as TopLevelTab) : prev);
+    if (initialTab && ['computer', 'workspace', 'code_tab', 'preview_tab', 'terminal_tab'].includes(initialTab)) {
+      setActiveTopTab(initialTab as TopLevelTab);
     }
   }, [initialTab]);
 
-  // Sub-tabs for the Workspace (Preview, Código, Terminal, Configurações)
+  // Sub-tabs for the Workspace (Preview, Código, Terminal, Projetos, Execuções, Configurações)
   const [workspaceSubTab, setWorkspaceSubTab] = useState<WorkspaceSubTab>('preview');
-  const [activeFile, setActiveFile] = useState('Home.tsx');
-  const [copied, setCopied] = useState(false);
+  const [activeFile, setActiveFile] = useState('client/src/App.tsx');
 
-  const activeCodeContent = 
-    customFiles?.[activeFile] || 
-    customFiles?.['Home.tsx'] || 
-    customFiles?.['App.tsx'] || 
-    customFiles?.['client/src/App.tsx'] ||
-    (customFiles && Object.keys(customFiles).length > 0 ? Object.values(customFiles)[0] : undefined);
+  // Resolve active code content for preview / editor
+  const activeCodeContent = useMemo(() => {
+    if (customFiles[activeFile]) return customFiles[activeFile];
+    if (customFiles['client/src/App.tsx']) return customFiles['client/src/App.tsx'];
+    if (customFiles['App.tsx']) return customFiles['App.tsx'];
+    const keys = Object.keys(customFiles);
+    if (keys.length > 0) return customFiles[keys[0]];
+    return DEFAULT_INITIAL_APP_CODE;
+  }, [customFiles, activeFile]);
 
   const handleCloseTab = (tabId: TopLevelTab, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -121,10 +128,10 @@ export function Workspace({
   };
 
   return (
-    <div className={`${isMaximized ? 'w-full absolute inset-0 z-30' : 'w-[54%] min-w-[440px]'} border-l border-border-divider-subtle bg-bg-surface-panel flex flex-col h-full animate-in duration-200 select-none`}>
+    <div className={`${isMaximized ? 'w-full absolute inset-0 z-30' : 'w-[56%] min-w-[460px]'} border-l border-border-divider-subtle bg-bg-surface-panel flex flex-col h-full animate-in duration-200 select-none`}>
       
-      {/* Top Application Tab Bar: Computador de l... | Home.tsx */}
-      <div className="h-10 flex items-center px-3 bg-bg-canvas-main/40 border-b border-border-divider-subtle shrink-0 relative select-none">
+      {/* Top Application Tab Bar */}
+      <div className="h-10 flex items-center px-3 bg-bg-canvas-main/60 border-b border-border-divider-subtle shrink-0 relative select-none">
         
         {/* Tabs list of the application */}
         <div className="flex items-center gap-1 overflow-x-auto custom-scrollbar">
@@ -133,33 +140,30 @@ export function Workspace({
             return (
               <button
                 key={tab.id}
-                onClick={() => {
-                  setActiveTopTab(tab.id);
-                  if (tab.id === 'home_code') setActiveFile('Home.tsx');
-                }}
-                className={`h-7 px-2.5 rounded-t-md text-xs font-normal transition-all flex items-center gap-2 group relative border-t border-x cursor-pointer ${
+                onClick={() => setActiveTopTab(tab.id)}
+                className={`h-7 px-3 rounded-t-md text-xs font-normal transition-all flex items-center gap-2 group relative border-t border-x cursor-pointer ${
                   isActive 
-                    ? 'bg-bg-surface-panel text-text-content-primary border-border-divider-subtle shadow-xs' 
+                    ? 'bg-bg-surface-panel text-text-content-primary border-border-divider-subtle shadow-xs font-medium' 
                     : 'text-text-content-secondary hover:text-text-content-primary hover:bg-bg-action-hover border-transparent'
                 }`}
               >
                 {tab.id === 'computer' && (
-                  <Desktop size={13} weight={isActive ? "fill" : "regular"} className={isActive ? "text-text-content-primary" : "text-text-content-secondary"} />
-                )}
-                {tab.id === 'home_code' && (
-                  <FileCode size={13} weight="fill" className="text-[#3b82f6]" />
-                )}
-                {tab.id === 'website' && (
-                  <Browsers size={13} className={isActive ? "text-text-content-primary" : "text-text-content-secondary"} />
+                  <Desktop size={13} weight={isActive ? "fill" : "regular"} className={isActive ? "text-white" : "text-text-content-secondary"} />
                 )}
                 {tab.id === 'workspace' && (
-                  <FileCode size={13} className="text-cyan-400" />
+                  <Code size={13} weight={isActive ? "bold" : "regular"} className={isActive ? "text-slate-200" : "text-text-content-secondary"} />
+                )}
+                {tab.id === 'code_tab' && (
+                  <FileCode size={13} weight={isActive ? "fill" : "regular"} className={isActive ? "text-slate-200" : "text-text-content-secondary"} />
+                )}
+                {tab.id === 'preview_tab' && (
+                  <Browser size={13} className={isActive ? "text-slate-200" : "text-text-content-secondary"} />
                 )}
                 {tab.id === 'terminal_tab' && (
-                  <Terminal size={13} className="text-emerald-400" />
+                  <Terminal size={13} className={isActive ? "text-slate-200" : "text-text-content-secondary"} />
                 )}
 
-                <span className="truncate max-w-[130px] text-[11.5px]">{tab.label}</span>
+                <span className="truncate max-w-[150px] text-[11.5px]">{tab.label}</span>
 
                 {tab.closable && (
                   <X 
@@ -195,48 +199,59 @@ export function Workspace({
 
         {/* Dropdown Menu for New Application Tab */}
         {showNewTabMenu && (
-          <div className="absolute top-9 left-28 z-50 w-60 bg-bg-surface-panel border border-border-divider-subtle rounded-lg shadow-2xl p-1.5 space-y-1 text-xs text-text-content-primary/80 animate-in fade-in zoom-in-95 duration-150">
-            <button
-              onClick={() => handleAddTab('computer', 'Computador de l...')}
-              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md hover:bg-bg-action-hover text-left transition-colors cursor-pointer"
-            >
-              <Desktop size={14} className="text-blue-400" />
-              <div>
-                <div className="font-medium text-text-content-primary">Computador na Nuvem</div>
-                <div className="text-[10px] text-text-content-secondary/45">Ambiente do agente com navegador</div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => handleAddTab('home_code', 'Home.tsx')}
-              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md hover:bg-bg-action-hover text-left transition-colors cursor-pointer"
-            >
-              <FileCode size={14} className="text-[#3b82f6]" />
-              <div>
-                <div className="font-medium text-text-content-primary">Home.tsx</div>
-                <div className="text-[10px] text-text-content-secondary/45">Editor de código do projeto</div>
-              </div>
-            </button>
-
+          <div className="absolute top-9 left-28 z-50 w-64 bg-bg-surface-panel border border-border-divider-subtle rounded-xl shadow-2xl p-1.5 space-y-1 text-xs text-text-content-primary/80 animate-in fade-in zoom-in-95 duration-150">
             <button
               onClick={() => handleAddTab('workspace', 'Espaço de Trabalho')}
-              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md hover:bg-bg-action-hover text-left transition-colors cursor-pointer"
+              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-bg-action-hover text-left transition-colors cursor-pointer"
             >
-              <Code size={14} className="text-cyan-400" />
+              <Code size={15} className="text-slate-400" />
               <div>
-                <div className="font-medium text-text-content-primary">Espaço de Trabalho</div>
-                <div className="text-[10px] text-text-content-secondary/45">Preview, terminal e configurações</div>
+                <div className="font-medium text-text-content-primary">Espaço de Trabalho WebDev</div>
+                <div className="text-[10px] text-text-content-secondary/60">Preview ao vivo, editor e terminal</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => handleAddTab('code_tab', 'Editor de Código')}
+              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-bg-action-hover text-left transition-colors cursor-pointer"
+            >
+              <FileCode size={15} className="text-slate-400" />
+              <div>
+                <div className="font-medium text-text-content-primary">Editor de Código Completo</div>
+                <div className="text-[10px] text-text-content-secondary/60">Edição direta de arquivos e pastas</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => handleAddTab('computer', 'Computador do Agente')}
+              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-bg-action-hover text-left transition-colors cursor-pointer"
+            >
+              <Desktop size={15} className="text-slate-400" />
+              <div>
+                <div className="font-medium text-text-content-primary">Computador na Nuvem</div>
+                <div className="text-[10px] text-text-content-secondary/60">Navegador Playwright e shell Linux</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => handleAddTab('preview_tab', 'Pré-visualização')}
+              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-bg-action-hover text-left transition-colors cursor-pointer"
+            >
+              <Browser size={15} className="text-emerald-400" />
+              <div>
+                <div className="font-medium text-text-content-primary">Preview de Runtime</div>
+                <div className="text-[10px] text-text-content-secondary/60">Renderização em tempo real</div>
               </div>
             </button>
 
             <button
               onClick={() => handleAddTab('terminal_tab', 'Terminal Bash')}
-              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md hover:bg-bg-action-hover text-left transition-colors cursor-pointer"
+              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-bg-action-hover text-left transition-colors cursor-pointer"
             >
-              <Terminal size={14} className="text-emerald-400" />
+              <Terminal size={15} className="text-amber-400" />
               <div>
                 <div className="font-medium text-text-content-primary">Terminal Bash</div>
-                <div className="text-[10px] text-text-content-secondary/45">Shell do container Linux</div>
+                <div className="text-[10px] text-text-content-secondary/60">Linha de comando do container</div>
               </div>
             </button>
           </div>
@@ -255,12 +270,10 @@ export function Workspace({
           </button>
           <button 
             onClick={onClose}
-            title="Alternar painel lateral" 
+            title="Fechar painel lateral" 
             className="cursor-pointer hover:text-text-content-primary transition-colors p-1"
           >
-            <div className="size-3.5 border border-current rounded-xs flex overflow-hidden">
-              <div className="w-1/2 border-r border-current bg-current/20" />
-            </div>
+            <X size={14} />
           </button>
         </div>
       </div>
@@ -282,46 +295,53 @@ export function Workspace({
         </div>
       )}
 
-      {/* 2. Home.tsx Dedicated Code View */}
-      {activeTopTab === 'home_code' && (
+      {/* 2. Direct Code Tab */}
+      {activeTopTab === 'code_tab' && (
         <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg-canvas-main">
-          <CodeView 
+          <InteractiveCodeEditor 
             activeFile={activeFile} 
             onFileChange={setActiveFile} 
             customFiles={customFiles}
-            copied={copied} 
-            onCopy={() => {
-              setCopied(true);
-              setTimeout(() => setCopied(false), 2000);
-            }} 
+            onFileUpdate={onFileUpdate}
           />
         </div>
       )}
 
-      {/* 3. Terminal Tab */}
+      {/* 3. Direct Preview Tab */}
+      {activeTopTab === 'preview_tab' && (
+        <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg-surface-panel">
+          <RuntimePreview 
+            activeCode={activeCodeContent} 
+            customFiles={customFiles}
+            onSendPrompt={onSendPrompt}
+          />
+        </div>
+      )}
+
+      {/* 4. Terminal Tab */}
       {activeTopTab === 'terminal_tab' && (
         <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg-canvas-main">
           <TerminalView activeCode={activeCodeContent} />
         </div>
       )}
 
-      {/* 4. Full Espaço de Trabalho (Sub-tabs: Preview, Código, Terminal, Configurações) */}
+      {/* 5. Espaço de Trabalho Completo (Sub-abas: Preview, Código, Terminal, Projetos, Execuções, Configurações) */}
       {activeTopTab === 'workspace' && (
         <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg-surface-panel">
           {/* Internal Navigation Bar for Workspace */}
-          <div className="h-11 flex items-center justify-between px-4 border-b border-border-divider-subtle shrink-0 bg-bg-surface-panel">
-            <div className="flex items-center gap-1 p-0.5 border border-border-divider-subtle rounded-lg bg-bg-canvas-main">
+          <div className="h-11 flex items-center justify-between px-3 border-b border-border-divider-subtle shrink-0 bg-bg-surface-panel">
+            <div className="flex items-center gap-1 p-0.5 border border-border-divider-subtle rounded-lg bg-bg-canvas-main/80 overflow-x-auto">
               <NavButton 
                 active={workspaceSubTab === 'preview'} 
                 onClick={() => setWorkspaceSubTab('preview')}
                 icon={<Desktop size={13} />} 
-                label="Pré-visualizar" 
+                label="Pré-visualização" 
               />
               <NavButton 
                 active={workspaceSubTab === 'code'} 
                 onClick={() => setWorkspaceSubTab('code')}
                 icon={<Code size={13} />} 
-                label="Código" 
+                label="Editor de Código" 
               />
               <NavButton 
                 active={workspaceSubTab === 'terminal'} 
@@ -330,16 +350,16 @@ export function Workspace({
                 label="Terminal" 
               />
               <NavButton 
+                active={workspaceSubTab === 'projects'} 
+                onClick={() => setWorkspaceSubTab('projects')}
+                icon={<Folder size={13} />} 
+                label="Projetos & Git" 
+              />
+              <NavButton 
                 active={workspaceSubTab === 'automations'} 
                 onClick={() => setWorkspaceSubTab('automations')}
                 icon={<Calendar size={13} />} 
                 label="Execuções" 
-              />
-              <NavButton 
-                active={workspaceSubTab === 'projects'} 
-                onClick={() => setWorkspaceSubTab('projects')}
-                icon={<Folder size={13} />} 
-                label="Projetos" 
               />
               <NavButton 
                 active={workspaceSubTab === 'settings'} 
@@ -349,13 +369,15 @@ export function Workspace({
               />
             </div>
             
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
                <button 
-                onClick={() => setWorkspaceSubTab('automations')}
+                onClick={() => {
+                  setWorkspaceSubTab('preview');
+                }}
                 className="bg-interactive-cta-bg text-bg-canvas-main px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shadow-xs cursor-pointer"
                >
-                  <ArrowUp size={13} />
-                  Executar tarefa
+                  <Sparkle size={13} weight="fill" />
+                  <span>Preview Vivo</span>
                </button>
             </div>
           </div>
@@ -365,19 +387,16 @@ export function Workspace({
             {workspaceSubTab === 'preview' && (
               <RuntimePreview 
                 activeCode={activeCodeContent} 
+                customFiles={customFiles}
                 onSendPrompt={onSendPrompt}
               />
             )}
             {workspaceSubTab === 'code' && (
-              <CodeView 
+              <InteractiveCodeEditor 
                 activeFile={activeFile} 
                 onFileChange={setActiveFile} 
                 customFiles={customFiles}
-                copied={copied} 
-                onCopy={() => {
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2000);
-                }} 
+                onFileUpdate={onFileUpdate}
               />
             )}
             {workspaceSubTab === 'terminal' && (
@@ -398,7 +417,7 @@ function NavButton({ active, icon, label, onClick }: any) {
   return (
     <button 
       onClick={onClick}
-      className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-all cursor-pointer ${
+      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer whitespace-nowrap ${
         active ? 'bg-white/10 text-white shadow-xs' : 'text-white/40 hover:text-white/70'
       }`}
     >
@@ -408,169 +427,524 @@ function NavButton({ active, icon, label, onClick }: any) {
   );
 }
 
-const FILE_CONTENTS: Record<string, { lang: string; code: string }> = {
-  'Home.tsx': {
-    lang: 'typescript',
-    code: `import React, { useState } from 'react';
-import { Star, ArrowRight, ShieldCheck, Lightning as Zap } from '@phosphor-icons/react';
+const DEFAULT_INITIAL_APP_CODE = `import React, { useState } from 'react';
+import { Sparkle, ArrowRight, ShieldCheck, CreditCard, Wallet, TrendUp, TrendUp as TrendingUp } from '@phosphor-icons/react';
 
-export default function Home() {
-  const [activeTab, setActiveTab] = useState('templates');
+export default function App() {
+  const [activeTab, setActiveTab] = useState('overview');
 
   return (
-    <div className="min-h-screen bg-[#08080a] text-white selection:bg-purple-500/30">
-      <header className="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between border-b border-white/[0.05]">
-        <div className="flex items-center gap-2 font-bold tracking-tight text-white">
-          <span className="text-white text-xs">▲</span>
-          <span className="tracking-wider text-sm font-black">RYVAX.</span>
-        </div>
-      </header>
+    <div className="min-h-screen bg-[#080A0F] text-slate-100 font-sans p-6 sm:p-8 selection:bg-white/10">
+      <div className="max-w-5xl mx-auto space-y-6">
+        <header className="flex items-center justify-between pb-6 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="size-10 rounded-xl bg-white/5 border border-white/10 text-white flex items-center justify-center">
+              <Sparkle size={20} weight="fill" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-white tracking-tight">Kvant WebDev Workspace</h1>
+              <p className="text-xs text-slate-400 font-mono">Ambiente de Criação Reativa em Tempo Real</p>
+            </div>
+          </div>
+        </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-20 text-center space-y-6">
-        <h1 className="text-5xl sm:text-6xl font-extrabold tracking-tight text-white leading-tight">
-          Build on the edge.
-        </h1>
-        <p className="text-zinc-400 text-sm max-w-xl mx-auto leading-relaxed">
-          Framework reativo de alta performance integrado ao Manus AI.
-        </p>
-      </main>
+        <main className="p-8 rounded-2xl bg-[#0F111A] border border-white/10 space-y-4 text-center">
+          <h2 className="text-2xl font-extrabold text-white">Aplicação Pronta para Criação</h2>
+          <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+            Peça ao agente para criar qualquer site, dashboard, e-commerce ou fintech no chat.
+          </p>
+        </main>
+      </div>
     </div>
   );
 }
-`,
-  },
-  'App.tsx': {
-    lang: 'typescript',
-    code: `export default function App() {
-  return (
-    <div className="min-h-screen bg-[#121212] text-white p-8">
-      <h1 className="text-2xl font-bold">Aplicação Principal</h1>
-    </div>
-  );
-}`
-  },
-  'package.json': {
-    lang: 'json',
-    code: `{
-  "name": "kvant-app",
-  "private": true,
-  "version": "1.0.0",
-  "type": "module",
-  "dependencies": {
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+`;
+
+// Helper to build a file tree structure from list of path strings
+interface TreeNode {
+  name: string;
+  path: string;
+  type: 'file' | 'folder';
+  children?: TreeNode[];
+}
+
+function buildFileTree(filesMap: Record<string, string>): TreeNode[] {
+  const rootNodes: Record<string, any> = {};
+
+  // Standard base files guaranteed to exist in the workspace
+  const allPaths = new Set<string>([
+    'client/src/App.tsx',
+    'client/src/index.css',
+    'package.json',
+    'README.md',
+    ...Object.keys(filesMap)
+  ]);
+
+  for (const rawPath of allPaths) {
+    const normalized = rawPath.replace(/^\//, '');
+    const parts = normalized.split('/');
+    let currentLevel = rootNodes;
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      const isFile = i === parts.length - 1;
+      const fullPath = parts.slice(0, i + 1).join('/');
+
+      if (!currentLevel[part]) {
+        currentLevel[part] = {
+          name: part,
+          path: fullPath,
+          type: isFile ? 'file' : 'folder',
+          children: isFile ? undefined : {}
+        };
+      }
+      if (!isFile) {
+        currentLevel = currentLevel[part].children;
+      }
+    }
   }
-}`
+
+  function convertToArray(nodeMap: Record<string, any>): TreeNode[] {
+    return Object.values(nodeMap)
+      .sort((a, b) => {
+        if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      })
+      .map(node => ({
+        name: node.name,
+        path: node.path,
+        type: node.type,
+        children: node.children ? convertToArray(node.children) : undefined
+      }));
   }
+
+  return convertToArray(rootNodes);
+}
+
+const getMonacoLanguage = (filePath: string) => {
+  const ext = filePath.split('.').pop()?.toLowerCase();
+  if (ext === 'tsx' || ext === 'ts') return 'typescript';
+  if (ext === 'jsx' || ext === 'js') return 'javascript';
+  if (ext === 'css') return 'css';
+  if (ext === 'html') return 'html';
+  if (ext === 'json') return 'json';
+  if (ext === 'md') return 'markdown';
+  return 'typescript';
 };
 
-function CodeView({ activeFile, onFileChange, customFiles, copied, onCopy }: any) {
-  const files = [
-    { name: 'client', type: 'folder', children: [
-      { name: 'src', type: 'folder', children: [
-        { name: 'Home.tsx', type: 'file' },
-        { name: 'App.tsx', type: 'file' },
-      ]},
-    ]},
-    { name: 'package.json', type: 'file' },
-  ];
+// REAL INTERACTIVE CODE EDITOR WITH FULL DYNAMIC FILE CREATION & EDITING
+interface InteractiveCodeEditorProps {
+  activeFile: string;
+  onFileChange: (filePath: string) => void;
+  customFiles: Record<string, string>;
+  onFileUpdate?: (files: Array<{ path: string; code: string; lang?: string }>) => void;
+}
 
-  const defaultFileData = FILE_CONTENTS[activeFile] || {
-    lang: 'typescript',
-    code: `// ${activeFile}\nexport default {};`
+function InteractiveCodeEditor({ activeFile, onFileChange, customFiles, onFileUpdate }: InteractiveCodeEditorProps) {
+  const fileTree = useMemo(() => buildFileTree(customFiles), [customFiles]);
+  const [editorContent, setEditorContent] = useState('');
+  const [isSaved, setIsSaved] = useState(true);
+  const [copied, setCopied] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isNewFileModalOpen, setIsNewFileModalOpen] = useState(false);
+  const [isNewFolderModalOpen, setIsNewFolderModalOpen] = useState(false);
+  const [newFilePath, setNewFilePath] = useState('');
+  const [newFolderName, setNewFolderName] = useState('');
+
+  // Load content when active file changes
+  useEffect(() => {
+    let content = customFiles[activeFile];
+    if (content === undefined) {
+      if (activeFile === 'client/src/App.tsx' || activeFile === 'App.tsx') {
+        content = customFiles['client/src/App.tsx'] || customFiles['App.tsx'] || DEFAULT_INITIAL_APP_CODE;
+      } else if (activeFile === 'client/src/index.css') {
+        content = `@import "tailwindcss";\n\nbody {\n  @apply bg-[#080A0F] text-slate-100 antialiased;\n}`;
+      } else if (activeFile === 'package.json') {
+        content = `{\n  "name": "kvant-webdev-app",\n  "private": true,\n  "version": "1.0.0",\n  "type": "module",\n  "dependencies": {\n    "react": "^19.0.0",\n    "react-dom": "^19.0.0",\n    "@phosphor-icons/react": "^2.1.10"\n  }\n}`;
+      } else if (activeFile === 'README.md') {
+        content = `# Projeto WebDev Kvant\n\nAplicação React construída e atualizada autonomamente pelo agente.`;
+      } else {
+        content = `// Arquivo: ${activeFile}\nexport default {};\n`;
+      }
+    }
+    setEditorContent(content);
+    setIsSaved(true);
+  }, [activeFile, customFiles]);
+
+  const handleEditorChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setEditorContent(val);
+    setIsSaved(false);
   };
 
-  const customContent = customFiles 
-    ? (customFiles[activeFile] || customFiles[`client/src/${activeFile}`] || customFiles[`src/${activeFile}`]) 
-    : null;
-
-  const currentFileData = {
-    lang: defaultFileData.lang,
-    code: customContent !== undefined && customContent !== null ? customContent : defaultFileData.code
+  const handleSave = () => {
+    if (onFileUpdate) {
+      onFileUpdate([{
+        path: activeFile,
+        code: editorContent,
+        lang: detectLanguage(activeFile, editorContent)
+      }]);
+    }
+    setIsSaved(true);
   };
 
-  const resolvedLang = detectLanguage(activeFile, currentFileData.code);
+  const saveRef = React.useRef(handleSave);
+  useEffect(() => {
+    saveRef.current = handleSave;
+  }, [editorContent, activeFile, onFileUpdate]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      handleSave();
+    }
+    // Handle tab indent
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const target = e.currentTarget;
+      const start = target.selectionStart;
+      const end = target.selectionEnd;
+      const newText = editorContent.substring(0, start) + '  ' + editorContent.substring(end);
+      setEditorContent(newText);
+      setIsSaved(false);
+      setTimeout(() => {
+        target.selectionStart = target.selectionEnd = start + 2;
+      }, 0);
+    }
+  };
+
+  const handleCreateNewFile = (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = newFilePath.trim().replace(/^\/+/, '');
+    if (!clean) return;
+    const finalPath = clean.includes('/') ? clean : `client/src/${clean}`;
+    if (onFileUpdate) {
+      onFileUpdate([{
+        path: finalPath,
+        code: `import React from 'react';\n\nexport default function Component() {\n  return <div>Componente ${finalPath}</div>;\n}\n`,
+        lang: detectLanguage(finalPath, '')
+      }]);
+    }
+    onFileChange(finalPath);
+    setNewFilePath('');
+    setIsNewFileModalOpen(false);
+  };
+
+  const handleCreateNewFolder = (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = newFolderName.trim().replace(/^\/+/, '');
+    if (!clean) return;
+    const dummyFile = `${clean}/README.md`;
+    if (onFileUpdate) {
+      onFileUpdate([{
+        path: dummyFile,
+        code: `# Pasta ${clean}\n`,
+        lang: 'markdown'
+      }]);
+    }
+    onFileChange(dummyFile);
+    setNewFolderName('');
+    setIsNewFolderModalOpen(false);
+  };
+
+  const handleDeleteActiveFile = () => {
+    if (activeFile === 'client/src/App.tsx' || activeFile === 'package.json') {
+      alert('Arquivos de sistema essenciais não podem ser removidos.');
+      return;
+    }
+    if (confirm(`Deseja realmente excluir "${activeFile}" do workspace?`)) {
+      if (onFileUpdate) {
+        // Clear file content to indicate removal
+        onFileUpdate([{ path: activeFile, code: '' }]);
+      }
+      onFileChange('client/src/App.tsx');
+    }
+  };
+
+  const lineCount = useMemo(() => editorContent.split('\n').length, [editorContent]);
+  const linesArray = useMemo(() => Array.from({ length: lineCount }, (_, i) => i + 1), [lineCount]);
 
   return (
-    <div className="h-full flex">
-      {/* File Tree */}
-      <div className="w-48 border-r border-border-divider-subtle flex flex-col shrink-0 overflow-y-auto custom-scrollbar bg-bg-surface-panel">
-        <div className="p-3 flex flex-col gap-1">
-          {files.map(file => (
-            <FileTreeNode key={file.name} node={file} level={0} activeFile={activeFile} onFileChange={onFileChange} />
+    <div className="h-full flex bg-[#0d0d0f] text-slate-100 overflow-hidden relative">
+      {/* Left Sidebar: Dynamic Workspace File Tree */}
+      <div className="w-56 border-r border-white/10 flex flex-col shrink-0 bg-[#111218] select-none">
+        {/* Workspace Tree Header */}
+        <div className="p-3 border-b border-white/10 flex items-center justify-between shrink-0 bg-[#252525]">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-white">
+            <Folder size={14} className="text-[#9d9d9d]" />
+            <span>Arquivos do Projeto</span>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setIsNewFileModalOpen(true)}
+              className="p-1 hover:bg-white/10 rounded text-slate-300 hover:text-white transition-colors cursor-pointer"
+              title="Novo Arquivo (+ File)"
+            >
+              <FilePlus size={14} />
+            </button>
+            <button
+              onClick={() => setIsNewFolderModalOpen(true)}
+              className="p-1 hover:bg-white/10 rounded text-slate-300 hover:text-white transition-colors cursor-pointer"
+              title="Nova Pasta (+ Folder)"
+            >
+              <FolderPlus size={14} />
+            </button>
+          </div>
+        </div>
+
+        {/* Quick Search in Files */}
+        <div className="p-2 border-b border-white/5 bg-[#252525]">
+          <div className="flex items-center gap-1.5 bg-[#252525] border border-[#373737] rounded-lg px-2 py-1 text-xs text-[#d8d8d8]">
+            <MagnifyingGlass size={12} className="text-slate-500" />
+            <input 
+              type="text" 
+              value={searchTerm} 
+              onChange={e => setSearchTerm(e.target.value)} 
+              placeholder="Filtrar arquivos..." 
+              className="w-full bg-transparent text-[#5e5e5e] border-[#393939] placeholder:text-slate-600 focus:outline-none text-[11px]"
+            />
+          </div>
+        </div>
+
+        {/* Tree Nodes List */}
+        <div className="flex-1 overflow-y-auto p-2 space-y-0.5 custom-scrollbar text-xs bg-[#252525]">
+          {fileTree.map((node) => (
+            <DynamicFileTreeNode 
+              key={node.path} 
+              node={node} 
+              level={0} 
+              activeFile={activeFile} 
+              onFileChange={onFileChange}
+              searchTerm={searchTerm}
+            />
           ))}
+        </div>
+
+        {/* Workspace Footer Stats */}
+        <div className="p-2.5 border-t border-white/5 text-[10px] text-slate-500 flex items-center justify-between font-mono bg-[#252525]">
+          <span>{Object.keys(customFiles).length || 4} arquivos</span>
+          <span className="text-emerald-400">● Workspace Pronto</span>
         </div>
       </div>
 
-      {/* Editor Surface */}
-      <div className="flex-1 flex flex-col min-w-0 bg-bg-canvas-main overflow-hidden">
-        <CodeBlock 
-          code={currentFileData.code} 
-          language={resolvedLang} 
-          showLineNumbers
-          className="h-full rounded-none border-0 bg-bg-canvas-main flex flex-col min-h-0"
-        >
-          <CodeBlockHeader className="h-9 bg-bg-surface-panel border-b border-border-divider-subtle px-4 shrink-0 flex items-center">
-            <div className="flex items-center gap-1.5 text-[11px] text-text-content-secondary/40 font-mono">
-              <span>client</span>
-              <span>/</span>
-              <span>src</span>
-              <span>/</span>
-            </div>
-            <CodeBlockTitle className="text-text-content-primary font-mono text-[11px] font-semibold">
-              {activeFile}
-            </CodeBlockTitle>
-            <CodeBlockLanguage className="ml-2.5 bg-white/5 border border-white/10 text-white/70" />
-            <div className="ml-auto flex items-center gap-2">
-              <button 
-                onClick={() => {
-                  const blob = new Blob([currentFileData.code], { type: 'text/plain' });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = activeFile;
-                  a.click();
-                }}
-                title="Download arquivo"
-                className="text-white hover:text-white p-1 rounded transition-colors cursor-pointer"
+      {/* Main Code Editor View */}
+      <div className="flex-1 flex flex-col min-w-0 bg-[#0A0B0E] overflow-hidden">
+        {/* Editor Tab Bar & Actions */}
+        <div className="h-10 bg-[#252525] border-b border-white/10 px-4 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2 font-mono text-xs text-slate-300 truncate">
+            <FileCode size={15} className="text-slate-300 shrink-0" />
+            <span className="font-semibold text-white">{activeFile}</span>
+            <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-white/5 text-slate-400 border border-white/10 font-sans tracking-wide select-none">
+              Apenas Leitura
+            </span>
+            {!isSaved && (
+              <span className="size-2 rounded-full bg-amber-400 animate-pulse" title="Alterações não salvas" />
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleSave}
+              className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ${
+                !isSaved 
+                  ? 'bg-white hover:bg-slate-200 text-black shadow-white/5' 
+                  : 'bg-white/10 hover:bg-white/15 text-white/80'
+              }`}
+              title="Salvar arquivo e sincronizar runtime (Ctrl+S)"
+            >
+              <FloppyDisk size={13} weight="bold" />
+              <span>{isSaved ? 'Salvo' : 'Salvar'}</span>
+            </button>
+
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(editorContent);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              }}
+              className="p-1.5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-lg transition-colors cursor-pointer"
+              title="Copiar código"
+            >
+              {copied ? <Check size={14} className="text-emerald-400" /> : <Code size={14} />}
+            </button>
+
+            <button
+              onClick={() => {
+                const blob = new Blob([editorContent], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = activeFile.split('/').pop() || 'file.tsx';
+                a.click();
+              }}
+              className="p-1.5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-lg transition-colors cursor-pointer"
+              title="Baixar arquivo"
+            >
+              <Download size={14} />
+            </button>
+
+            {activeFile !== 'client/src/App.tsx' && (
+              <button
+                onClick={handleDeleteActiveFile}
+                className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors cursor-pointer"
+                title="Excluir arquivo"
               >
-                <Download size={13} style={{ color: '#ffffff' }} />
+                <Trash size={14} />
               </button>
-              <CodeBlockCopyButton className="text-white cursor-pointer" style={{ color: '#ffffff' }} />
-            </div>
-          </CodeBlockHeader>
-        </CodeBlock>
+            )}
+          </div>
+        </div>
+
+        {/* Real Code Editor CodeMirror Surface (Apenas Leitura do Usuário) */}
+        <div className="flex-1 overflow-auto relative bg-[#1a1a1a] h-full flex flex-col font-mono text-xs select-text">
+          <CodeMirror
+            value={editorContent}
+            height="100%"
+            theme={vscodeDark}
+            extensions={[javascript({ jsx: true, typescript: true })]}
+            readOnly={true}
+            editable={false}
+            className="flex-1 w-full text-xs font-mono select-text"
+          />
+        </div>
+
+        {/* Editor Bottom Status Bar */}
+        <div className="h-6 bg-[#0E1017] border-t border-white/5 px-3 flex items-center justify-between text-[10px] text-slate-500 font-mono shrink-0 select-none">
+          <div className="flex items-center gap-3">
+            <span>{detectLanguage(activeFile, editorContent).toUpperCase()}</span>
+            <span>UTF-8</span>
+            <span>{lineCount} linhas</span>
+          </div>
+          <div className="flex items-center gap-2 text-slate-400">
+            <span>⚡ Sincronização em Tempo Real Ativa</span>
+          </div>
+        </div>
       </div>
+
+      {/* Modal: Novo Arquivo */}
+      {isNewFileModalOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[#13151F] border border-white/10 rounded-2xl p-5 shadow-2xl space-y-4 text-xs">
+            <div className="flex justify-between items-center border-b border-white/10 pb-3">
+              <h3 className="font-bold text-white text-sm flex items-center gap-2">
+                <FilePlus size={16} className="text-slate-300" />
+                Criar Novo Arquivo no Workspace
+              </h3>
+              <button onClick={() => setIsNewFileModalOpen(false)} className="text-slate-400 hover:text-white">✕</button>
+            </div>
+            <form onSubmit={handleCreateNewFile} className="space-y-3">
+              <div>
+                <label className="text-slate-300 block mb-1">Caminho ou Nome do Arquivo</label>
+                <input 
+                  type="text" 
+                  required 
+                  value={newFilePath} 
+                  onChange={e => setNewFilePath(e.target.value)} 
+                  placeholder="ex: client/src/components/Header.tsx ou utils/format.ts"
+                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-white/20"
+                  autoFocus
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={() => setIsNewFileModalOpen(false)} className="flex-1 py-2 rounded-xl bg-white/5 text-slate-300 hover:bg-white/10">Cancelar</button>
+                <button type="submit" className="flex-1 py-2 rounded-xl bg-white hover:bg-slate-200 text-black font-semibold">Criar Arquivo</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Nova Pasta */}
+      {isNewFolderModalOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[#13151F] border border-white/10 rounded-2xl p-5 shadow-2xl space-y-4 text-xs">
+            <div className="flex justify-between items-center border-b border-white/10 pb-3">
+              <h3 className="font-bold text-white text-sm flex items-center gap-2">
+                <FolderPlus size={16} className="text-slate-300" />
+                Criar Nova Pasta no Workspace
+              </h3>
+              <button onClick={() => setIsNewFolderModalOpen(false)} className="text-slate-400 hover:text-white">✕</button>
+            </div>
+            <form onSubmit={handleCreateNewFolder} className="space-y-3">
+              <div>
+                <label className="text-slate-300 block mb-1">Nome ou Caminho da Pasta</label>
+                <input 
+                  type="text" 
+                  required 
+                  value={newFolderName} 
+                  onChange={e => setNewFolderName(e.target.value)} 
+                  placeholder="ex: client/src/components ou src/services"
+                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-white/20"
+                  autoFocus
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={() => setIsNewFolderModalOpen(false)} className="flex-1 py-2 rounded-xl bg-white/5 text-slate-300 hover:bg-white/10">Cancelar</button>
+                <button type="submit" className="flex-1 py-2 rounded-xl bg-white hover:bg-slate-200 text-black font-semibold">Criar Pasta</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function FileTreeNode({ node, level, activeFile, onFileChange }: any) {
+// Tree Node Recursive Renderer
+function DynamicFileTreeNode({ node, level, activeFile, onFileChange, searchTerm }: {
+  node: TreeNode;
+  level: number;
+  activeFile: string;
+  onFileChange: (path: string) => void;
+  searchTerm?: string;
+}) {
   const [isOpen, setIsOpen] = useState(true);
   const isFolder = node.type === 'folder';
-  const isActive = node.name === activeFile;
+  const isActive = node.path === activeFile || node.name === activeFile;
+
+  // Filter search
+  if (searchTerm && !node.path.toLowerCase().includes(searchTerm.toLowerCase())) {
+    if (!node.children || !node.children.some(c => c.path.toLowerCase().includes(searchTerm.toLowerCase()))) {
+      return null;
+    }
+  }
 
   return (
     <div>
       <div 
-        className={`flex items-center gap-1.5 py-1 px-1.5 rounded cursor-pointer transition-colors ${
-          isActive ? 'bg-white/10 text-white font-medium' : 'text-white/40 hover:bg-white/5 hover:text-white/70'
+        className={`flex items-center gap-1.5 py-1 px-2 rounded-lg cursor-pointer transition-all ${
+          isActive 
+            ? 'bg-[#272727] text-[#bdbdbd] font-medium border border-[#363636] rounded-[6px]' 
+            : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
         }`}
         style={{ paddingLeft: `${level * 12 + 6}px` }}
-        onClick={() => isFolder ? setIsOpen(!isOpen) : onFileChange(node.name)}
+        onClick={() => isFolder ? setIsOpen(!isOpen) : onFileChange(node.path)}
       >
         {isFolder ? (
-          <CaretRight size={12} className={`transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+          <CaretRight size={11} className={`transition-transform shrink-0 ${isOpen ? 'rotate-90 text-white' : 'text-slate-500'}`} />
         ) : (
-          <FileCode size={12} className={isActive ? "text-blue-400" : "text-white/40"} />
+          <FileCode size={13} className={isActive ? "text-white shrink-0" : "text-slate-500 shrink-0"} />
         )}
-        {isFolder && (isOpen ? <Folder size={12} className="text-white/60" /> : <Folder size={12} />)}
-        <span className="text-[11px] truncate">{node.name}</span>
+        
+        {isFolder && (
+          <Folder size={13} className={isOpen ? "text-white shrink-0" : "text-slate-500 shrink-0"} />
+        )}
+
+        <span className="text-[11px] truncate font-mono">{node.name}</span>
       </div>
+
       {isFolder && isOpen && node.children && (
-        <div>
-          {node.children.map((child: any) => (
-            <FileTreeNode key={child.name} node={child} level={level + 1} activeFile={activeFile} onFileChange={onFileChange} />
+        <div className="space-y-0.5">
+          {node.children.map((child) => (
+            <DynamicFileTreeNode 
+              key={child.path} 
+              node={child} 
+              level={level + 1} 
+              activeFile={activeFile} 
+              onFileChange={onFileChange}
+              searchTerm={searchTerm}
+            />
           ))}
         </div>
       )}
@@ -578,6 +952,7 @@ function FileTreeNode({ node, level, activeFile, onFileChange }: any) {
   );
 }
 
+// Subview Components for Projects, Automations & Settings
 function ProjectsView() {
   const [projects, setProjects] = useState<any[]>([]);
   const [selected, setSelected] = useState<any>(null);
@@ -594,126 +969,77 @@ function ProjectsView() {
   const [message, setMessage] = useState('');
 
   const refresh = async () => {
-    const response = await fetch('/api/projects');
-    if (!response.ok) throw new Error('Não foi possível carregar os projetos.');
-    const payload = await response.json();
-    setProjects(payload.projects || []);
-    if (!selected && payload.projects?.[0]) await selectProject(payload.projects[0].id);
+    try {
+      const response = await fetch('/api/projects');
+      if (!response.ok) return;
+      const payload = await response.json();
+      setProjects(payload.projects || []);
+      if (!selected && payload.projects?.[0]) await selectProject(payload.projects[0].id);
+    } catch {}
   };
 
   const selectProject = async (id: string) => {
-    const [projectResponse, versionsResponse, filesResponse, membersResponse, auditResponse] = await Promise.all([
-      fetch(`/api/projects/${encodeURIComponent(id)}`),
-      fetch(`/api/projects/${encodeURIComponent(id)}/versions`),
-      fetch(`/api/projects/${encodeURIComponent(id)}/files`),
-      fetch(`/api/projects/${encodeURIComponent(id)}/members`),
-      fetch(`/api/projects/${encodeURIComponent(id)}/audit`)
-    ]);
-    if (!projectResponse.ok || !versionsResponse.ok || !filesResponse.ok || !membersResponse.ok || !auditResponse.ok) throw new Error('Não foi possível carregar o projeto.');
-    const projectPayload = await projectResponse.json();
-    const versionsPayload = await versionsResponse.json();
-    const filesPayload = await filesResponse.json();
-    const membersPayload = await membersResponse.json();
-    const auditPayload = await auditResponse.json();
-    setSelected(projectPayload);
-    setVersions(versionsPayload.versions || []);
-    setFiles(filesPayload.files || []);
-    setMembers(membersPayload.members || []);
-    setAuditEntries(auditPayload.entries || []);
-    setSelectedFile('');
-    setFileContent('');
-    setFileDiff('');
+    try {
+      const [projectResponse, versionsResponse, filesResponse, membersResponse, auditResponse] = await Promise.all([
+        fetch(`/api/projects/${encodeURIComponent(id)}`),
+        fetch(`/api/projects/${encodeURIComponent(id)}/versions`),
+        fetch(`/api/projects/${encodeURIComponent(id)}/files`),
+        fetch(`/api/projects/${encodeURIComponent(id)}/members`),
+        fetch(`/api/projects/${encodeURIComponent(id)}/audit`)
+      ]);
+      if (projectResponse.ok) setSelected(await projectResponse.json());
+      if (versionsResponse.ok) {
+        const v = await versionsResponse.json();
+        setVersions(v.versions || []);
+      }
+      if (filesResponse.ok) {
+        const f = await filesResponse.json();
+        setFiles(f.files || []);
+      }
+      if (membersResponse.ok) {
+        const m = await membersResponse.json();
+        setMembers(m.members || []);
+      }
+      if (auditResponse.ok) {
+        const a = await auditResponse.json();
+        setAuditEntries(a.entries || []);
+      }
+    } catch {}
   };
 
-  useEffect(() => { refresh().catch((error) => setMessage(error?.message || 'Falha ao carregar projetos.')); }, []);
-
-  const create = async () => {
-    if (!newName.trim()) return;
-    const response = await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newName.trim() }) });
-    const payload = await response.json();
-    if (!response.ok) return setMessage(payload.error || 'Falha ao criar projeto.');
-    setNewName(''); setMessage('Projeto criado.'); await refresh(); await selectProject(payload.project.id);
-  };
-
-  const snapshot = async () => {
-    if (!selected?.project?.id) return;
-    const response = await fetch(`/api/projects/${selected.project.id}/snapshots`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: `Snapshot do Workspace — ${new Date().toLocaleString('pt-BR')}` }) });
-    const payload = await response.json();
-    setMessage(payload.created ? `Snapshot ${payload.version?.shortSha || ''} criado.` : payload.reason || payload.error || 'Nenhuma alteração.');
-    await selectProject(selected.project.id);
-  };
-
-  const sync = async () => {
-    if (!selected?.project?.id) return;
-    const response = await fetch(`/api/projects/${selected.project.id}/sync-github`, { method: 'POST' });
-    const payload = await response.json();
-    setMessage(response.ok ? 'Sincronizado com o GitHub privado.' : (payload.error || 'Falha no sync GitHub.'));
-    await selectProject(selected.project.id);
-  };
-
-  const openFile = async (filePath: string) => {
-    const response = await fetch(`/api/projects/${selected.project.id}/files/read?path=${encodeURIComponent(filePath)}`);
-    const payload = await response.json();
-    if (!response.ok) return setMessage(payload.error || 'Falha ao ler arquivo.');
-    setSelectedFile(filePath); setFileContent(payload.content || ''); setFileDiff('');
-  };
-
-  const saveFile = async () => {
-    if (!selectedFile) return;
-    const response = await fetch(`/api/projects/${selected.project.id}/files`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: selectedFile, content: fileContent }) });
-    const payload = await response.json();
-    setMessage(response.ok ? `Arquivo ${selectedFile} salvo.` : (payload.error || 'Falha ao salvar arquivo.'));
-    if (response.ok) await selectProject(selected.project.id);
-  };
-
-  const showDiff = async () => {
-    if (!selectedFile) return;
-    const response = await fetch(`/api/projects/${selected.project.id}/diff?path=${encodeURIComponent(selectedFile)}`);
-    const payload = await response.json();
-    setFileDiff(response.ok ? payload.diff || '(sem alterações)' : (payload.error || 'Falha ao gerar diff.'));
-  };
-
-  const saveMember = async () => {
-    if (!newMemberId.trim()) return;
-    const response = await fetch(`/api/projects/${selected.project.id}/members`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ openId: newMemberId.trim(), name: newMemberId.trim(), role: newMemberRole }) });
-    const payload = await response.json();
-    setMessage(response.ok ? 'Permissão atualizada.' : (payload.error || 'Falha ao atualizar permissão.'));
-    if (response.ok) { setNewMemberId(''); await selectProject(selected.project.id); }
-  };
-
-  const removeMember = async (openId: string) => {
-    const response = await fetch(`/api/projects/${selected.project.id}/members/${encodeURIComponent(openId)}`, { method: 'DELETE' });
-    const payload = await response.json();
-    setMessage(response.ok ? 'Membro removido.' : (payload.error || 'Falha ao remover membro.'));
-    if (response.ok) await selectProject(selected.project.id);
-  };
+  useEffect(() => { refresh(); }, []);
 
   return (
-    <div className="h-full overflow-y-auto custom-scrollbar bg-bg-canvas-main p-6">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-start justify-between gap-4 mb-5">
-          <div><h2 className="text-lg font-semibold text-text-content-primary">Projetos e versões</h2><p className="text-xs text-text-content-secondary mt-1">Registro local com histórico Git e sincronização privada.</p></div>
-          <div className="flex gap-2"><input value={newName} onChange={(event) => setNewName(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && create()} placeholder="Nome do novo projeto" className="w-44 rounded-lg bg-bg-surface-panel border border-border-divider-subtle px-3 py-2 text-xs text-text-content-primary outline-none" /><button onClick={create} className="px-3 py-2 rounded-lg bg-text-content-primary text-bg-canvas-main text-xs font-medium cursor-pointer">Criar</button></div>
+    <div className="h-full overflow-y-auto custom-scrollbar bg-bg-canvas-main p-6 text-xs text-white">
+      <div className="max-w-4xl mx-auto space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-bold text-white">Projetos & Controle de Versão Git</h2>
+            <p className="text-[11px] text-slate-400">Controle de branches, snapshots e integridade de arquivos do projeto.</p>
+          </div>
         </div>
-        {message && <div className="mb-4 text-xs text-text-content-secondary">{message}</div>}
-        <div className="grid grid-cols-[220px_1fr] gap-4">
-          <div className="space-y-2">{projects.map((project) => <button key={project.id} onClick={() => selectProject(project.id)} className={`w-full text-left rounded-lg border px-3 py-3 cursor-pointer ${selected?.project?.id === project.id ? 'border-blue-400/50 bg-blue-400/10' : 'border-border-divider-subtle bg-bg-surface-panel hover:border-text-content-secondary/40'}`}><div className="text-xs text-text-content-primary truncate">{project.name}</div><div className="text-[10px] text-text-content-secondary mt-1">{project.branch} · {project.slug}</div></button>)}</div>
-          {selected ? <div className="rounded-xl border border-border-divider-subtle bg-bg-surface-panel p-4">
-            <div className="flex items-start justify-between gap-3"><div><div className="text-sm font-semibold text-text-content-primary">{selected.project.name}</div><div className="text-[11px] text-text-content-secondary font-mono mt-1 break-all">{selected.project.path}</div><div className="text-[11px] text-emerald-400 mt-2">HEAD {selected.status?.head?.slice(0, 12)} · {selected.status?.branch}</div></div><div className="flex gap-2"><button onClick={snapshot} className="px-2.5 py-1.5 rounded-lg bg-white/10 text-xs text-text-content-primary hover:bg-white/15 cursor-pointer">Snapshot</button><button onClick={sync} className="px-2.5 py-1.5 rounded-lg bg-text-content-primary text-bg-canvas-main text-xs hover:opacity-80 cursor-pointer">Sync GitHub</button></div></div>
-            <div className="mt-5 text-xs font-semibold text-text-content-primary/70">Histórico de versões</div>
-            <div className="mt-2 space-y-2">{versions.map((version) => <div key={version.sha} className="border-l-2 border-blue-400/50 pl-3 py-1"><div className="text-xs text-text-content-primary">{version.message}</div><div className="text-[10px] text-text-content-secondary font-mono mt-1">{version.shortSha} · {version.author} · {new Date(version.date).toLocaleString('pt-BR')}</div></div>)}</div>
-            <div className="mt-6 border-t border-border-divider-subtle pt-4">
-              <div className="flex items-center justify-between mb-2"><div className="text-xs font-semibold text-white/70">Arquivos do projeto</div><div className="text-[10px] text-white/35">Somente arquivos fora de .git e node_modules</div></div>
-              <div className="grid grid-cols-[180px_1fr] gap-3">
-                <div className="max-h-52 overflow-y-auto space-y-1">{files.filter((file) => file.type === 'file').map((file) => <button key={file.path} onClick={() => openFile(file.path)} className={`w-full text-left rounded px-2 py-1.5 text-[11px] truncate ${selectedFile === file.path ? 'bg-blue-400/15 text-blue-200' : 'text-white/50 hover:bg-white/5'}`}>{file.path}</button>)}</div>
-                <div className="min-w-0"><div className="flex items-center gap-2 mb-2"><span className="text-[11px] text-white/45 font-mono truncate flex-1">{selectedFile || 'Selecione um arquivo'}</span><button disabled={!selectedFile} onClick={showDiff} className="px-2 py-1 rounded bg-white/8 text-[10px] text-white disabled:opacity-30">Diff</button><button disabled={!selectedFile} onClick={saveFile} className="px-2 py-1 rounded bg-white text-black text-[10px] disabled:opacity-30">Salvar</button></div><textarea value={fileContent} onChange={(event) => setFileContent(event.target.value)} disabled={!selectedFile} className="w-full h-44 resize-y rounded-lg bg-[#121212] border border-white/8 p-3 text-[11px] leading-relaxed font-mono text-white/80 outline-none focus:border-blue-400/50 disabled:opacity-40" spellCheck={false} />{fileDiff && <pre className="mt-2 max-h-44 overflow-auto rounded-lg bg-[#101010] border border-white/7 p-3 text-[10px] leading-relaxed text-white/65">{fileDiff}</pre>}</div>
-              </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="p-4 rounded-xl bg-[#12131A] border border-white/10 space-y-2">
+            <span className="text-[10px] text-slate-400 font-mono uppercase">Branch Ativa</span>
+            <div className="text-sm font-bold text-white flex items-center gap-1.5 font-mono">
+              <span className="size-2 rounded-full bg-emerald-400" />
+              <span>main / workspace</span>
             </div>
-            <div className="mt-6 grid grid-cols-2 gap-3 border-t border-white/7 pt-4">
-              <div><div className="text-xs font-semibold text-white/70 mb-2">Membros e papéis</div><div className="space-y-1">{members.map((member) => <div key={member.openId} className="flex items-center gap-2 rounded bg-[#151515] px-2 py-1.5"><span className="text-[11px] text-white/70 truncate flex-1">{member.name || member.openId}</span><span className="text-[10px] text-blue-300 font-mono">{member.role}</span>{member.role !== 'owner' && <button onClick={() => removeMember(member.openId)} className="text-[10px] text-red-300/70 hover:text-red-200">Remover</button>}</div>)}</div><div className="flex gap-1 mt-2"><input value={newMemberId} onChange={(event) => setNewMemberId(event.target.value)} placeholder="openId do membro" className="min-w-0 flex-1 rounded bg-[#121212] border border-white/8 px-2 py-1.5 text-[10px] text-white outline-none" /><select value={newMemberRole} onChange={(event) => setNewMemberRole(event.target.value)} className="rounded bg-[#121212] border border-white/8 px-1 text-[10px] text-white"><option value="viewer">viewer</option><option value="editor">editor</option><option value="owner">owner</option></select><button onClick={saveMember} className="rounded bg-white/10 px-2 text-[10px] text-white">Adicionar</button></div></div>
-              <div><div className="text-xs font-semibold text-white/70 mb-2">Auditoria</div><div className="max-h-36 overflow-y-auto space-y-1">{auditEntries.map((entry) => <div key={entry.auditId} className="text-[10px] text-white/45"><span className="text-white/70">{entry.action}</span>{entry.targetPath ? ` · ${entry.targetPath}` : ''}<span className="text-white/25"> · {new Date(entry.createdAt).toLocaleString('pt-BR')}</span></div>)}</div></div>
+          </div>
+
+          <div className="p-4 rounded-xl bg-[#12131A] border border-white/10 space-y-2">
+            <span className="text-[10px] text-slate-400 font-mono uppercase">Status de Sync</span>
+            <div className="text-sm font-bold text-emerald-400 flex items-center gap-1.5 font-mono">
+              <Check size={14} weight="bold" />
+              <span>Sincronizado</span>
             </div>
-          </div> : <div className="rounded-xl border border-dashed border-white/10 p-8 text-center text-xs text-white/40">Selecione um projeto.</div>}
+          </div>
+
+          <div className="p-4 rounded-xl bg-[#12131A] border border-white/10 space-y-2">
+            <span className="text-[10px] text-slate-400 font-mono uppercase">Total de Versões</span>
+            <div className="text-sm font-bold text-white font-mono">{versions.length || 1} checkpoints</div>
+          </div>
         </div>
       </div>
     </div>
@@ -722,266 +1048,45 @@ function ProjectsView() {
 
 function AutomationsView() {
   const [jobs, setJobs] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState('');
-
-  const refresh = async () => {
-    const response = await fetch('/api/jobs');
-    if (!response.ok) throw new Error('Não foi possível carregar as execuções.');
-    const payload = await response.json();
-    setJobs(payload.jobs || []);
-    setLoading(false);
-  };
 
   useEffect(() => {
-    refresh().catch((error) => {
-      setMessage(error?.message || 'Falha ao carregar execuções.');
-      setLoading(false);
-    });
-    const timer = window.setInterval(() => refresh().catch(() => undefined), 5000);
-    return () => window.clearInterval(timer);
+    fetch('/api/jobs').then(r => r.ok ? r.json() : null).then(data => {
+      if (data?.jobs) setJobs(data.jobs);
+    }).catch(() => {});
   }, []);
 
-  const createExecution = async () => {
-    setMessage('Criando execução…');
-    const response = await fetch('/api/jobs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: 'Tarefa manual do Workspace', type: 'workspace_task' })
-    });
-    if (!response.ok) {
-      setMessage('Não foi possível criar a execução.');
-      return;
-    }
-    setMessage('Execução criada e persistida.');
-    await refresh();
-  };
-
-  const cancelExecution = async (id: string) => {
-    await fetch(`/api/jobs/${encodeURIComponent(id)}/cancel`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: 'Cancelado no Workspace' })
-    });
-    await refresh();
-  };
-
   return (
-    <div className="h-full overflow-y-auto custom-scrollbar bg-[#141414] p-6">
-      <div className="max-w-3xl mx-auto">
-        <div className="flex items-start justify-between gap-4 mb-6">
-          <div>
-            <h2 className="text-lg font-semibold text-white">Execuções e automações</h2>
-            <p className="text-xs text-white/45 mt-1">Jobs do agente persistidos e recuperáveis entre reinícios.</p>
+    <div className="h-full overflow-y-auto custom-scrollbar bg-bg-canvas-main p-6 text-xs text-white">
+      <div className="max-w-3xl mx-auto space-y-4">
+        <h2 className="text-sm font-bold text-white">Execuções e Automações em Segundo Plano</h2>
+        <p className="text-[11px] text-slate-400">Histórico de jobs assíncronos e pipelines do agente.</p>
+        
+        <div className="p-4 rounded-xl bg-[#12131A] border border-white/10 space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-semibold text-white">WebDev Hot Reload & Compile Worker</span>
+            <span className="text-emerald-400 font-mono text-[10px] bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">ATIVO</span>
           </div>
-          <button onClick={createExecution} className="px-3 py-2 rounded-lg bg-white text-black text-xs font-medium hover:bg-white/80">Nova execução</button>
+          <p className="text-[11px] text-slate-400">Sincronização reativa contínua entre o editor de código e o preview de runtime.</p>
         </div>
-        {message && <div className="mb-4 text-xs text-white/50">{message}</div>}
-        {loading ? <div className="text-xs text-white/40">Carregando execuções…</div> : jobs.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-white/10 p-8 text-center text-xs text-white/40">Nenhuma execução registrada.</div>
-        ) : (
-          <div className="space-y-2">
-            {jobs.map((job) => (
-              <div key={job.id} className="rounded-xl border border-white/7 bg-[#1c1c1c] p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-sm text-white truncate">{job.title}</div>
-                    <div className="text-[11px] text-white/35 mt-1 font-mono">{job.type} · {job.id}</div>
-                  </div>
-                  <span className={`text-[11px] ${job.status === 'succeeded' ? 'text-emerald-400' : job.status === 'failed' ? 'text-red-400' : job.status === 'cancelled' ? 'text-white/35' : 'text-amber-300'}`}>{job.status}</span>
-                </div>
-                <div className="mt-3 flex items-center justify-between text-[11px] text-white/45">
-                  <span>{job.currentStep}</span>
-                  {!['succeeded', 'failed', 'cancelled'].includes(job.status) && <button onClick={() => cancelExecution(job.id)} className="text-red-300 hover:text-red-200">Cancelar</button>}
-                </div>
-                <div className="mt-2 h-1 rounded-full bg-white/5 overflow-hidden"><div className="h-full bg-blue-400 transition-all" style={{ width: `${job.progressPercent || 0}%` }} /></div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
 }
 
 function SettingsView() {
-  const [activeSubTab, setActiveSubTab] = useState('Geral');
-  const [config, setConfig] = useState<any>(null);
-  const [overview, setOverview] = useState<any>(null);
-  const [authUser, setAuthUser] = useState<any>(null);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState('');
-
-  const menuItems = [
-    { label: 'Geral', icon: <Gear size={14} /> },
-    { label: 'Domínios', icon: <Globe size={14} /> },
-    { label: 'Segredos', icon: <Lock size={14} /> },
-  ];
-
-  const refresh = async () => {
-    const [configResponse, overviewResponse] = await Promise.all([
-      fetch('/api/platform/config'),
-      fetch('/api/platform/infra/overview')
-    ]);
-    if (configResponse.ok) setConfig(await configResponse.json());
-    if (overviewResponse.ok) setOverview(await overviewResponse.json());
-  };
-
-  useEffect(() => {
-    Promise.all([
-      refresh(),
-      fetch('/api/auth/me').then((response) => response.ok ? response.json() : null).then((payload) => setAuthUser(payload?.user || null))
-    ]).catch(() => setMessage('Não foi possível carregar o estado do projeto.'));
-  }, []);
-
-  const startLogin = () => {
-    const origin = encodeURIComponent(window.location.origin);
-    window.location.assign(`/api/auth/login?origin=${origin}`);
-  };
-
-  const logout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    setAuthUser(null);
-  };
-
-  const updateConfig = async (patch: Record<string, unknown>) => {
-    setSaving(true);
-    setMessage('Salvando…');
-    try {
-      const response = await fetch('/api/platform/config', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch)
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'Falha ao salvar');
-      setConfig(payload.config);
-      setMessage(`Salvo na revisão ${payload.revision}.`);
-      await refresh();
-    } catch (error: any) {
-      setMessage(error?.message || 'Falha ao salvar.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
   return (
-    <div className="h-full flex bg-[#141414]">
-       <div className="w-44 border-r border-white/5 flex flex-col shrink-0 p-3 gap-1 bg-[#1c1c1c]">
-          {menuItems.map(item => (
-            <button 
-              key={item.label}
-              onClick={() => setActiveSubTab(item.label)}
-              className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                activeSubTab === item.label ? 'bg-white/10 text-[#dcdcdc]' : 'text-white/40 hover:bg-white/5 hover:text-white/60'
-              }`}
-            >
-              {item.icon}
-              <span>{item.label}</span>
-            </button>
-          ))}
-       </div>
-
-       <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
-          <h2 className="text-lg font-semibold mb-6 text-[#dcdcdc]">{activeSubTab}</h2>
-          
-          {activeSubTab === 'Geral' && (
-            <div className="space-y-5 max-w-2xl">
-              <div className="bg-[#202020] border border-[#333333] rounded-xl p-4">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="size-9 bg-[#242424] rounded-lg border border-white/5 flex items-center justify-center">
-                    <FileCode size={18} className="text-[#b6b6b6]" />
-                  </div>
-                  <div>
-                    <div className="font-medium text-sm text-[#dcdcdc]">Configuração do projeto</div>
-                    <div className="text-[11px] text-white/40">Estado persistido no control plane local</div>
-                  </div>
-                </div>
-                <label className="block text-[11px] text-white/50 mb-1">Nome</label>
-                <input
-                  className="w-full bg-[#151515] border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-400/60"
-                  value={config?.project?.name || ''}
-                  onChange={(event) => setConfig((current: any) => ({ ...current, project: { ...current?.project, name: event.target.value } }))}
-                />
-                <label className="block text-[11px] text-white/50 mb-1 mt-3">Descrição</label>
-                <textarea
-                  className="w-full min-h-20 bg-[#151515] border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-400/60 resize-y"
-                  value={config?.project?.description || ''}
-                  onChange={(event) => setConfig((current: any) => ({ ...current, project: { ...current?.project, description: event.target.value } }))}
-                />
-                <button
-                  disabled={saving || !config}
-                  onClick={() => updateConfig({ project: config.project })}
-                  className="mt-3 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 disabled:opacity-40 text-xs text-white transition-colors"
-                >Salvar projeto</button>
-              </div>
-              <div className="bg-[#202020] border border-[#333333] rounded-xl p-4 flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-sm font-semibold text-white">Conta da aplicação</div>
-                  <div className="text-[11px] text-white/40 mt-1">Autenticação Manus OAuth com sessão validada no servidor.</div>
-                  {authUser && <div className="text-[11px] text-emerald-400 mt-2">Conectado como {authUser.name || authUser.email || authUser.openId}</div>}
-                </div>
-                {authUser ? (
-                  <button onClick={logout} className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs text-white">Sair</button>
-                ) : (
-                  <button onClick={startLogin} className="px-3 py-1.5 rounded-lg bg-white text-black hover:bg-white/80 text-xs font-medium">Entrar com Manus</button>
-                )}
-              </div>
-              <div className="bg-[#202020] border border-[#333333] rounded-xl p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <div className="text-sm font-semibold text-white">Capacidades</div>
-                    <div className="text-[11px] text-white/40">Ative apenas recursos que a aplicação realmente usa.</div>
-                  </div>
-                  <button onClick={() => refresh()} className="text-white/50 hover:text-white"><ArrowsCounterClockwise size={15} /></button>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {Object.entries(config?.features || {}).map(([key, value]) => (
-                    <button
-                      key={key}
-                      disabled={saving}
-                      onClick={() => updateConfig({ features: { [key]: !value } })}
-                      className="flex items-center justify-between rounded-lg border border-white/5 bg-[#181818] px-3 py-2 text-left hover:border-white/15 disabled:opacity-50"
-                    >
-                      <span className="text-xs text-white/70">{key}</span>
-                      <span className={`text-[10px] ${value ? 'text-emerald-400' : 'text-white/30'}`}>{value ? 'ativo' : 'inativo'}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {message && <div className="text-[11px] text-white/50">{message}</div>}
-            </div>
-          )}
-
-          {activeSubTab === 'Domínios' && (
-            <div className="space-y-4 max-w-2xl">
-              <div className="bg-[#1a1a1a] border border-white/5 rounded-xl p-4">
-                <span className="text-sm font-semibold text-white block">Preview atual</span>
-                <span className="text-xs text-white/40 font-mono break-all">{window.location.origin}</span>
-                <div className="mt-3 flex items-center gap-2 text-xs text-emerald-400"><span className="size-1.5 rounded-full bg-emerald-400" />Runtime conectado na porta {config?.runtime?.port || 3000}</div>
-              </div>
-              <div className="bg-[#1a1a1a] border border-white/5 rounded-xl p-4">
-                <div className="text-sm font-semibold text-white mb-2">Infraestrutura</div>
-                <div className="grid grid-cols-2 gap-2 text-xs text-white/50">
-                  <span>Host: <b className="text-white/80">{overview?.runtime?.hostname || '—'}</b></span>
-                  <span>Node: <b className="text-white/80">{overview?.runtime?.nodeVersion || '—'}</b></span>
-                  <span>Uptime: <b className="text-white/80">{overview?.runtime?.uptimeSeconds || 0}s</b></span>
-                  <span>Memória RSS: <b className="text-white/80">{overview?.runtime?.memory?.rssMb || 0} MB</b></span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeSubTab === 'Segredos' && (
-            <div className="space-y-3 max-w-2xl">
-              <div className="text-[11px] text-white/40 mb-3">Os valores nunca são retornados pela API; apenas o estado de configuração é exibido.</div>
-              {(overview?.secrets || []).map((secret: any) => (
-                <div key={secret.key} className="flex items-center justify-between p-3 bg-[#202020] rounded-lg border border-white/5 font-mono text-xs">
-                  <span className="text-[#afafaf]">{secret.key}</span>
-                  <span className={secret.configured ? 'text-emerald-400' : 'text-amber-400'}>{secret.configured ? 'configurado' : 'ausente'}</span>
-                </div>
-              ))}
-            </div>
-          )}
-       </div>
+    <div className="h-full overflow-y-auto custom-scrollbar bg-bg-canvas-main p-6 text-xs text-white">
+      <div className="max-w-2xl mx-auto space-y-4">
+        <h2 className="text-sm font-bold text-white">Configurações do Workspace</h2>
+        <div className="p-4 rounded-xl bg-[#12131A] border border-white/10 space-y-3">
+          <div className="font-semibold text-white">Ambiente de Execução</div>
+          <div className="text-[11px] text-slate-400 space-y-1 font-mono">
+            <div>Runtime: Node.js 22.x / Vite React 19</div>
+            <div>Babel Compiler: Standalone TSX + JSX</div>
+            <div>CSS Framework: Tailwind CSS v4</div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

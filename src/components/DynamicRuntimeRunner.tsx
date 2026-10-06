@@ -63,13 +63,16 @@ const FallbackIcon = ({ size = 18, className = '', ...props }: any) => (
   </svg>
 );
 
-// Proxy for Lucide icons: prevents undefined icon crashes
+// Proxy for Phosphor & Lucide icons: prevents undefined icon crashes
 const SafePhosphorIcons = new Proxy(PhosphorIcons, {
   get(target: any, prop: string) {
-    if (prop in target) return target[prop];
+    if (typeof prop !== 'string') return target[prop];
+    if (prop in target && target[prop] !== undefined) return target[prop];
+    if (prop === 'TrendingUp' || prop === 'TrendUp') return target.TrendUp || FallbackIcon;
+    if (prop === 'TrendingDown' || prop === 'TrendDown') return target.TrendDown || FallbackIcon;
     const lower = prop.toLowerCase();
     for (const k of Object.keys(target)) {
-      if (k.toLowerCase() === lower) return target[k];
+      if (k.toLowerCase() === lower && target[k]) return target[k];
     }
     return FallbackIcon;
   }
@@ -103,6 +106,22 @@ const SafeMotion = new Proxy(motionObj, {
 });
 
 const AnimatePresence = ({ children }: { children?: ReactNode }) => <>{children}</>;
+
+// Safely instantiate new Function by filtering out keys that are not valid JS identifier names
+function createSafeFunction(scope: Record<string, any>, body: string) {
+  const keys: string[] = [];
+  const values: any[] = [];
+  for (const [key, val] of Object.entries(scope)) {
+    if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key)) {
+      keys.push(key);
+      values.push(val);
+    }
+  }
+  return {
+    fn: new Function(...keys, body),
+    values
+  };
+}
 
 // Helper to sanitize code before passing to Babel
 function sanitizeSourceCode(rawCode: string): { code: string; mainComponentName: string } {
@@ -162,9 +181,10 @@ function sanitizeSourceCode(rawCode: string): { code: string; mainComponentName:
 
 interface DynamicRuntimeRunnerProps {
   code: string;
+  customFiles?: Record<string, string>;
 }
 
-export function DynamicRuntimeRunner({ code }: DynamicRuntimeRunnerProps) {
+export function DynamicRuntimeRunner({ code, customFiles = {} }: DynamicRuntimeRunnerProps) {
   const [ComponentToRender, setComponentToRender] = useState<React.ComponentType<any> | null>(null);
   const [compilationError, setCompilationError] = useState<string | null>(null);
   const [isCompiling, setIsCompiling] = useState(false);
@@ -180,10 +200,120 @@ export function DynamicRuntimeRunner({ code }: DynamicRuntimeRunnerProps) {
     setCompilationError(null);
 
     try {
-      // 1. Sanitize code and detect component name
+      // 1. Compile subcomponents from customFiles if any
+      const subComponents: Record<string, any> = {};
+
+      // 1a. Process and inject custom CSS files dynamically into document head
+      let aggregatedCss = '';
+      for (const [filePath, fileContent] of Object.entries(customFiles)) {
+        if (filePath.endsWith('.css') && fileContent && typeof fileContent === 'string') {
+          aggregatedCss += `\n/* --- STYLE MODULE: ${filePath} --- */\n${fileContent}\n`;
+        }
+      }
+
+      if (typeof document !== 'undefined') {
+        let styleElement = document.getElementById('dynamic-runtime-css');
+        if (!styleElement) {
+          styleElement = document.createElement('style');
+          styleElement.setAttribute('id', 'dynamic-runtime-css');
+          document.head.appendChild(styleElement);
+        }
+        styleElement.textContent = aggregatedCss;
+      }
+
+      // 1b. Parse and expose JSON, MD, TXT files into the subcomponents dictionary for imports
+      for (const [filePath, fileContent] of Object.entries(customFiles)) {
+        if (!fileContent || typeof fileContent !== 'string' || !fileContent.trim()) continue;
+        
+        if (filePath.endsWith('.json')) {
+          try {
+            const parsedJson = JSON.parse(fileContent);
+            const fileNameBase = filePath.split('/').pop()?.replace(/\.json$/, '');
+            if (fileNameBase) {
+              subComponents[fileNameBase] = parsedJson;
+            }
+            subComponents[filePath] = parsedJson;
+          } catch (jsonErr) {
+            console.warn(`[DynamicRuntimeRunner] Fail to parse JSON file (${filePath}):`, jsonErr);
+          }
+        } else if (filePath.endsWith('.md') || filePath.endsWith('.txt')) {
+          const fileNameBase = filePath.split('/').pop()?.replace(/\.(md|txt)$/, '');
+          if (fileNameBase) {
+            subComponents[fileNameBase] = fileContent;
+          }
+          subComponents[filePath] = fileContent;
+        }
+      }
+
+      for (const [filePath, fileContent] of Object.entries(customFiles)) {
+        if (!fileContent || typeof fileContent !== 'string' || !fileContent.trim()) continue;
+        if (filePath.endsWith('.css') || filePath.endsWith('.json') || filePath.endsWith('.md') || filePath.endsWith('.txt')) continue;
+        if (filePath.includes('App.tsx') && (code.includes('export default') || code.length > 50)) continue;
+
+        try {
+          const { code: subProcessed, mainComponentName: subName } = sanitizeSourceCode(fileContent);
+          const subCompiled = Babel.transform(subProcessed, {
+            presets: [
+              ['react', { runtime: 'classic' }],
+              ['typescript', { isTSX: true, allExtensions: true }]
+            ],
+            filename: filePath,
+            parserOpts: { allowReturnOutsideFunction: true }
+          }).code;
+
+          if (subCompiled) {
+            const subScope: Record<string, any> = {
+              React,
+              useState: React.useState,
+              useEffect: React.useEffect,
+              useContext: React.useContext,
+              useReducer: React.useReducer,
+              useCallback: React.useCallback,
+              useMemo: React.useMemo,
+              useRef: React.useRef,
+              useId: React.useId,
+              useLayoutEffect: React.useLayoutEffect,
+              Fragment: React.Fragment,
+              createElement: React.createElement,
+              cloneElement: React.cloneElement,
+              Children: React.Children,
+              memo: React.memo,
+              forwardRef: React.forwardRef,
+              ...SafePhosphorIcons,
+              Lucide: SafePhosphorIcons,
+              icons: SafePhosphorIcons,
+              PhosphorIcons,
+              ...PhosphorIcons,
+              TrendingUp: PhosphorIcons.TrendUp || FallbackIcon,
+              TrendingDown: PhosphorIcons.TrendDown || FallbackIcon,
+              TrendUp: PhosphorIcons.TrendUp || FallbackIcon,
+              TrendDown: PhosphorIcons.TrendDown || FallbackIcon,
+              motion: SafeMotion,
+              AnimatePresence,
+              clsx: (...args: any[]) => args.filter(Boolean).join(' '),
+              cn: (...args: any[]) => args.filter(Boolean).join(' ')
+            };
+
+            const subResolver = `\nreturn (typeof ${subName} !== 'undefined' ? ${subName} : typeof __DefaultDynamicApp__ !== 'undefined' ? __DefaultDynamicApp__ : null);`;
+            const { fn: subEvaluator, values: subValues } = createSafeFunction(subScope, subCompiled + subResolver);
+            const SubComp = subEvaluator(...subValues);
+            if (SubComp) {
+              subComponents[subName] = SubComp;
+              const fileNameBase = filePath.split('/').pop()?.replace(/\.(tsx|jsx|ts|js)$/, '');
+              if (fileNameBase) {
+                subComponents[fileNameBase] = SubComp;
+              }
+            }
+          }
+        } catch (subErr) {
+          console.warn(`[DynamicRuntimeRunner] Non-critical subcomponent compile notice (${filePath}):`, subErr);
+        }
+      }
+
+      // 2. Sanitize main code and detect component name
       const { code: processed, mainComponentName } = sanitizeSourceCode(code);
 
-      // 2. Compile with Babel TypeScript + JSX
+      // 3. Compile main component with Babel TypeScript + JSX
       let compiled: string | null | undefined = null;
       
       try {
@@ -229,7 +359,7 @@ export function DynamicRuntimeRunner({ code }: DynamicRuntimeRunnerProps) {
         (window as any).useLayoutEffect = React.useLayoutEffect;
       }
 
-      // 3. Assemble execution scope
+      // 4. Assemble execution scope with all subcomponents and helpers
       const scope: Record<string, any> = {
         React,
         useState: React.useState,
@@ -252,20 +382,24 @@ export function DynamicRuntimeRunner({ code }: DynamicRuntimeRunnerProps) {
         Lucide: SafePhosphorIcons,
         icons: SafePhosphorIcons,
         // Phosphor Icons
+        PhosphorIcons,
         ...PhosphorIcons,
+        TrendingUp: PhosphorIcons.TrendUp || FallbackIcon,
+        TrendingDown: PhosphorIcons.TrendDown || FallbackIcon,
+        TrendUp: PhosphorIcons.TrendUp || FallbackIcon,
+        TrendDown: PhosphorIcons.TrendDown || FallbackIcon,
         // Framer Motion / Motion Compatibility
         motion: SafeMotion,
         AnimatePresence,
         // Common utility helpers
         clsx: (...args: any[]) => args.filter(Boolean).join(' '),
         cn: (...args: any[]) => args.filter(Boolean).join(' '),
-        confetti: () => console.log('🎉 Confetti action executed')
+        confetti: () => console.log('🎉 Confetti action executed'),
+        // Multi-file subcomponents
+        ...subComponents
       };
 
-      const scopeKeys = Object.keys(scope);
-      const scopeValues = Object.values(scope);
-
-      // 4. Construct execution wrapper with robust component resolver
+      // 5. Construct execution wrapper with robust component resolver
       const returnResolver = `
 \nreturn (
   (typeof __DefaultDynamicApp__ !== 'undefined' && __DefaultDynamicApp__) ||
@@ -283,7 +417,7 @@ export function DynamicRuntimeRunner({ code }: DynamicRuntimeRunnerProps) {
 );
 `;
 
-      const evaluator = new Function(...scopeKeys, compiled + returnResolver);
+      const { fn: evaluator, values: scopeValues } = createSafeFunction(scope, compiled + returnResolver);
       const ComponentResult = evaluator(...scopeValues);
 
       if (!ComponentResult || (typeof ComponentResult !== 'function' && typeof ComponentResult !== 'object')) {
@@ -298,7 +432,7 @@ export function DynamicRuntimeRunner({ code }: DynamicRuntimeRunnerProps) {
     } finally {
       setIsCompiling(false);
     }
-  }, [code]);
+  }, [code, customFiles]);
 
   if (compilationError) {
     return (
@@ -354,7 +488,7 @@ export function DynamicRuntimeRunner({ code }: DynamicRuntimeRunnerProps) {
         </div>
       )}
     >
-      <div className="w-full h-full overflow-auto">
+      <div className="w-full h-full min-h-full flex flex-col bg-transparent overflow-auto">
         <RenderedComponent />
       </div>
     </ErrorBoundary>

@@ -10,7 +10,7 @@
   --font-serif: "Newsreader", "Playfair Display", serif;
   --font-mono: "Geist Mono", "JetBrains Mono", monospace;
   
-  /* Manus AI Base Palette */
+  /* Sparkle AI Base Palette */
   --color-base-black-deep: #0a0a0a;
   --color-base-black-elevated: #161616;
   --color-base-charcoal-light: #232323;
@@ -166,7 +166,7 @@ body {
   animation: spin-slow 3s linear infinite;
 }
 
-/* Manus specific selection */
+/* Sparkle specific selection */
 ::selection {
   background: rgba(52, 50, 45, 0.5);
   color: inherit;

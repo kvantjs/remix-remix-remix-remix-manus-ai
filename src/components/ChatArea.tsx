@@ -590,13 +590,22 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
           
           // Only extract if it looks like a component or config
           if (code.length > 50) {
-            let filename = 'Home.tsx';
-            if (lang === 'json') filename = 'package.json';
-            else if (code.includes('export default function App')) filename = 'App.tsx';
-            else if (code.includes('export default function')) filename = 'Home.tsx';
+            let filename = 'client/src/App.tsx';
+            if (lang === 'json') {
+              filename = 'package.json';
+            } else if (lang === 'css') {
+              filename = 'client/src/index.css';
+            } else {
+              const fnMatch = code.match(/export\s+default\s+function\s+([A-Za-z0-9_$]+)/);
+              if (fnMatch && fnMatch[1] && fnMatch[1] !== 'App') {
+                filename = `client/src/components/${fnMatch[1]}.tsx`;
+              } else {
+                filename = 'client/src/App.tsx';
+              }
+            }
 
             generatedFilesList.push({
-              path: `client/src/${filename}`,
+              path: filename,
               code,
               lang
             });
@@ -607,11 +616,11 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                 id: `auto_extract_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
                 toolName: 'webdev.write_file',
                 server: 'WebDev MCP',
-                arguments: { path: `client/src/${filename}`, content: code },
+                arguments: { path: filename, content: code },
                 result: 'Código extraído e sincronizado com o workspace.',
                 timestamp: new Date().toLocaleTimeString(),
                 status: 'success',
-                screenData: { actionDescription: `Sincronizando ${filename} extraído da resposta` }
+                screenData: { actionDescription: `Sincronizando ${filename} no workspace` }
               });
             }
           }
@@ -730,15 +739,9 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
       {/* Header */}
       <header className="h-14 flex items-center justify-between px-6 border-b border-white/5 shrink-0 z-10 bg-[#1a1a1a]">
         <div className="flex items-center gap-2.5 cursor-pointer hover:bg-white/5 px-2.5 py-1.5 rounded-lg transition-colors group">
-          <img 
-            src="https://imgdb.io/i/6lwOlmk.png" 
-            alt="Logotipo do Agente" 
-            className="size-6 object-contain rounded-md shadow-xs" 
-          />
-          <span className="text-sm font-medium text-[#dcdcdc]">manus</span>
-          <span className="text-[10px] bg-green-500/10 text-green-400 border border-green-500/20 px-1.5 py-0.5 rounded-full font-mono flex items-center gap-1">
-            <span className="size-1.5 bg-green-400 rounded-full animate-pulse" />
-            Online
+          <span className="text-sm font-medium text-[#dcdcdc]">Sparkle 1.0</span>
+          <span className="text-[10px] font-mono px-1.5 py-0.5 border border-solid" style={{ borderRadius: '6px', backgroundColor: '#1a1a1a', borderColor: '#303030', color: '#cfcfcf' }}>
+            Lite
           </span>
           <CaretDown size={14} className="text-[#dcdcdc]/40 group-hover:text-[#dcdcdc]" />
         </div>
@@ -834,11 +837,11 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
           onSend={(text) => handleSendMessage(text)} 
           onStop={handleStop}
           isThinking={isThinking} 
-          placeholder="Mensagem para o agente manus ou digite @ para fontes e / para comandos..."
+          placeholder="Mensagem para o agente Sparkle ou digite @ para fontes e / para comandos..."
         />
         
         <p className="mt-2 text-center text-[10px] text-[#dcdcdc]/30">
-          manus ativo: digite @ para fontes & arquivos, / para comandos rápidos e selecione o modelo de IA.
+          Sparkle ativo: digite @ para fontes & arquivos, / para comandos rápidos e selecione o modelo de IA.
         </p>
       </div>
 
@@ -933,7 +936,7 @@ function InlineChatQuestionnaire({
             <div className="size-5 rounded-full border border-white/20 flex items-center justify-center bg-[#1f1f1f]">
               <Question size={11} weight="bold" />
             </div>
-            <span className="text-[10px] font-bold uppercase tracking-widest opacity-50">O Manus tem uma pergunta</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest opacity-50">O Sparkle tem uma pergunta</span>
           </div>
           <div className="text-[10px] font-mono text-white/20 bg-white/5 px-2 py-0.5 rounded-full">
             {showTextArea ? 'Final' : `${currentStep + 1} de ${questions.length}`}
@@ -1169,9 +1172,9 @@ function MessageItem({
           className="size-6 object-contain rounded-md shadow-xs bg-bg-surface-panel p-0.5" 
           />
         <div className="flex items-center gap-2 text-xs font-medium">
-          <span className="text-text-content-primary">manus</span>
-          <span className="text-[9px] bg-bg-action-hover border border-border-divider-subtle px-1.5 py-0.5 rounded text-text-content-secondary font-mono">
-            Autonomous Agent
+          <span className="text-text-content-primary">Sparkle</span>
+          <span className="font-mono px-1.5 py-0.5 border border-solid" style={{ borderRadius: '6px', backgroundColor: '#1a1a1a', borderColor: '#303030', borderWidth: '2.1507px', color: '#c0c0c0', fontSize: '9px' }}>
+            Lite
           </span>
         </div>
       </div>
@@ -1220,57 +1223,6 @@ function MessageItem({
               onFinishQuestionnaire?.(answers, summaryText);
             }}
           />
-        )}
-
-        {/* Generated Files Notification Box (Vibecoding Clean UI) */}
-        {!isWaiting && message.files && message.files.length > 0 && (
-          <div className="bg-bg-surface-panel border border-border-divider-subtle rounded-xl p-3.5 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Code size={15} className="text-text-content-secondary" />
-                <span className="text-xs font-semibold text-text-content-primary">Arquivos Gerados & Sincronizados</span>
-                <span className="text-[10px] bg-white/5 text-text-content-secondary border border-border-divider-subtle px-1.5 py-0.5 rounded-full font-mono">
-                  {message.files.length} arquivo(s)
-                </span>
-              </div>
-              <button
-                onClick={() => setShowCodeSnippet(!showCodeSnippet)}
-                className="text-[11px] text-text-content-secondary hover:text-text-content-primary flex items-center gap-1 cursor-pointer transition-colors"
-              >
-                <span>{showCodeSnippet ? 'Ocultar código' : 'Ver código'}</span>
-                <CaretRight size={12} className={`transition-transform ${showCodeSnippet ? 'rotate-90' : ''}`} />
-              </button>
-            </div>
-
-            <div className="space-y-1.5">
-              {message.files.map((file, fIdx) => (
-                <div key={fIdx} className="bg-bg-canvas-main/50 border border-border-divider-subtle rounded-lg px-3 py-2 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2 font-mono text-[11px]">
-                    {getContextualFileIcon(file.path)}
-                    <span className="text-text-content-primary/90 font-medium">{file.path}</span>
-                  </div>
-                  <span className="text-[10px] text-text-content-secondary/60">
-                    {file.code.split('\n').length} linhas · TypeScript
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            {/* Collapsible Inspection with Professional Code Block */}
-            {showCodeSnippet && (
-              <div className="pt-2 border-t border-border-divider-subtle space-y-3 animate-in fade-in duration-200">
-                {message.files.map((file, fIdx) => (
-                  <ProfessionalCodeBlock 
-                     key={fIdx}
-                     code={file.code}
-                     language={file.lang || 'typescript'}
-                     filename={file.path}
-                     diff={{ added: "1-999" }}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
         )}
 
         {/* Web Search Sources & Citations (Grounding) */}
@@ -1429,7 +1381,7 @@ function MessageItem({
                   <div className="size-3.5 border border-amber-400/30 rounded-full flex items-center justify-center">
                     <div className="size-1.5 bg-amber-400 rounded-full animate-pulse" />
                   </div>
-                  <span>Manus continuará após sua resposta</span>
+                  <span>Sparkle continuará após sua resposta</span>
                 </div>
                 <div className="flex items-center gap-1 text-text-content-secondary/40">
                   <button 
@@ -1643,8 +1595,8 @@ function LocalActiveThinkingState({ elapsedSeconds, step, steps }: { elapsedSeco
           className="size-6 object-contain rounded-md shadow-xs bg-white/5 p-0.5 animate-pulse" 
         />
         <div className="flex items-center gap-2 text-xs font-medium">
-          <span className="text-text-content-primary">manus</span>
-          <span className="text-[9px] bg-bg-action-hover border border-border-divider-subtle px-1.5 py-0.5 rounded text-text-content-secondary font-mono">
+          <span className="text-text-content-primary">Sparkle</span>
+          <span className="text-[9px] text-text-content-secondary font-mono px-1.5 py-0.5 border border-solid" style={{ borderRadius: '4px', backgroundColor: '#1a1a1a', borderColor: '#303030', borderWidth: '2.1507px' }}>
             Executando · {elapsedSeconds || 1}s
           </span>
         </div>
@@ -1775,7 +1727,7 @@ function ChatInput({ onSend, onStop, isThinking }: { onSend: (val: string) => vo
     <div className="relative group">
       <div className="bg-bg-surface-panel border border-border-divider-subtle rounded-2xl focus-within:border-border-control-active transition-all shadow-2xl overflow-hidden">
         <textarea 
-          placeholder="Mensagem para o agente Manus..."
+          placeholder="Mensagem para o agente Sparkle..."
           value={value}
           onChange={(e) => setValue(e.target.value)}
           rows={1}
@@ -1808,7 +1760,7 @@ function ChatInput({ onSend, onStop, isThinking }: { onSend: (val: string) => vo
                 src="https://imgdb.io/i/6lwOlmk.png" 
                 alt="Agente" 
                 className="size-5 object-contain rounded bg-bg-action-hover p-0.5" 
-                title="Agente Manus Conectado"
+                title="Agente Sparkle Conectado"
               />
               <div className="h-4 w-px bg-border-divider-subtle mx-1" />
               <div className="flex items-center gap-1.5 px-2 py-1 hover:bg-bg-action-hover rounded-md text-text-content-secondary/40 hover:text-text-content-primary transition-colors cursor-pointer">

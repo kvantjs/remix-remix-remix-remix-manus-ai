@@ -170,7 +170,7 @@ export function TerminalView({ activeCode }: { activeCode?: string }) {
       <div className="h-9 border-b border-white/5 bg-[#181818] px-3 flex items-center justify-between shrink-0 select-none">
         <div className="flex items-center gap-2 text-white/50 text-[11px] font-sans">
           <TerminalIcon size={13} className="text-green-400" />
-          <span className="font-semibold text-white/80">bash (manus@sandbox)</span>
+          <span className="font-semibold text-white/80">bash (Sparkle@sandbox)</span>
           <span className="text-[10px] bg-green-500/10 text-green-400 border border-green-500/20 px-1.5 py-0.5 rounded">
             Interativo Real
           </span>
@@ -214,7 +214,7 @@ export function TerminalView({ activeCode }: { activeCode?: string }) {
           <div key={line.id} className="leading-relaxed">
             {line.type === 'input' && (
               <div className="flex items-start gap-2 text-white">
-                <span className="text-green-400 font-semibold select-none">manus@sandbox:~/project$</span>
+                <span className="text-green-400 font-semibold select-none">Sparkle@sandbox:~/project$</span>
                 <span className="font-medium text-white/90">{line.content}</span>
               </div>
             )}
@@ -236,7 +236,7 @@ export function TerminalView({ activeCode }: { activeCode?: string }) {
 
         {/* Live Input Prompt Row */}
         <div className="flex items-center gap-2 pt-1">
-          <span className="text-green-400 font-semibold select-none shrink-0">manus@sandbox:~/project$</span>
+          <span className="text-green-400 font-semibold select-none shrink-0">Sparkle@sandbox:~/project$</span>
           <input
             ref={inputRef}
             type="text"

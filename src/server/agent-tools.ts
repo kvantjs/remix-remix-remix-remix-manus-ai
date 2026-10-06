@@ -5,6 +5,8 @@ import util from 'util';
 import { resolveSafeSandboxPath, redactSecrets, isSafeUrl, SANDBOX_WORKSPACE_ROOT } from './security.js';
 import { jobsManager, AgentJob, JobApprovalRequest } from './jobs-manager.js';
 import { challengeMessage } from './browser-challenge.js';
+import { agentIsolatedRuntime } from './agent-isolated-runtime.js';
+import { daytonaManager } from './daytona-manager.js';
 
 const execAsync = util.promisify(exec);
 
@@ -76,6 +78,20 @@ export const AGENT_TOOL_DECLARATIONS = [
         }
       },
       required: ['code']
+    }
+  },
+  {
+    name: 'file_create_directory',
+    description: 'Cria uma nova pasta ou diretório no workspace (ex: client/src/components, lib, utils, styles).',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        directoryPath: {
+          type: 'STRING',
+          description: 'Caminho relativo da nova pasta dentro do workspace.'
+        }
+      },
+      required: ['directoryPath']
     }
   },
   {
@@ -273,6 +289,66 @@ export const AGENT_TOOL_DECLARATIONS = [
       },
       required: ['jobId']
     }
+  },
+  {
+    name: 'webdev_secret_set',
+    description: 'WebDev MCP: Define uma variável de ambiente ou segredo seguro no runtime isolado do projeto.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        key: {
+          type: 'STRING',
+          description: 'Nome da chave do segredo ou variável (ex: API_KEY, DATABASE_URL, STRIPE_SECRET).'
+        },
+        value: {
+          type: 'STRING',
+          description: 'Valor seguro a ser armazenado no runtime isolado.'
+        }
+      },
+      required: ['key', 'value']
+    }
+  },
+  {
+    name: 'webdev_secret_get',
+    description: 'WebDev MCP: Consulta se um segredo existe no runtime isolado.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        key: {
+          type: 'STRING',
+          description: 'Nome da chave a ser consultada.'
+        }
+      },
+      required: ['key']
+    }
+  },
+  {
+    name: 'webdev_snapshot',
+    description: 'WebDev MCP: Cria um checkpoint/snapshot de versão de todos os arquivos do projeto para controle de versão e rollback.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        description: {
+          type: 'STRING',
+          description: 'Descrição semântica do checkpoint (ex: Adicionou módulo de autenticação).'
+        }
+      },
+      required: ['description']
+    }
+  },
+  {
+    name: 'webdev_rollback',
+    description: 'WebDev MCP: Restaura o workspace para um checkpoint/snapshot de versão anterior.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        snapshotId: {
+          type: 'STRING',
+          description: 'Identificador do snapshot a ser restaurado.'
+        }
+      },
+      required: ['snapshotId']
+    }
   }
 ];
 
@@ -400,26 +476,44 @@ export class AgentToolExecutor {
           let stderr = '';
           let exitCode = 0;
           let timedOut = false;
+          let isDaytona = false;
 
-          try {
-            const { stdout: out, stderr: err } = await execAsync(command, {
-              cwd: SANDBOX_WORKSPACE_ROOT,
-              timeout: timeoutMs,
-              maxBuffer: 1024 * 512, // 512 KB
-              env: {
-                ...process.env,
-                PATH: process.env.PATH,
-                HOME: SANDBOX_WORKSPACE_ROOT,
-                WORKSPACE: SANDBOX_WORKSPACE_ROOT
+          if (daytonaManager.isAvailable() && (process.env.DAYTONA_API_KEY || process.env.DAYTONA_SERVER_URL)) {
+            try {
+              const projectId = args.projectId || 'remix-manus-ai';
+              const daytonaRes = await daytonaManager.executeCommand(projectId, command);
+              if (daytonaManager.isAvailable()) {
+                stdout = daytonaRes.stdout;
+                stderr = daytonaRes.stderr;
+                exitCode = daytonaRes.exitCode;
+                isDaytona = true;
               }
-            });
-            stdout = out;
-            stderr = err;
-          } catch (err: any) {
-            stdout = err.stdout || '';
-            stderr = err.stderr || err.message;
-            exitCode = err.code || (err.killed ? 124 : 1);
-            timedOut = !!err.killed;
+            } catch (err: any) {
+              console.warn('[Agent Tools] Falha na execução via Daytona, utilizando fallback local:', err?.message || err);
+            }
+          }
+
+          if (!isDaytona) {
+            try {
+              const { stdout: out, stderr: err } = await execAsync(command, {
+                cwd: SANDBOX_WORKSPACE_ROOT,
+                timeout: timeoutMs,
+                maxBuffer: 1024 * 512, // 512 KB
+                env: {
+                  ...process.env,
+                  PATH: process.env.PATH,
+                  HOME: SANDBOX_WORKSPACE_ROOT,
+                  WORKSPACE: SANDBOX_WORKSPACE_ROOT
+                }
+              });
+              stdout = out;
+              stderr = err;
+            } catch (err: any) {
+              stdout = err.stdout || '';
+              stderr = err.stderr || err.message;
+              exitCode = err.code || (err.killed ? 124 : 1);
+              timedOut = !!err.killed;
+            }
           }
 
           const durationMs = Math.round(performance.now() - startTime);
@@ -431,11 +525,12 @@ export class AgentToolExecutor {
               exitCode,
               timedOut,
               durationMs,
+              runner: isDaytona ? 'Daytona Sandbox SDK' : 'Local Isolated Sandbox',
               stdout: redactSecrets(stdout.slice(0, 16000)),
               stderr: redactSecrets(stderr.slice(0, 8000)),
-              workingDir: 'workspace/'
+              workingDir: isDaytona ? '/home/daytona/app' : 'workspace/'
             },
-            actionDescription: `Execução no Sandbox: \`${command.slice(0, 50)}\` (Exit: ${exitCode}, ${durationMs}ms)`
+            actionDescription: `Execução no Sandbox ${isDaytona ? 'Daytona' : 'Local'}: \`${command.slice(0, 50)}\` (Exit: ${exitCode}, ${durationMs}ms)`
           };
         }
 
@@ -481,7 +576,30 @@ export class AgentToolExecutor {
           };
         }
 
-        case 'file_list': {
+        case 'file_create_directory':
+        case 'fs_mkdir':
+        case 'fs.mkdir':
+        case 'mkdir': {
+          const dirPath = String(args.directoryPath || args.path || args.dirPath || '').trim();
+          if (!dirPath) throw new Error('Caminho do diretório é obrigatório.');
+          const safe = resolveSafeSandboxPath(dirPath);
+          if (!safe.safePath) throw new Error(safe.error || 'Caminho inválido');
+          await fs.mkdir(safe.safePath, { recursive: true });
+          return {
+            success: true,
+            result: {
+              directoryPath: dirPath,
+              created: true,
+              message: `Diretório criado com sucesso: ${dirPath}`
+            },
+            actionDescription: `Criação da pasta "${dirPath}" no workspace`
+          };
+        }
+
+        case 'file_list':
+        case 'fs_list':
+        case 'fs.listFiles':
+        case 'fs.readDir': {
           const subDir = args.subDirectory ? String(args.subDirectory) : '';
           const safe = resolveSafeSandboxPath(subDir);
           if (!safe.safePath) throw new Error(safe.error || 'Caminho inválido');
@@ -520,8 +638,11 @@ export class AgentToolExecutor {
           };
         }
 
-        case 'file_read': {
-          const filePath = String(args.filePath || '').trim();
+        case 'file_read':
+        case 'fs_read':
+        case 'fs.readFile':
+        case 'read_file': {
+          const filePath = String(args.filePath || args.path || '').trim();
           const safe = resolveSafeSandboxPath(filePath);
           if (!safe.safePath) throw new Error(safe.error || 'Caminho inválido');
 
@@ -542,15 +663,27 @@ export class AgentToolExecutor {
           };
         }
 
-        case 'file_write': {
-          const filePath = String(args.filePath || '').trim();
-          const content = String(args.content ?? '');
+        case 'file_write':
+        case 'fs_write':
+        case 'fs.writeFile':
+        case 'write_file':
+        case 'webdev_write_file': {
+          const filePath = String(args.filePath || args.path || args.filename || '').trim();
+          const content = String(args.content ?? args.code ?? '');
           const safe = resolveSafeSandboxPath(filePath);
           if (!safe.safePath) throw new Error(safe.error || 'Caminho inválido');
 
           await fs.mkdir(path.dirname(safe.safePath), { recursive: true });
           await fs.writeFile(safe.safePath, content, 'utf-8');
           const stat = await fs.stat(safe.safePath);
+
+          // Synchronize with Daytona sandbox if available and active
+          if (daytonaManager.isAvailable() && (process.env.DAYTONA_API_KEY || process.env.DAYTONA_SERVER_URL)) {
+            const projectId = args.projectId || 'remix-manus-ai';
+            daytonaManager.writeFile(projectId, filePath, content).catch(err => {
+              console.warn('[Agent Tools] Notificação Daytona:', err?.message || err);
+            });
+          }
 
           // Register as artifact in current job if applicable
           const artifact = jobsManager.addArtifact('default', path.basename(filePath), filePath, stat.size);
@@ -561,13 +694,17 @@ export class AgentToolExecutor {
               filePath,
               sizeBytes: stat.size,
               artifactUrl: artifact.downloadUrl,
-              message: `Arquivo gravado com sucesso no workspace: ${filePath}`
+              message: `Arquivo gravado com sucesso no workspace e sincronizado com o sandbox: ${filePath}`
             },
             actionDescription: `Gravação do arquivo "${filePath}" (${stat.size} bytes)`
           };
         }
 
-        case 'file_delete': {
+        case 'file_delete':
+        case 'fs_delete':
+        case 'fs.deleteFile':
+        case 'fs.unlink':
+        case 'delete_file': {
           const filePath = String(args.filePath || '').trim();
           const safe = resolveSafeSandboxPath(filePath);
           if (!safe.safePath) throw new Error(safe.error || 'Caminho inválido');
@@ -806,6 +943,53 @@ export class AgentToolExecutor {
               reason
             },
             actionDescription: `Cancelamento do job [${jobId}]`
+          };
+        }
+
+        case 'webdev_secret_set':
+        case 'secret_set': {
+          const key = String(args.key || '').trim();
+          const value = String(args.value || '');
+          if (!key) throw new Error('Chave do segredo é obrigatória.');
+          const secret = agentIsolatedRuntime.setSecret(key, value);
+          return {
+            success: true,
+            result: { key: secret.key, set: true, updatedAt: secret.updatedAt },
+            actionDescription: `Variável de ambiente "${secret.key}" salva com segurança no runtime isolado`
+          };
+        }
+
+        case 'webdev_secret_get':
+        case 'secret_get': {
+          const key = String(args.key || '').trim();
+          const val = agentIsolatedRuntime.getSecret(key);
+          return {
+            success: true,
+            result: { key, exists: val !== undefined },
+            actionDescription: `Consulta de variável de ambiente "${key}" no runtime isolado`
+          };
+        }
+
+        case 'webdev_snapshot':
+        case 'snapshot_create': {
+          const description = String(args.description || 'Checkpoint do agente').trim();
+          const snapshot = await agentIsolatedRuntime.createSnapshot(description, args.currentFiles || {});
+          return {
+            success: true,
+            result: { snapshotId: snapshot.id, description: snapshot.description, timestamp: snapshot.timestamp },
+            actionDescription: `Snapshot de versão criado [${snapshot.id}]: "${description}"`
+          };
+        }
+
+        case 'webdev_rollback':
+        case 'snapshot_rollback': {
+          const snapshotId = String(args.snapshotId || '').trim();
+          const restoredFiles = agentIsolatedRuntime.rollbackSnapshot(snapshotId);
+          if (!restoredFiles) throw new Error(`Snapshot "${snapshotId}" não encontrado.`);
+          return {
+            success: true,
+            result: { snapshotId, restored: true, totalFiles: Object.keys(restoredFiles).length },
+            actionDescription: `Rollback de versão executado com sucesso para o snapshot [${snapshotId}]`
           };
         }
 

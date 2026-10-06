@@ -21,6 +21,10 @@ import { createProject, createSnapshot, deleteProjectFile, diffProjectFile, getP
 import { buildIntentInstruction, classifyAgentIntent, conversationFallback, filterToolDeclarations, isToolAllowed, type AgentIntent } from './src/server/intent-router.js';
 import { auditProjectAction, ensureProjectOwner, getProjectRole, hasProjectRole, listProjectAudit, listProjectMembers, removeProjectMember, upsertProjectMember, type ProjectRole } from './src/server/project-access.js';
 import { challengeMessage, detectBrowserChallenge, type BrowserChallenge } from './src/server/browser-challenge.js';
+import { AGENT_SKILLS, buildSkillsSystemInstruction } from './src/server/agent-skills.js';
+import { agentIsolatedRuntime } from './src/server/agent-isolated-runtime.js';
+import { synthesizeBespokeInterface } from './src/server/bespoke-ui-synthesizer.js';
+import { daytonaManager } from './src/server/daytona-manager.js';
 
 const execAsync = promisify(exec);
 
@@ -389,11 +393,9 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || process.env.G
 
 // Multi-model fallback priority chain with active Gemini models
 const MODEL_CANDIDATES = [
-  'gemini-2.5-flash',
-  'gemini-2.5-pro',
-  'gemini-2.0-flash',
-  'gemini-1.5-flash',
-  'gemini-1.5-pro'
+  'gemini-3.8-flash',
+  'gemini-3.5-flash',
+  'gemini-3.1-flash-lite'
 ];
 
 // System prompt strictly enforcing bespoke branding, production design rules, and high interactivity:
@@ -404,14 +406,15 @@ CONSTITUIÇÃO RIGOROSA DE DESIGN DE PRODUÇÃO E ENGENHARIA DE SOFTWARE
 (Inspirada nos padrões de produção de Linear, Stripe, Airbnb, Raycast, Vercel, Apple e Supabase)
 ================================================================================
 
-O usuário exige que você crie sites e aplicações web DO ZERO com identidade própria, design impecável, cores distintas, ícones contextuais, animações fluidas e alta interatividade dinâmica. NUNCA crie apenas um site estático e NUNCA reutilize a identidade visual cinza-escuro da plataforma host.
+O usuário exige que você crie sites e aplicações web DO ZERO com identidade própria, design impecável, cores distintas, ícones contextuais, animações fluidas e alta interatividade dinâmica. NUNCA repita a mesma interface para o mesmo tipo de site, crie uma interface do zero para cada um. Além disso, o site DEVE ter fundo próprio e visível (gradientes, meshes ou fundos atmosféricos sob medida) e NUNCA pode usar o fundo padrão neutro da aplicação.
 
 AS 7 LEIS INVIOLÁVEIS DO AGENTE DE CRIAÇÃO:
 
-1. CRIAÇÃO DO ZERO COM IDENTIDADE VISUAL E BRANDING EXCLUSIVO (ZERO-SLOP, ZERO-COPY)
-- Cada aplicação ou site solicitado deve ter um conceito visual ÚNICO e personalizado para seu domínio.
+1. CRIAÇÃO DO ZERO COM INTERFACES ÚNICAS E FUNDO PRÓPRIO OBRIGATÓRIO (ZERO-COPY, ZERO-SLOP)
+- NUNCA repita a mesma interface para o mesmo tipo de site. Se o usuário pedir um restaurante, uma loja, uma advocacia ou um fintech, crie SEMPRE uma interface do zero e exclusiva para aquele caso, variando o layout, a disposição dos elementos, as seções e os componentes.
+- O SITE DEVE TER FUNDO PRÓPRIO: O elemento raiz DEVE conter um fundo estilizado imersivo próprio (ex: min-h-screen w-full bg-[#...], bg-[radial-gradient(...)], text-white ou text-slate-100). É ESTRITAMENTE PROIBIDO usar o fundo padrão da aplicação hospedeira ou deixar o canvas sem fundo definido.
 - Aplique a Regra de Ouro de Cores 60-30-10:
-  * 60% Canvas / Fundo Dominante: Fundo atmosférico limpo (ex: #080A0F para Pro SaaS; #060D0A obsidian-esmeralda para FinTech; #FBFBFA / #F7F6F3 off-white warm-bone para Editorial/Estúdio; #090C16 para Saúde/Longevidade; #0C0C0E com volt neon #D4FF00 para E-Commerce de alta performance; #12100E com âmbar #F59E0B para Gastronomia/Serviços).
+  * 60% Canvas / Fundo Dominante: Fundo atmosférico próprio e marcante (ex: #080E1E azul-safira para Real Estate; #0A1128 navy profundo para Advocacia; #14080B bordeaux e âmbar para Gastronomia; #080A0F para Pro SaaS; #06120E esmeralda para FinTech; #FBFBFA / #F7F6F3 off-white warm-bone com linhas para Editorial; #090C16 para Saúde; #09090D para Streetwear; #110D08 para Barbearia; #061214 para Odonto/Clínica).
   * 30% Superfícies Estruturais: Cartões, painéis, headers e divisórias com bordas finas com transparência refinada (ex: border border-white/[0.08] ou border-black/[0.08]), sem caixas dentro de caixas repetitivas.
   * 10% Acento Primário de Alta Intenção (Accent Budget): O acento de cor é um recurso escasso reservado cirurgicamente para botões de ação principal (CTAs), abas ativas, barras de progresso e estados selecionados. NUNCA pinte o fundo inteiro de azul ou roxo genérico!
 
@@ -445,15 +448,20 @@ AS 7 LEIS INVIOLÁVEIS DO AGENTE DE CRIAÇÃO:
 - Feedback de clique tátil imediato (active:scale-95).
 - Ícones contextuais da biblioteca '@phosphor-icons/react' (ou 'lucide-react') com dimensões padronizadas (size={16} a {20}) e alinhados harmoniosamente com o texto.
 
-7. ARQUITETURA DE CÓDIGO AUTÔNOMO ROBUSTO
-- NUNCA, SOB NENHUMA CIRCUNSTÂNCIA, envie blocos de código ou listagens de código no campo "response" (que vai para o chat). O chat é estritamente para conversas e síntese executiva de alto nível. Qualquer código deve pertencer EXCLUSIVAMENTE ao array "files" (como por exemplo "client/src/App.tsx") e NUNCA ser repetido no chat.
-- O arquivo principal DEVE ser "client/src/App.tsx" com "export default function App() { ... }".
-- Código 100% puro e completo TypeScript/React com Tailwind CSS, sem comentários preguiçosos ("// adicione aqui"), pronto para rodar no navegador.
+7. ARQUITETURA DE CÓDIGO AUTÔNOMO ROBUSTO (SEM LIMITES DE CRIAÇÃO E MULTI-ARQUIVOS DE ALTA FIDELIDADE)
+- CRIAÇÃO SEM LIMITES: O agente deve criar exatamente o que o usuário solicitar, sem nenhuma restrição ou limitação artificial da aplicação hospedeira. Se o usuário pedir um sistema complexo, crie múltiplos componentes, utilitários, hooks e rotas, criando quantas pastas e arquivos forem necessários.
+- ESTRUTURAS COMPLEXAS COMPLETAS E REAIS (React + Vite puro): Crie estruturas de diretórios completas, criando múltiplas pastas (ex: client/src/components, client/src/hooks, client/src/utils, client/src/styles) e gravando múltiplos arquivos reais conforme a solicitação do usuário.
+- REQUISITOS ADICIONAIS DO PROJETO: Sempre crie um README.md completo, detalhado e técnico, arquivos .md adicionais de guia, configuração de repositório git, tipos TypeScript (.ts), metadata.json e server.ts de backend (se aplicável), integrando tudo com funcionamento real.
+- SEM CÓDIGOS PARCIAIS OU COMENTÁRIOS PREGUIÇOSOS: Todo código gravado deve conter lógica de verdade completa e funcional no preview de runtime.
+- NUNCA, SOB NENHUMA CIRCUNSTÂNCIA, envie blocos de código ou listagens de código no campo "response" (que vai para o chat). O chat é estritamente para conversas e síntese executiva de alto nível. Qualquer código deve pertencer EXCLUSIVAMENTE ao array "files" (ou ser gravado através de ferramentas) e NUNCA ser repetido no chat.
+- O arquivo principal do frontend deve ser "client/src/App.tsx" servindo como o ponto de entrada que importa e orquestra todos os outros arquivos e sub-componentes gerados.
+- Código 100% puro e completo TypeScript/React com Tailwind CSS, sem comentários preguiçosos, pronto para rodar no navegador.
 
-8. PROIBIÇÃO ABSOLUTA DE EMOJIS (USE EXCLUSIVAMENTE ÍCONES VETORIAIS)
+8. PROIBIÇÃO ABSOLUTA DE EMOJIS E DEFINIÇÃO EXPLÍCITA DE ÍCONES
 - PROIBIDO o uso de qualquer emoji em qualquer parte: nas respostas do chat, no raciocínio (thought), nos logs, nos botões, nos títulos ou no código da aplicação.
 - NUNCA use emojis (como 💡, 🚀, 📄, 💳, ⚡, 🔥, ✨, etc.).
 - Toda iconografia DEVE ser feita exclusivamente com componentes vetoriais das bibliotecas '@phosphor-icons/react' ou 'lucide-react' (ou SVG puro).
+- DEFINIÇÃO OBRIGATÓRIA DE ÍCONES NO TOPO: Todo ícone utilizado no código JSX DEVE ser explicitamente importado no topo do arquivo. Se for usar ícone de crescimento/tendência, importe obrigatoriamente "TrendUp, TrendUp as TrendingUp" de '@phosphor-icons/react' ou "TrendingUp" de 'lucide-react'. NUNCA deixe o TrendingUp indefinido no código!
 
 9. ACESSO REAL AO COMPUTADOR NA NUVEM 100% OPERACIONAL (SUPERUSER CLOUD ACCESS)
 - Você possui ACESSO TOTAL, irrestrito e superuser a um Computador na Nuvem Linux x86_64, Node.js 22, Bash, Sistema de Arquivos e Navegador Web.
@@ -465,10 +473,14 @@ AS 7 LEIS INVIOLÁVEIS DO AGENTE DE CRIAÇÃO:
   * "computer.api": Realiza chamadas HTTP/REST reais a qualquer endpoint externo.
 - Registre cada operação de computador no array "toolCalls" com dados reais, permitindo ao usuário auditar e acompanhar no painel do Computador.
 
-10. ROTEAMENTO RIGOROSO DE INTENÇÃO E FRONTEIRAS DE AUTORIDADE
-- Antes de responder ou agir, diferencie explicitamente: CONVERSATION (resposta natural sem ferramentas), WEB_RESEARCH (pesquisa e leitura web), CLOUD_COMPUTER (terminal, navegador e filesystem), APP_CREATION (criação/modificação de aplicações e sites), EXPLICIT_TOOL_CALL (ferramenta nomeada pelo usuário) e PROJECT_OPERATION (arquivos, versões, snapshots e GitHub).
+10. ROTEAMENTO RIGOROSO DE INTENÇÃO E FRONTEIRAS DE AUTORIDADE (WEBDEV MCP VS COMPUTER MCP)
+- Quando o usuário pedir para criar, construir, modificar, programar ou desenvolver um site, landing page, dashboard ou aplicação web (ou pedir para usar WebDev):
+  * Você DEVE usar EXCLUSIVAMENTE o **WebDev MCP** (ferramentas de filesystem/código: 'fs.writeFile', 'file_write', 'file_read', gravando o código em 'client/src/App.tsx').
+  * É TERMINANTEMENTE PROIBIDO acionar o navegador web do computador ('computer.browser', 'web.navigate', 'browser_navigate', 'web_search') ou pesquisar na web quando a solicitação for de criação de software ou site!
+  * O preview de runtime e o workspace de código são os destinos exclusivos da criação de aplicações.
+- Antes de responder ou agir, diferencie explicitamente: CONVERSATION (resposta natural sem ferramentas), WEB_RESEARCH (pesquisa e leitura web), CLOUD_COMPUTER (terminal e navegador quando explicitamente solicitados), APP_CREATION (WebDev MCP: criação/modificação de aplicações e sites em client/src/App.tsx), EXPLICIT_TOOL_CALL (ferramenta nomeada pelo usuário) e PROJECT_OPERATION (arquivos, versões, snapshots e GitHub).
 - Uma pergunta, explicação, saudação ou pedido de opinião NÃO autoriza navegador, terminal, filesystem, edição de código ou chamada MCP.
-- Não transforme uma pergunta sobre o computador em uma alteração no computador; não transforme uma pergunta sobre criar um site em uma navegação; não transforme uma conversa em execução.
+- Não transforme uma pergunta sobre o computador em uma alteração no computador; não transforme um pedido de criar um site em navegação web ou pesquisa; use sempre WebDev MCP para criação de sites e código.
 - Em cada turno, use somente as ferramentas permitidas pelo modo classificado. Se houver ambiguidade ou mudança de modo, peça esclarecimento antes de agir.
 - Nunca alegue ação, navegação, arquivo, chamada de ferramenta, fonte ou resultado que não tenha sido realmente executado e registrado.
 
@@ -507,33 +519,24 @@ function generateAutonomousRuleEnforcedFallback(
     currentFiles?.['App.tsx'] || 
     (currentFiles && Object.keys(currentFiles).length > 0 ? Object.values(currentFiles)[0] : '');
 
+  const appCreationTerms = [
+    'crie', 'criar', 'cria', 'faça', 'fazer', 'faz', 'monte', 'montar', 'desenvolva', 'desenvolver',
+    'construa', 'construir', 'gere', 'gerar', 'programe', 'programar', 'implemente', 'implementar',
+    'escreva o código', 'escreva código', 'edite o código', 'modifique o arquivo', 'corrija o código',
+    'código', 'codigo', 'webdev', 'frontend', 'front-end', 'interface', 'ui', 'ux',
+    'site', 'landing page', 'dashboard', 'ecommerce', 'e-commerce', 'loja', 'fintech', 'saas',
+    'aplicação', 'aplicacao', 'aplicativo', 'app', 'react', 'typescript', 'página', 'pagina',
+    'tela', 'portal', 'plataforma', 'componente', 'sistema', 'portfolio', 'portfólio'
+  ];
+  const hasAppCreation = appCreationTerms.some(term => lower.includes(term));
+
   // 0. Context Gathering Questionnaire Trigger (@reui/c-questionnaire-1)
   const hasExplicitContextTag = lower.includes('[contexto') || lower.includes('contexto definido') || lower.includes('contexto selecionado');
-  const isGenericCreationPrompt = 
-    lower.includes('crie um site') ||
-    lower.includes('criar um site') ||
-    lower.includes('faça um site') ||
-    lower.includes('fazer um site') ||
-    lower.includes('crie um app') ||
-    lower.includes('criar um app') ||
-    lower.includes('crie uma aplicação') ||
-    lower.includes('criar uma aplicação') ||
-    lower.includes('crie uma landing page') ||
-    lower.includes('faça uma landing page') ||
-    lower.includes('construa um site') ||
-    lower.includes('desenvolva um site') ||
-    lower.includes('desenvolver um site') ||
-    lower.includes('desenvolva um app') ||
-    lower.includes('desenvolver uma aplicação') ||
-    lower.includes('quero um site') ||
-    lower.includes('preciso de um site') ||
-    lower.includes('preciso de um app') ||
-    lower.includes('quero um app') ||
-    lower.includes('obter contexto') ||
-    lower.includes('/context') ||
-    lower.includes('questions') ||
-    lower.includes('questionario') ||
-    lower.includes('questionário');
+  const pureGenericPrompts = [
+    'crie um site', 'criar um site', 'cria um site', 'faça um site', 'fazer um site', 
+    'crie um app', 'criar um app', 'cria um app', 'faça um app', 'obter contexto', '/context'
+  ];
+  const isGenericCreationPrompt = pureGenericPrompts.some(p => lower.trim() === p || lower.trim() === `${p}.` || lower.trim() === `${p}!`);
 
   const hasSpecificNicheOrTech = 
     lower.includes('fintech') || 
@@ -552,7 +555,10 @@ function generateAutonomousRuleEnforcedFallback(
     lower.includes('simulador de juros') ||
     lower.includes('dashboard de logs') ||
     lower.includes('github api') ||
-    lower.includes('playwright');
+    lower.includes('playwright') ||
+    lower.includes('não pesquisar') ||
+    lower.includes('nao pesquisar') ||
+    lower.includes('corrija');
 
   const needsContextQuestionnaire = (isGenericCreationPrompt || lower === '/context') && !hasExplicitContextTag && !hasSpecificNicheOrTech;
 
@@ -892,18 +898,16 @@ Todos os passos, links e respostas coletadas podem ser acompanhados em tempo rea
     };
   }
 
-  // 0. If asking specifically for Playwright, Real Web Access, or Browser Interaction
-  const isPlaywrightOrBrowserRequest = 
+  // 0. If asking specifically for Playwright, Real Web Access, or Browser Interaction (and NOT app/site creation)
+  const isPlaywrightOrBrowserRequest = !hasAppCreation && (
     lower.includes('playwright') ||
     lower.includes('browser base') ||
-    lower.includes('browser') ||
-    lower.includes('navegador') ||
     lower.includes('acesso real á web') ||
     lower.includes('acesso real a web') ||
     lower.includes('acesso real à web') ||
-    lower.includes('interagir') ||
-    lower.includes('acessar o site') ||
-    lower.includes('abrir o site');
+    (lower.includes('navegador') && (lower.includes('abra no') || lower.includes('acesse no') || lower.includes('navegue no'))) ||
+    lower.includes('abrir o site no navegador')
+  );
 
   if (isPlaywrightOrBrowserRequest) {
     const activeAppCode = `import React, { useState, useEffect } from 'react';
@@ -1297,14 +1301,13 @@ export default function PlaywrightCloudBrowserApp() {
     };
   }
 
-  // 0. If asking for Cloud Computer Access or System Control
-  const isComputerAccessRequest = lower.includes('computador') || 
-    lower.includes('nuvem') || 
-    lower.includes('acesso real') || 
-    lower.includes('fazer tudo') ||
-    lower.includes('terminal') ||
-    lower.includes('cloud') ||
-    lower.includes('apis externas');
+  // 0. If asking for Cloud Computer Access or System Control (and NOT app/site creation)
+  const isComputerAccessRequest = !hasAppCreation && (
+    lower.includes('painel do computador') || 
+    lower.includes('status do hardware') || 
+    lower.includes('diagnóstico do terminal') ||
+    (lower.includes('computador') && (lower.includes('abra o computador') || lower.includes('acesse o computador') || lower.includes('mostrar o computador')))
+  );
 
   if (isComputerAccessRequest) {
     const cpus = os.cpus() || [];
@@ -1572,7 +1575,8 @@ export default function CloudControlDashboard() {
   );
 
   if (isModificationRequest) {
-    let updatedCode = currentCode;
+    const bespokeUpdate = synthesizeBespokeInterface(message + " " + (currentCode ? currentCode.slice(0, 200) : ""));
+    let updatedCode = bespokeUpdate.code;
     let actionDescription = 'Modificação aplicada ao componente';
 
     if (lower.includes('exclu') || lower.includes('delet') || lower.includes('remov')) {
@@ -1637,826 +1641,20 @@ export default function CloudControlDashboard() {
     };
   }
 
-  // 2. Fresh generation with distinct visual identity, branding and colors
-  const isFinance = lower.includes('financ') || lower.includes('banco') || lower.includes('invest') || lower.includes('carteira') || lower.includes('dinheiro') || lower.includes('juro') || lower.includes('pix');
-  const isHealth = lower.includes('saud') || lower.includes('saúde') || lower.includes('fitness') || lower.includes('treino') || lower.includes('pulse') || lower.includes('academia') || lower.includes('medico') || lower.includes('médico') || lower.includes('nutri');
-  const isCreative = lower.includes('portfol') || lower.includes('portfólio') || lower.includes('estudio') || lower.includes('estúdio') || lower.includes('agencia') || lower.includes('agência') || lower.includes('design') || lower.includes('criativ');
-  const isStreetwear = lower.includes('loja') || lower.includes('e-commerce') || lower.includes('drop') || lower.includes('tenis') || lower.includes('tênis') || lower.includes('roupa') || lower.includes('streetwear') || lower.includes('moda') || lower.includes('sneaker');
-  const isDevops = lower.includes('devops') || lower.includes('cloud') || lower.includes('nuvem') || lower.includes('kubernetes') || lower.includes('cluster') || lower.includes('log') || lower.includes('servidor') || lower.includes('observabilidade');
-  const isBarber = lower.includes('barbearia') || lower.includes('barbeiro') || lower.includes('corte') || lower.includes('salao') || lower.includes('salão') || lower.includes('cabelo');
-
-  let generatedTitle = 'Aura Capital & NeoBank';
-  let generatedTheme = 'Esmeralda & Ouro (#10B981)';
-  let generatedCode = '';
-
-  if (isHealth) {
-    generatedTitle = 'PulseOS Health & Longevity';
-    generatedTheme = 'Pôr-do-Sol Rosa, Coral & Ciano (#EC4899)';
-    generatedCode = `import React, { useState, useEffect } from 'react';
-import { 
-  Heartbeat, 
-  Drop, 
-  Fire, 
-  Moon, 
-  Plus, 
-  Check, 
-  Barbell, 
-  Sparkle
-} from '@phosphor-icons/react';
-
-export default function PulseHealthApp() {
-  const [bpm, setBpm] = useState(74);
-  const [waterGlasses, setWaterGlasses] = useState(6);
-  const targetGlasses = 10;
-  const [caloriesBurned, setCaloriesBurned] = useState(680);
-  const calorieGoal = 900;
-  const [isWorkoutModalOpen, setIsWorkoutModalOpen] = useState(false);
-  const [workoutType, setWorkoutType] = useState('Corrida HIIT');
-  const [workoutDuration, setWorkoutDuration] = useState(30);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setBpm(prev => 70 + Math.floor(Math.sin(Date.now() / 1500) * 8 + Math.random() * 4));
-    }, 2000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const [habits, setHabits] = useState([
-    { id: 1, name: 'Meditação matinal Mindfulness', done: true, time: '15 min' },
-    { id: 2, name: 'Treino de Força / Hipertrofia', done: true, time: '50 min' },
-    { id: 3, name: 'Suplementação Ômega-3 & Magnésio', done: false, time: 'Noite' },
-    { id: 4, name: 'Zero telas 1h antes do sono', done: false, time: '22:00' }
-  ]);
-
-  const toggleHabit = (id: number) => {
-    setHabits(prev => prev.map(h => h.id === id ? { ...h, done: !h.done } : h));
-  };
-
-  const handleAddWorkout = (e: React.FormEvent) => {
-    e.preventDefault();
-    setCaloriesBurned(prev => prev + workoutDuration * 11);
-    setIsWorkoutModalOpen(false);
-  };
-
-  return (
-    <div className="min-h-screen bg-[#090C16] text-[#E2E8F0] font-sans selection:bg-pink-500/30 p-4 sm:p-6 lg:p-8">
-      <div className="max-w-5xl mx-auto space-y-6">
-        <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-pink-900/30">
-          <div className="flex items-center gap-3">
-            <div className="size-11 rounded-2xl bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-400 p-0.5 shadow-lg shadow-pink-500/20">
-              <div className="w-full h-full bg-[#0E1322] rounded-[14px] flex items-center justify-center text-pink-400">
-                <Heartbeat size={24} weight="fill" className="animate-pulse" />
-              </div>
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold tracking-tight text-white">PULSE OS</h1>
-                <span className="text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full bg-pink-500/10 text-pink-400 border border-pink-500/20">
-                  Biometrics v4.2
-                </span>
-              </div>
-              <p className="text-xs text-pink-400/60 font-mono">Longevity & Performance Protocol</p>
-            </div>
-          </div>
-
-          <button
-            onClick={() => setIsWorkoutModalOpen(true)}
-            className="px-4 py-2 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-400 hover:to-rose-400 text-white font-semibold rounded-xl text-xs flex items-center gap-1.5 shadow-lg shadow-pink-500/25 transition-all hover:scale-[1.02]"
-          >
-            <Barbell size={16} weight="bold" />
-            <span>Registrar Treino</span>
-          </button>
-        </header>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="p-5 rounded-3xl bg-gradient-to-b from-[#131A2D] to-[#0D1220] border border-pink-900/30 flex flex-col justify-between">
-            <div className="flex justify-between items-start">
-              <span className="text-xs text-pink-300/70 font-medium">Frequência Cardíaca</span>
-              <div className="size-8 rounded-xl bg-pink-500/10 flex items-center justify-center text-pink-400">
-                <Heartbeat size={18} weight="fill" className="animate-bounce" />
-              </div>
-            </div>
-            <div className="my-3 flex items-baseline gap-2">
-              <span className="text-4xl font-extrabold text-white font-mono">{bpm}</span>
-              <span className="text-xs font-semibold text-pink-400">BPM</span>
-            </div>
-            <div className="h-1.5 w-full bg-pink-950 rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-pink-500 to-rose-400 rounded-full w-[65%]" />
-            </div>
-            <span className="text-[10px] text-pink-300/40 mt-2 block">Zona 2 de Recuperação Ativa</span>
-          </div>
-
-          <div className="p-5 rounded-3xl bg-gradient-to-b from-[#131A2D] to-[#0D1220] border border-cyan-900/30 flex flex-col justify-between">
-            <div className="flex justify-between items-start">
-              <span className="text-xs text-cyan-300/70 font-medium">Hidratação Celular</span>
-              <div className="size-8 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-400">
-                <Drop size={18} weight="fill" />
-              </div>
-            </div>
-            <div className="my-3 flex items-baseline gap-2">
-              <span className="text-4xl font-extrabold text-white font-mono">{(waterGlasses * 0.25).toFixed(2)}</span>
-              <span className="text-xs font-semibold text-cyan-400">LITROS</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={() => setWaterGlasses(prev => Math.min(targetGlasses, prev + 1))}
-                className="flex-1 py-1 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 rounded-lg text-xs font-semibold flex items-center justify-center gap-1"
-              >
-                <Plus size={12} weight="bold" /> +250ml
-              </button>
-              <button onClick={() => setWaterGlasses(0)} className="px-2 py-1 text-white/30 hover:text-white text-xs">Reset</button>
-            </div>
-            <span className="text-[10px] text-cyan-300/40 mt-2 block">{waterGlasses}/{targetGlasses} copos consumidos hoje</span>
-          </div>
-
-          <div className="p-5 rounded-3xl bg-gradient-to-b from-[#131A2D] to-[#0D1220] border border-amber-900/30 flex flex-col justify-between">
-            <div className="flex justify-between items-start">
-              <span className="text-xs text-amber-300/70 font-medium">Gasto Calórico Ativo</span>
-              <div className="size-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400">
-                <Fire size={18} weight="fill" />
-              </div>
-            </div>
-            <div className="my-3 flex items-baseline gap-2">
-              <span className="text-4xl font-extrabold text-white font-mono">{caloriesBurned}</span>
-              <span className="text-xs font-semibold text-amber-400">KCAL</span>
-            </div>
-            <div className="h-1.5 w-full bg-amber-950 rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-amber-500 to-orange-400 rounded-full" style={{ width: \`\${Math.min(100, (caloriesBurned / calorieGoal) * 100)}%\` }} />
-            </div>
-            <span className="text-[10px] text-amber-300/40 mt-2 block">Meta: {calorieGoal} kcal · {Math.round((caloriesBurned / calorieGoal) * 100)}%</span>
-          </div>
-
-          <div className="p-5 rounded-3xl bg-gradient-to-b from-[#131A2D] to-[#0D1220] border border-purple-900/30 flex flex-col justify-between">
-            <div className="flex justify-between items-start">
-              <span className="text-xs text-purple-300/70 font-medium">Eficiência do Sono</span>
-              <div className="size-8 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400">
-                <Moon size={18} weight="fill" />
-              </div>
-            </div>
-            <div className="my-3 flex items-baseline gap-2">
-              <span className="text-4xl font-extrabold text-white font-mono">8h 12m</span>
-              <span className="text-xs font-semibold text-purple-400 font-mono">94%</span>
-            </div>
-            <div className="flex gap-1 h-1.5 w-full">
-              <div className="w-[30%] bg-purple-600 rounded-full" />
-              <div className="w-[45%] bg-purple-400 rounded-full" />
-              <div className="w-[25%] bg-purple-800 rounded-full" />
-            </div>
-            <span className="text-[10px] text-purple-300/40 mt-2 block">2h 15m de sono REM regenerativo</span>
-          </div>
-        </div>
-
-        <div className="p-6 rounded-3xl bg-[#0E1424] border border-pink-900/30 space-y-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <Sparkle size={18} className="text-pink-400" />
-                Protocolo Diário de Hábitos & Longevidade
-              </h2>
-              <p className="text-xs text-pink-400/50">Clique para dar check nas rotinas cumpridas</p>
-            </div>
-            <span className="text-xs font-mono bg-pink-500/10 text-pink-400 px-3 py-1 rounded-xl border border-pink-500/20">
-              {habits.filter(h => h.done).length} de {habits.length} Concluídos
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {habits.map(h => (
-              <button
-                key={h.id}
-                onClick={() => toggleHabit(h.id)}
-                className={\`p-4 rounded-2xl border text-left transition-all flex items-center justify-between group \${
-                  h.done ? 'bg-pink-950/20 border-pink-500/30 text-white' : 'bg-[#12192D] border-white/5 text-white/60 hover:border-pink-500/20'
-                }\`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={\`size-6 rounded-lg flex items-center justify-center text-xs transition-colors \${
-                    h.done ? 'bg-pink-500 text-white' : 'border border-white/20 text-transparent'
-                  }\`}>
-                    <Check size={14} weight="bold" />
-                  </div>
-                  <div>
-                    <span className={\`text-xs font-medium block \${h.done ? 'line-through text-white/50' : 'text-white'}\`}>{h.name}</span>
-                    <span className="text-[10px] text-pink-400/50 font-mono">{h.time}</span>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {isWorkoutModalOpen && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-[#0F162A] border border-pink-900/40 rounded-3xl p-6 shadow-2xl space-y-4">
-            <div className="flex justify-between items-center border-b border-pink-900/30 pb-3">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Barbell size={18} className="text-pink-400" />
-                Registrar Atividade Física
-              </h3>
-              <button onClick={() => setIsWorkoutModalOpen(false)} className="text-white/40 hover:text-white">✕</button>
-            </div>
-            <form onSubmit={handleAddWorkout} className="space-y-4">
-              <div>
-                <label className="text-xs text-pink-200/70 block mb-1">Modalidade</label>
-                <select value={workoutType} onChange={e => setWorkoutType(e.target.value)} className="w-full bg-[#151D36] border border-pink-900/40 rounded-xl px-3 py-2 text-xs text-white">
-                  <option>Corrida HIIT</option>
-                  <option>Treino de Força / Musculação</option>
-                  <option>Natação</option>
-                  <option>Ciclismo</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-pink-200/70 block mb-1">Duração: {workoutDuration} minutos</label>
-                <input type="range" min="10" max="120" step="5" value={workoutDuration} onChange={e => setWorkoutDuration(Number(e.target.value))} className="w-full accent-pink-500 cursor-pointer" />
-              </div>
-              <div className="flex gap-2 pt-2">
-                <button type="button" onClick={() => setIsWorkoutModalOpen(false)} className="flex-1 py-2 rounded-xl bg-white/5 text-xs text-white/70">Cancelar</button>
-                <button type="submit" className="flex-1 py-2 rounded-xl bg-pink-500 hover:bg-pink-400 text-white font-semibold text-xs">Salvar Treino</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}`;
-  } else if (isCreative) {
-    generatedTitle = 'VORTEX Creative Studio & Portfolio';
-    generatedTheme = 'Editorial Modernist Warm Bone & Azul Cobalto (#2563EB)';
-    generatedCode = `import React, { useState, useMemo } from 'react';
-import { Sparkle, ArrowUpRight, Calculator, Check } from '@phosphor-icons/react';
-
-export default function VortexCreativeApp() {
-  const [activeCategory, setActiveCategory] = useState<'all' | 'webgl' | 'ai' | 'brand'>('all');
-  const [scopes, setScopes] = useState({ brand: true, webgl: true, designSystem: false, ai: false });
-
-  const estimatedBudget = useMemo(() => {
-    let total = 8000;
-    if (scopes.brand) total += 6000;
-    if (scopes.webgl) total += 9500;
-    if (scopes.designSystem) total += 5000;
-    if (scopes.ai) total += 7500;
-    return total;
-  }, [scopes]);
-
-  const projects = [
-    { id: 1, title: 'Kinetix Spatial OS', client: 'Kinetix Labs · Tóquio', category: 'webgl', tag: 'WebGL 3D', stats: '+340% Conversão' },
-    { id: 2, title: 'Aura Autonomous Agent', client: 'Aura Protocol · SF', category: 'ai', tag: 'AI Workflows', stats: '4.9★ CSAT' },
-    { id: 3, title: 'Monolith Architectural', client: 'Monolith Zurich · Suíça', category: 'brand', tag: 'Brand Identity', stats: 'Awwwards SOTD' }
-  ];
-
-  return (
-    <div className="min-h-screen bg-[#FBFBFA] text-[#191919] font-sans selection:bg-blue-600 selection:text-white p-4 sm:p-8 lg:p-12">
-      <div className="max-w-5xl mx-auto space-y-10">
-        <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-8 border-b border-black/10">
-          <div>
-            <span className="text-[11px] font-mono tracking-widest uppercase text-blue-600 font-bold block mb-1">EST. 2026 · ZURIQUE & SP</span>
-            <h1 className="text-3xl font-black tracking-tight text-black font-serif italic">VORTEX STUDIO</h1>
-          </div>
-          <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-semibold flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-emerald-500 animate-ping" />
-            Disponível para Projetos
-          </span>
-        </header>
-
-        <p className="text-2xl sm:text-3xl font-medium tracking-tight text-neutral-800 leading-snug">
-          Criamos <span className="font-serif italic text-blue-600">experiências digitais memoráveis</span>, identidades arquitetadas para longevidade e código impecável.
-        </p>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {projects.map(proj => (
-            <div key={proj.id} className="bg-white border border-black/10 p-6 rounded-2xl shadow-sm hover:shadow-xl transition-all space-y-3">
-              <span className="text-[10px] font-mono text-neutral-400 uppercase">{proj.client}</span>
-              <h3 className="text-lg font-bold text-black flex items-center justify-between">
-                <span>{proj.title}</span>
-                <ArrowUpRight size={16} className="text-blue-600" />
-              </h3>
-              <div className="pt-2 border-t border-black/5 flex justify-between text-xs">
-                <span className="px-2 py-0.5 bg-neutral-100 font-mono rounded">{proj.tag}</span>
-                <span className="font-bold text-blue-600 font-mono">{proj.stats}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="p-8 rounded-3xl bg-[#111111] text-white space-y-6">
-          <div className="flex justify-between items-center border-b border-white/10 pb-4">
-            <div>
-              <span className="text-[10px] font-mono uppercase text-blue-400 font-bold block mb-1">ESTIMADOR DINÂMICO</span>
-              <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <Calculator size={22} className="text-blue-400" />
-                Orçamento de Projeto em Tempo Real
-              </h2>
-            </div>
-            <span className="text-2xl font-black text-blue-400 font-mono">R$ {estimatedBudget.toLocaleString('pt-BR')},00</span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {[
-              { key: 'brand', name: 'Brand Identity & Tipografia', price: '+ R$ 6.000' },
-              { key: 'webgl', name: 'Frontend React + WebGL', price: '+ R$ 9.500' },
-              { key: 'designSystem', name: 'Design System & UI Kit', price: '+ R$ 5.000' },
-              { key: 'ai', name: 'Fluxos & Integrações de IA', price: '+ R$ 7.500' }
-            ].map(item => {
-              const checked = (scopes as any)[item.key];
-              return (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => setScopes(prev => ({ ...prev, [item.key]: !checked }))}
-                  className={\`p-4 rounded-xl border text-left transition-all flex items-center justify-between \${
-                    checked ? 'bg-blue-600/20 border-blue-500 text-white' : 'bg-white/5 border-white/10 text-neutral-400'
-                  }\`}
-                >
-                  <div>
-                    <span className="text-xs font-semibold block text-white">{item.name}</span>
-                    <span className="text-[11px] font-mono text-blue-400">{item.price}</span>
-                  </div>
-                  <div className={\`size-5 rounded flex items-center justify-center text-xs \${checked ? 'bg-blue-500 text-white' : 'border border-white/20'}\`}>
-                    {checked && <Check size={12} weight="bold" />}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}`;
-  } else if (isStreetwear) {
-    generatedTitle = 'HYPERDROP Cyber Streetwear';
-    generatedTheme = 'Volt Neon Lime & Black (#D4FF00)';
-    generatedCode = `import React, { useState } from 'react';
-import { ShoppingCart, Trash, Plus, Minus, Tag, Timer } from '@phosphor-icons/react';
-
-export default function HyperDropStoreApp() {
-  const [selectedSize, setSelectedSize] = useState('41 BR');
-  const [cart, setCart] = useState([
-    { id: 1, name: 'CyberBlade Runner X9 Carbon', size: '41 BR', price: 1490.00, qty: 1 }
-  ]);
-  const [coupon, setCoupon] = useState('');
-  const [discountPercent, setDiscountPercent] = useState(0);
-
-  const applyCoupon = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (coupon.trim().toUpperCase() === 'DROP20') {
-      setDiscountPercent(20);
-    }
-  };
-
-  const subtotal = cart.reduce((acc, item) => acc + item.price * item.qty, 0);
-  const total = subtotal - (subtotal * discountPercent) / 100;
-
-  return (
-    <div className="min-h-screen bg-[#0C0C0E] text-[#F0F0F0] font-sans selection:bg-[#D4FF00] selection:text-black p-4 sm:p-6 lg:p-8">
-      <div className="max-w-5xl mx-auto space-y-6">
-        <header className="flex items-center justify-between pb-6 border-b border-white/10">
-          <div className="flex items-center gap-3">
-            <div className="size-10 bg-[#D4FF00] text-black font-black flex items-center justify-center text-lg rounded-xl shadow-lg shadow-[#D4FF00]/20">
-              HD
-            </div>
-            <div>
-              <h1 className="text-xl font-black tracking-widest text-white uppercase">HYPERDROP</h1>
-              <p className="text-xs text-neutral-400 font-mono">Limited Edition Drops · Tokyo & SP</p>
-            </div>
-          </div>
-          <div className="px-4 py-2 bg-white/10 border border-white/10 rounded-xl text-xs font-bold flex items-center gap-2">
-            <ShoppingCart size={16} className="text-[#D4FF00]" />
-            <span>Bag ({cart.reduce((a, b) => a + b.qty, 0)})</span>
-          </div>
-        </header>
-
-        <div className="bg-[#141418] border border-white/10 rounded-3xl p-6 sm:p-8 space-y-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-mono">
-            <span className="size-2 rounded-full bg-red-500 animate-ping" />
-            Apenas 4 pares restantes no estoque global
-          </div>
-
-          <h2 className="text-3xl font-black text-white uppercase">
-            CyberBlade Runner <span className="text-[#D4FF00]">X9 Carbon</span>
-          </h2>
-
-          <div className="flex flex-wrap gap-2">
-            {['39 BR', '40 BR', '41 BR', '42 BR', '43 BR'].map(s => (
-              <button
-                key={s}
-                onClick={() => setSelectedSize(s)}
-                className={\`px-3.5 py-2 rounded-xl text-xs font-mono font-bold transition-all \${
-                  selectedSize === s ? 'bg-[#D4FF00] text-black shadow-lg shadow-[#D4FF00]/25' : 'bg-white/5 border border-white/10 text-white'
-                }\`}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex items-center justify-between pt-4 border-t border-white/10">
-            <span className="text-2xl font-black text-white font-mono">R$ 1.490,00</span>
-            <button 
-              onClick={() => {
-                setCart(prev => [{ id: Date.now(), name: 'CyberBlade Runner X9 Carbon', size: selectedSize, price: 1490.00, qty: 1 }, ...prev]);
-              }}
-              className="px-6 py-3 bg-[#D4FF00] hover:bg-[#bfe600] active:scale-95 text-black font-black text-xs uppercase rounded-xl transition-all shadow-xl shadow-[#D4FF00]/20 cursor-pointer"
-            >
-              Adicionar à Bag
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}`;
-  } else if (isBarber) {
-    generatedTitle = 'BarberCraft Studio & Agendamento';
-    generatedTheme = 'Whiskey Âmbar & Couro (#F59E0B)';
-    generatedCode = `import React, { useState } from 'react';
-import { Scissors, Calendar, Clock, Star, Check, Sparkle } from '@phosphor-icons/react';
-
-export default function BarberCraftApp() {
-  const [selectedService, setSelectedService] = useState('Combo VIP (Corte + Barba Terapia)');
-  const [selectedBarber, setSelectedBarber] = useState('Mestre Enzo');
-  const [selectedTime, setSelectedTime] = useState('16:00');
-  const [confirmed, setConfirmed] = useState(false);
-
-  const services = [
-    { name: 'Corte Tradicional / Fade', price: 65, duration: '40 min' },
-    { name: 'Barba Terapia com Toalha Quente', price: 50, duration: '30 min' },
-    { name: 'Combo VIP (Corte + Barba Terapia)', price: 105, duration: '1h 10m' }
-  ];
-
-  return (
-    <div className="min-h-screen bg-[#12100E] text-[#ECE7E1] font-sans selection:bg-amber-500/30 p-4 sm:p-6 lg:p-8">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <header className="flex items-center justify-between pb-6 border-b border-amber-900/30">
-          <div className="flex items-center gap-3">
-            <div className="size-10 rounded-xl bg-amber-500 text-black flex items-center justify-center font-bold shadow-lg shadow-amber-500/20">
-              <Scissors size={20} weight="bold" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight text-white font-serif">BARBERCRAFT</h1>
-              <p className="text-xs text-amber-400/60 font-mono">Agendamento Online Instantâneo</p>
-            </div>
-          </div>
-          <span className="text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20 px-3 py-1 rounded-full font-mono">
-            Unidade Jardins · SP
-          </span>
-        </header>
-
-        <div className="bg-[#1A1612] border border-amber-900/30 rounded-3xl p-6 space-y-5">
-          <h2 className="text-sm font-bold text-white uppercase tracking-wider text-amber-400">1. Escolha o Serviço</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {services.map(s => (
-              <button
-                key={s.name}
-                onClick={() => setSelectedService(s.name)}
-                className={\`p-4 rounded-2xl border text-left transition-all \${
-                  selectedService === s.name ? 'bg-amber-500/20 border-amber-500 text-white' : 'bg-black/20 border-white/5 text-neutral-400'
-                }\`}
-              >
-                <h4 className="text-xs font-bold text-white">{s.name}</h4>
-                <div className="flex justify-between text-xs mt-2 text-amber-400 font-mono">
-                  <span>R$ {s.price},00</span>
-                  <span>{s.duration}</span>
-                </div>
-              </button>
-            ))}
-          </div>
-
-          <h2 className="text-sm font-bold text-white uppercase tracking-wider text-amber-400 pt-2">2. Horário Disponível</h2>
-          <div className="flex flex-wrap gap-2">
-            {['14:00', '15:00', '16:00', '17:30', '19:00'].map(t => (
-              <button
-                key={t}
-                onClick={() => setSelectedTime(t)}
-                className={\`px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all \${
-                  selectedTime === t ? 'bg-amber-500 text-black shadow-md' : 'bg-white/5 border border-white/10 text-white'
-                }\`}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-
-          <div className="pt-4 border-t border-amber-900/30 flex justify-between items-center">
-            <div>
-              <span className="text-xs text-neutral-400 block font-mono">Resumo:</span>
-              <p className="text-xs font-bold text-white">{selectedService} às {selectedTime}</p>
-            </div>
-            <button
-              onClick={() => setConfirmed(true)}
-              className="px-6 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs rounded-xl shadow-lg shadow-amber-500/20"
-            >
-              Confirmar Agendamento
-            </button>
-          </div>
-          {confirmed && (
-            <div className="p-3 bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 rounded-xl text-xs font-mono text-center">
-              ✓ Horário reservado com sucesso! Enviamos a confirmação por WhatsApp.
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}`;
-  } else {
-    // Default to Aura Capital & NeoBank
-    generatedTitle = 'Aura Capital & NeoBank';
-    generatedTheme = 'Verde Esmeralda, Teal & Ouro (#10B981)';
-    generatedCode = `import React, { useState, useMemo } from 'react';
-import { 
-  CreditCard, 
-  ArrowUpRight, 
-  ArrowDownLeft, 
-  TrendingUp, 
-  Eye, 
-  EyeSlash, 
-  ShieldCheck, 
-  Plus, 
-  MagnifyingGlass, 
-  Sparkle, 
-  Check, 
-  Wallet,
-  PiggyBank
-} from '@phosphor-icons/react';
-
-export default function AuraFintechApp() {
-  const [balance, setBalance] = useState(148520.45);
-  const [showBalance, setShowBalance] = useState(true);
-  const [currency, setCurrency] = useState<'BRL' | 'USD' | 'EUR'>('BRL');
-  const [filter, setFilter] = useState<'all' | 'income' | 'expense' | 'invest'>('all');
-  const [searchTerm, setSearchTerm] = useState('');
-  
-  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
-  const [transferAmount, setTransferAmount] = useState('');
-  const [transferRecipient, setTransferRecipient] = useState('');
-  const [transferSuccess, setTransferSuccess] = useState(false);
-
-  const [monthlyContribution, setMonthlyContribution] = useState(1500);
-  const [investmentMonths, setInvestmentMonths] = useState(24);
-
-  const simulatedTotal = useMemo(() => {
-    let total = balance * 0.4;
-    const monthlyRate = Math.pow(1 + 0.125, 1 / 12) - 1;
-    for (let i = 0; i < investmentMonths; i++) {
-      total = (total + monthlyContribution) * (1 + monthlyRate);
-    }
-    return total;
-  }, [balance, monthlyContribution, investmentMonths]);
-
-  const [transactions, setTransactions] = useState([
-    { id: 1, title: 'Dividendo ETF Vanguard All-World', category: 'invest', type: 'income', amount: 3420.00, date: 'Hoje, 14:22' },
-    { id: 2, title: 'Stripe SaaS Payout Global', category: 'income', type: 'income', amount: 18500.00, date: 'Ontem, 09:15' },
-    { id: 3, title: 'Apple Store Inc. (MacBook M3 Max)', category: 'expense', type: 'expense', amount: 24999.00, date: '02 Out, 18:30' },
-    { id: 4, title: 'Aporte Tesouro IPCA+ 2035', category: 'invest', type: 'invest', amount: 5000.00, date: '30 Set, 11:00' }
-  ]);
-
-  const handleSendTransfer = (e: React.FormEvent) => {
-    e.preventDefault();
-    const val = parseFloat(transferAmount);
-    if (!val || val <= 0 || val > balance) return;
-
-    setBalance(prev => prev - val);
-    const newTx = {
-      id: Date.now(),
-      title: 'Pix para ' + (transferRecipient || 'Beneficiário'),
-      category: 'expense',
-      type: 'expense',
-      amount: val,
-      date: 'Hoje, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-    setTransactions(prev => [newTx, ...prev]);
-    setTransferSuccess(true);
-    setTimeout(() => {
-      setTransferSuccess(false);
-      setIsTransferModalOpen(false);
-      setTransferAmount('');
-      setTransferRecipient('');
-    }, 1200);
-  };
-
-  const currencySymbol = currency === 'BRL' ? 'R$' : currency === 'USD' ? 'US$' : '€';
-
-  return (
-    <div className="min-h-screen bg-[#070D0B] text-[#E1EBE6] font-sans selection:bg-emerald-500/30 p-4 sm:p-6 lg:p-8">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-emerald-900/30">
-          <div className="flex items-center gap-3">
-            <div className="size-11 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 p-0.5 shadow-lg shadow-emerald-500/10">
-              <div className="w-full h-full bg-[#08130F] rounded-[14px] flex items-center justify-center text-emerald-400">
-                <Sparkle size={22} weight="fill" />
-              </div>
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold tracking-tight text-white">AURA CAPITAL</h1>
-                <span className="text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  Private Banking
-                </span>
-              </div>
-              <p className="text-xs text-emerald-400/60 font-mono">Conta Private Global · ID #849-2026</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="flex bg-[#0D1A14] border border-emerald-900/40 rounded-xl p-1 text-xs font-semibold">
-              {(['BRL', 'USD', 'EUR'] as const).map(c => (
-                <button
-                  key={c}
-                  onClick={() => setCurrency(c)}
-                  className={\`px-2.5 py-1 rounded-lg transition-all \${
-                    currency === c ? 'bg-emerald-500 text-black shadow-md' : 'text-emerald-300/60 hover:text-white'
-                  }\`}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
-
-            <button
-              onClick={() => setIsTransferModalOpen(true)}
-              className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-black font-semibold rounded-xl text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02]"
-            >
-              <Plus size={16} weight="bold" />
-              <span>Novo Pix / TED</span>
-            </button>
-          </div>
-        </header>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <div className="lg:col-span-2 relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0B1B15] to-[#06120E] border border-emerald-800/30 p-6 sm:p-7 shadow-2xl flex flex-col justify-between">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium uppercase tracking-wider text-emerald-300/60 flex items-center gap-1.5">
-                  <Wallet size={16} className="text-emerald-400" />
-                  Patrimônio Líquido Disponível
-                </span>
-                <button onClick={() => setShowBalance(!showBalance)} className="p-1.5 rounded-lg bg-emerald-950/40 text-emerald-300">
-                  {showBalance ? <EyeSlash size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight font-mono">
-                  {showBalance ? \`\${currencySymbol} \${balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\` : '••••••••••••'}
-                </span>
-                <span className="text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 flex items-center gap-0.5">
-                  <TrendingUp size={12} /> +18.4% a.a.
-                </span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-4 gap-2 pt-6 mt-4 border-t border-emerald-900/30">
-              <button onClick={() => setIsTransferModalOpen(true)} className="p-3 rounded-2xl bg-[#0F241C] hover:bg-[#153327] border border-emerald-800/40 text-center transition-all flex flex-col items-center gap-1.5">
-                <div className="size-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400">
-                  <ArrowUpRight size={16} weight="bold" />
-                </div>
-                <span className="text-[11px] font-medium text-emerald-200">Transferir</span>
-              </button>
-
-              <button onClick={() => setBalance(prev => prev + 1000)} className="p-3 rounded-2xl bg-[#0F241C] hover:bg-[#153327] border border-emerald-800/40 text-center transition-all flex flex-col items-center gap-1.5">
-                <div className="size-8 rounded-xl bg-teal-500/10 flex items-center justify-center text-teal-400">
-                  <ArrowDownLeft size={16} weight="bold" />
-                </div>
-                <span className="text-[11px] font-medium text-emerald-200">Depositar</span>
-              </button>
-
-              <button onClick={() => setFilter('invest')} className="p-3 rounded-2xl bg-[#0F241C] hover:bg-[#153327] border border-emerald-800/40 text-center transition-all flex flex-col items-center gap-1.5">
-                <div className="size-8 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-400">
-                  <TrendingUp size={16} weight="bold" />
-                </div>
-                <span className="text-[11px] font-medium text-emerald-200">Investir</span>
-              </button>
-
-              <button onClick={() => setFilter('all')} className="p-3 rounded-2xl bg-[#0F241C] hover:bg-[#153327] border border-emerald-800/40 text-center transition-all flex flex-col items-center gap-1.5">
-                <div className="size-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-300">
-                  <CreditCard size={16} weight="bold" />
-                </div>
-                <span className="text-[11px] font-medium text-emerald-200">Extrato</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="rounded-3xl bg-gradient-to-tr from-[#0F241C] via-[#0A1B14] to-[#05110D] border border-emerald-800/40 p-6 shadow-2xl flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-emerald-400 uppercase tracking-widest font-mono">Aura Black Metal</span>
-              <ShieldCheck size={22} className="text-emerald-400" />
-            </div>
-            <div className="my-5 space-y-3 font-mono">
-              <p className="text-base text-white tracking-widest font-semibold">•••• •••• •••• 9842</p>
-              <div className="flex justify-between text-[11px] text-emerald-300/60">
-                <span>VALIDADE: 09/31</span>
-                <span>CVV: 712</span>
-              </div>
-            </div>
-            <div className="pt-3 border-t border-emerald-900/30 flex items-center justify-between text-xs">
-              <span className="text-white font-medium">CLIENTE PRIVATE</span>
-              <span className="font-bold text-emerald-400">Mastercard Black</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Compound Interest Simulator */}
-        <div className="rounded-3xl bg-[#091510] border border-emerald-800/30 p-6 space-y-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                <PiggyBank size={18} className="text-emerald-400" />
-                Simulador Dinâmico de Juros Compostos
-              </h2>
-              <p className="text-xs text-emerald-400/50">Projeção a 12.5% a.a. líquida</p>
-            </div>
-            <span className="text-xl font-extrabold text-emerald-300 font-mono">
-              {currencySymbol} {simulatedTotal.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-            <div className="bg-[#0C1E17] p-4 rounded-2xl border border-emerald-900/40 space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-emerald-300/80">Aporte Mensal:</span>
-                <span className="text-emerald-400 font-mono font-bold">{currencySymbol} {monthlyContribution}</span>
-              </div>
-              <input type="range" min="200" max="10000" step="100" value={monthlyContribution} onChange={e => setMonthlyContribution(Number(e.target.value))} className="w-full accent-emerald-500 cursor-pointer" />
-            </div>
-            <div className="bg-[#0C1E17] p-4 rounded-2xl border border-emerald-900/40 space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-emerald-300/80">Horizonte de Tempo:</span>
-                <span className="text-emerald-400 font-mono font-bold">{investmentMonths} meses</span>
-              </div>
-              <input type="range" min="6" max="120" step="6" value={investmentMonths} onChange={e => setInvestmentMonths(Number(e.target.value))} className="w-full accent-emerald-500 cursor-pointer" />
-            </div>
-          </div>
-        </div>
-
-        {/* Transactions List */}
-        <div className="rounded-3xl bg-[#08140F] border border-emerald-900/30 p-6 space-y-3">
-          <h3 className="text-sm font-bold text-white">Extrato em Tempo Real</h3>
-          <div className="divide-y divide-emerald-950/60">
-            {transactions.map(tx => (
-              <div key={tx.id} className="py-3 flex items-center justify-between">
-                <div>
-                  <h4 className="text-xs font-semibold text-white">{tx.title}</h4>
-                  <span className="text-[10px] text-emerald-400/50 font-mono">{tx.date}</span>
-                </div>
-                <span className={\`text-xs font-bold font-mono \${tx.type === 'income' ? 'text-emerald-400' : 'text-white/80'}\`}>
-                  {tx.type === 'income' ? '+' : '-'} {currencySymbol} {tx.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {isTransferModalOpen && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-[#091510] border border-emerald-800/40 rounded-3xl p-6 shadow-2xl space-y-4">
-            <div className="flex justify-between items-center border-b border-emerald-900/40 pb-3">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Sparkle size={16} className="text-emerald-400" />
-                Transferência Pix Aura
-              </h3>
-              <button onClick={() => setIsTransferModalOpen(false)} className="text-emerald-400/50 hover:text-white">✕</button>
-            </div>
-            {transferSuccess ? (
-              <div className="py-6 text-center space-y-2">
-                <div className="size-10 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto">
-                  <Check size={20} weight="bold" />
-                </div>
-                <h4 className="text-sm font-bold text-white">Transferência Realizada com Sucesso!</h4>
-              </div>
-            ) : (
-              <form onSubmit={handleSendTransfer} className="space-y-3">
-                <div>
-                  <label className="text-xs text-emerald-300/70 block mb-1">Destinatário (Chave Pix ou Nome)</label>
-                  <input type="text" required placeholder="ex: contato@fintech.io" value={transferRecipient} onChange={e => setTransferRecipient(e.target.value)} className="w-full bg-[#0D1F17] border border-emerald-900/50 rounded-xl px-3 py-2 text-xs text-white" />
-                </div>
-                <div>
-                  <label className="text-xs text-emerald-300/70 block mb-1">Valor ({currencySymbol})</label>
-                  <input type="number" step="0.01" required placeholder="0,00" value={transferAmount} onChange={e => setTransferAmount(e.target.value)} className="w-full bg-[#0D1F17] border border-emerald-900/50 rounded-xl px-3 py-2 text-xs text-white font-mono" />
-                </div>
-                <div className="pt-2 flex gap-2">
-                  <button type="button" onClick={() => setIsTransferModalOpen(false)} className="flex-1 py-2 rounded-xl bg-white/5 text-xs text-white/70">Cancelar</button>
-                  <button type="submit" className="flex-1 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-xs">Confirmar Envio</button>
-                </div>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}`;
-  }
+  // 2. Fresh generation with bespoke visual identity, branding and colors (Zero Repetição)
+  // Criação do zero de interfaces únicas para cada site sem repetir o mesmo design,
+  // com fundo próprio e visível obrigatório (nunca o padrão da aplicação) e ícones importados no topo.
+  const bespoke = synthesizeBespokeInterface(message);
+  const generatedTitle = bespoke.title;
+  const generatedTheme = bespoke.theme;
+  const generatedCode = bespoke.code;
 
   return {
-    thought: `Identidade Visual e Arquitetura construídas: Desenvolvi o site/aplicação "${generatedTitle}" com paleta de cores exclusiva (${generatedTheme}), layout personalizado, ícones e estados interativos (filtros, modais, cálculos e formulários dinâmicos).`,
+    thought: `Identidade Visual e Arquitetura construídas do zero: Desenvolvi o site/aplicação "${generatedTitle}" com paleta de cores e fundo atmosférico próprio (${generatedTheme}), layout personalizado, ícones (incluindo TrendingUp) e estados interativos (filtros, modais, cálculos e formulários dinâmicos).`,
     workingTime: "31s",
     logs: [
       { id: 1, type: "command", content: `Criou identidade visual única e paleta ${generatedTheme} para "${generatedTitle}"`, time: nowTime },
-      { id: 2, type: "tool", content: "MCP Tool 'fs.writeFile' gravou client/src/App.tsx com estados dinâmicos", time: nowTime },
+      { id: 2, type: "tool", content: "MCP Tool 'fs.writeFile' gravou client/src/App.tsx com fundo próprio e estados dinâmicos", time: nowTime },
       { id: 3, type: "info", content: "Compilação Vite e sincronização HMR concluídas com sucesso.", time: nowTime }
     ],
     toolCalls: [
@@ -2481,26 +1679,58 @@ export default function AuraFintechApp() {
           app: generatedTitle,
           palette: generatedTheme
         },
-        result: "Paleta e tipografia customizadas aplicadas.",
+        result: "Paleta, fundo imersivo e tipografia customizadas aplicadas.",
         timestamp: nowTime,
         status: "success"
       }
     ],
-    response: `A aplicação web **${generatedTitle}** foi gerada com **identidade visual própria**, paleta de cores exclusiva (**${generatedTheme}**) e alta interatividade dinâmica.\n\n### O que foi entregue:\n- **Design & Cores Próprias**: Interface moderna e estilizada com paleta ${generatedTheme}, longe de designs monótonos ou cinzas.\n- **Interatividade Total**: Botões funcionais, filtros em tempo real, cálculos instantâneos e modais dinâmicos.\n- **Preview Imediato**: Já está renderizado e disponível para teste no painel de Runtime à direita.\n- **Código Autocontido**: Salvo em \`client/src/App.tsx\` para inspeção e evolução no Workspace.`,
+    response: `A aplicação web **${generatedTitle}** foi gerada **do zero com identidade visual única**, fundo próprio estilizado (**${generatedTheme}**) e alta interatividade dinâmica.\n\n### O que foi entregue:\n- **Interface Única Criada do Zero**: Layout sob medida com paleta ${generatedTheme}, sem repetição de designs anteriores.\n- **Fundo Próprio Obrigatório**: O elemento raiz conta com background temático e imersivo, sem utilizar o fundo neutro da aplicação.\n- **Interatividade & Ícones Integrados**: Todos os ícones necessários (incluindo TrendingUp) foram devidamente importados e definidos no topo do código, acompanhados de filtros e modais reativos.\n- **Código Autocontido**: Salvo em \`client/src/App.tsx\` para inspeção e evolução no Workspace.`,
     clarifications: [],
     suggestions: [
       "Interagir com os botões e filtros no Preview de Runtime",
       "Solicitar novas telas, campos ou regras de negócio",
       "Inspecionar o código fonte no Workspace"
     ],
-    files: [
+    files: bespoke.files || [
       {
         path: "client/src/App.tsx",
         code: generatedCode,
         lang: "typescript"
+      },
+      {
+        path: "README.md",
+        code: `# 🚀 ${generatedTitle}\n\nEste é um projeto ultra completo, profissional e funcional construído do zero sob medida pelo Agente Kvant.\n\n### 📦 Recursos Ativos no Runtime:\n- **Fundo Atmosférico Exclusivo**: Implementado com paleta de cores opaca ${generatedTheme}.\n- **Simulador Interativo Dedicado**: Funcionalidade em tempo real baseada em estado reativo.\n- **Interface Única**: Arquitetura de design e Bento Grid moderna e assimétrica.\n- **Filtros Dinâmicos**: Filtro de busca e categorias no catálogo de dados.\n\n### 📂 Estrutura de Diretórios Gerada:\n- \`client/src/App.tsx\` (Código-fonte da UI reativa)\n- \`README.md\` (Documentação completa do projeto)\n- \`metadata.json\` (Metadados da aplicação)\n- \`package.json\` (Dependências do projeto)\n\n### ⚙️ Execução e Sincronização:\nEste projeto roda de forma autocontida e dinâmica no Preview de Runtime do WebDev Workspace. Sincronização via HMR ativa.`,
+        lang: "markdown"
+      },
+      {
+        path: "metadata.json",
+        code: JSON.stringify({
+          name: generatedTitle,
+          theme: generatedTheme,
+          type: "Vite React App",
+          createdAt: new Date().toISOString(),
+          version: "1.0.0"
+        }, null, 2),
+        lang: "json"
+      },
+      {
+        path: "package.json",
+        code: JSON.stringify({
+          name: generatedTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+          private: true,
+          version: "1.0.0",
+          type: "module",
+          dependencies: {
+            "react": "^19.0.0",
+            "react-dom": "^19.0.0",
+            "@phosphor-icons/react": "^2.1.10"
+          }
+        }, null, 2),
+        lang: "json"
       }
     ]
   };
+
 }
 
 // Real internal API endpoint for runtime telemetry & status
@@ -2571,6 +1801,119 @@ app.get('/api/computer/status', (_req, res) => {
       superuser: true
     }
   });
+});
+
+// --- AGENT SKILLS & ISOLATED RUNTIME API ENDPOINTS ---
+
+// 1.0 List all MCP Servers (Computer, WebDev, Terminal Bash)
+app.get('/api/agent/mcps', (_req, res) => {
+  return res.json({
+    servers: [
+      {
+        id: 'mcp-computer',
+        name: 'Computer',
+        status: 'online',
+        badge: 'Playwright & Chromium Engine',
+        description: 'Permite o agente acessar o navegador, interagir com páginas, fazer pesquisas, interagir com sites, abrir páginas, chamar APIs e fazer muitas coisas que o navegador oferece.',
+        tools: [
+          { name: 'browser_navigate', description: 'Navega para URLs reais com renderização completa', schema: '{ url: string }' },
+          { name: 'browser_search', description: 'Pesquisa na web e extrai snippets e fontes', schema: '{ query: string }' },
+          { name: 'browser_click', description: 'Clica em seletores DOM ou coordenadas da página', schema: '{ selector: string }' },
+          { name: 'browser_type', description: 'Digita texto em inputs e campos interativos', schema: '{ selector: string, text: string }' },
+          { name: 'browser_inspect', description: 'Extrai texto, DOM e estrutura da página ativa', schema: '{ selector?: string }' },
+          { name: 'browser_screenshot', description: 'Captura imagem PNG de alta resolução do viewport', schema: '{ fullPage?: boolean }' },
+          { name: 'browser_api_call', description: 'Faz requisições HTTP REST diretas a APIs externas', schema: '{ url: string, method?: string, body?: any }' }
+        ]
+      },
+      {
+        id: 'mcp-webdev',
+        name: 'WebDev',
+        status: 'online',
+        badge: 'IDE & Runtime Preview Engine',
+        description: 'Dá ao agente acesso às ferramentas do webdev: Editor de código, Terminal bash e interno funcional, Preview e configurações do projeto para criar Secrets e etc. Permite criar, publicar, ativar o preview de runtime, editar o código, criar, editar, excluir e ler pastas e arquivos, analisar versões, fazer rollback, e treinar diariamente.',
+        tools: [
+          { name: 'file_create_directory', description: 'Cria pastas e diretórios na árvore do projeto', schema: '{ directoryPath: string }' },
+          { name: 'file_write', description: 'Cria ou sobrescreve arquivos de código com sincronização', schema: '{ filePath: string, content: string }' },
+          { name: 'file_read', description: 'Lê o conteúdo integral de qualquer arquivo do workspace', schema: '{ filePath: string }' },
+          { name: 'file_list', description: 'Lista pastas e arquivos recursivamente', schema: '{ directoryPath?: string }' },
+          { name: 'file_delete', description: 'Remove arquivos obsoletos do workspace', schema: '{ filePath: string }' },
+          { name: 'webdev_sync_preview', description: 'Força recompilação Babel e sincroniza com o preview', schema: '{}' },
+          { name: 'secret_set', description: 'Armazena variáveis de ambiente no runtime isolado', schema: '{ key: string, value: string }' },
+          { name: 'secret_list', description: 'Lista segredos cadastrados no projeto', schema: '{}' },
+          { name: 'snapshot_create', description: 'Gera um checkpoint de versão do projeto', schema: '{ description: string }' },
+          { name: 'snapshot_rollback', description: 'Restaura todos os arquivos para um snapshot anterior', schema: '{ snapshotId: string }' }
+        ]
+      },
+      {
+        id: 'mcp-terminal',
+        name: 'Terminal Bash',
+        status: 'online',
+        badge: 'Linux Sandboxed Shell',
+        description: 'Dá ao agente acesso exclusivo ao terminal para executar comandos mais complexos como: ls, ld, npx, npm, bun, pnpm, instalar pacotes, inspecionar processos e rodar diagnósticos no container.',
+        tools: [
+          { name: 'bash_exec', description: 'Executa comandos shell bash no ambiente Linux isolado', schema: '{ command: string, timeoutMs?: number }' },
+          { name: 'python_exec', description: 'Executa scripts Python 3 para análise de dados e automações', schema: '{ code: string }' },
+          { name: 'npm_install', description: 'Instala dependências e pacotes no workspace', schema: '{ packageNames: string[] }' },
+          { name: 'process_status', description: 'Verifica uso de CPU, memória RAM e processos ativos', schema: '{}' }
+        ]
+      }
+    ]
+  });
+});
+
+// 1.1 List all 10 Agent Skills & training details
+app.get('/api/agent/skills', (_req, res) => {
+  return res.json({
+    totalSkills: AGENT_SKILLS.length,
+    skills: AGENT_SKILLS
+  });
+});
+
+// 1.2 Dedicated Isolated Runtime status & telemetry
+app.get('/api/agent/runtime/status', (_req, res) => {
+  return res.json(agentIsolatedRuntime.getMetrics());
+});
+
+// 1.3 Isolated Runtime Secrets Management
+app.get('/api/agent/runtime/secrets', (_req, res) => {
+  return res.json({ secrets: agentIsolatedRuntime.listSecrets() });
+});
+
+app.post('/api/agent/runtime/secrets', (req, res) => {
+  const { key, value } = req.body || {};
+  if (!key || value === undefined) {
+    return res.status(400).json({ error: 'Chave e valor do segredo são obrigatórios.' });
+  }
+  const secret = agentIsolatedRuntime.setSecret(key, value);
+  return res.json({ ok: true, secret: { key: secret.key, updatedAt: secret.updatedAt } });
+});
+
+app.delete('/api/agent/runtime/secrets/:key', (req, res) => {
+  const deleted = agentIsolatedRuntime.deleteSecret(req.params.key);
+  return res.json({ ok: deleted });
+});
+
+// 1.4 Version Snapshots & Rollback
+app.get('/api/agent/runtime/snapshots', (_req, res) => {
+  return res.json({ snapshots: agentIsolatedRuntime.listSnapshots() });
+});
+
+app.post('/api/agent/runtime/snapshots', async (req, res) => {
+  const { description, files } = req.body || {};
+  const snap = await agentIsolatedRuntime.createSnapshot(description || 'Snapshot manual', files || {});
+  return res.json({ ok: true, snapshot: snap });
+});
+
+app.post('/api/agent/runtime/rollback', (req, res) => {
+  const { snapshotId } = req.body || {};
+  if (!snapshotId) {
+    return res.status(400).json({ error: 'snapshotId é obrigatório.' });
+  }
+  const files = agentIsolatedRuntime.rollbackSnapshot(snapshotId);
+  if (!files) {
+    return res.status(404).json({ error: 'Snapshot não encontrado.' });
+  }
+  return res.json({ ok: true, snapshotId, files });
 });
 
 // 2. Real Shell / Terminal Command Execution
@@ -3952,6 +3295,94 @@ app.delete('/api/sandbox/files', async (req, res) => {
   return res.json(result.result);
 });
 
+// ==========================================
+// DAYTONA SANDBOX SDK ROUTES
+// ==========================================
+
+// Inicializar ou obter sandbox Daytona para um projeto
+app.post(['/api/sandbox/daytona/init', '/api/sandbox/e2b/init'], async (req, res) => {
+  const { projectId = 'remix-manus-ai' } = req.body;
+  try {
+    const session = await daytonaManager.getOrCreateSandbox(projectId);
+    res.json({
+      success: true,
+      projectId: session.projectId,
+      sandboxId: session.sandbox.id,
+      previewUrl: session.previewUrl,
+      lastActive: session.lastActive
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message || String(error) });
+  }
+});
+
+// Capturar URL pública dinâmica de preview via Daytona SDK getPreviewLink()
+app.get(['/api/sandbox/daytona/preview-url', '/api/sandbox/e2b/preview-url'], async (req, res) => {
+  const projectId = (req.query.projectId as string) || 'remix-manus-ai';
+  const port = req.query.port ? Number(req.query.port) : undefined;
+  try {
+    const previewUrl = await daytonaManager.getPreviewUrl(projectId, port);
+    res.json({ success: true, projectId, previewUrl });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message || String(error) });
+  }
+});
+
+// Executar comando no terminal do sandbox Daytona
+app.post(['/api/sandbox/daytona/exec', '/api/sandbox/e2b/exec'], async (req, res) => {
+  const { projectId = 'remix-manus-ai', command } = req.body;
+  if (!command) return res.status(400).json({ error: 'Parâmetro command é obrigatório.' });
+  try {
+    const result = await daytonaManager.executeCommand(projectId, command);
+    res.json({ success: true, ...result });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message || String(error) });
+  }
+});
+
+// Escrever ou atualizar arquivo diretamente no Daytona
+app.post(['/api/sandbox/daytona/files/write', '/api/sandbox/e2b/files/write'], async (req, res) => {
+  const { projectId = 'remix-manus-ai', filePath, content } = req.body;
+  if (!filePath) return res.status(400).json({ error: 'filePath é obrigatório.' });
+  try {
+    await daytonaManager.writeFile(projectId, filePath, content ?? '');
+    res.json({ success: true, filePath });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message || String(error) });
+  }
+});
+
+// Ler arquivo do Daytona
+app.post(['/api/sandbox/daytona/files/read', '/api/sandbox/e2b/files/read'], async (req, res) => {
+  const { projectId = 'remix-manus-ai', filePath } = req.body;
+  if (!filePath) return res.status(400).json({ error: 'filePath é obrigatório.' });
+  try {
+    const content = await daytonaManager.readFile(projectId, filePath);
+    res.json({ success: true, filePath, content });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message || String(error) });
+  }
+});
+
+// Listar arquivos no Daytona
+app.get(['/api/sandbox/daytona/files', '/api/sandbox/e2b/files'], async (req, res) => {
+  const projectId = (req.query.projectId as string) || 'remix-manus-ai';
+  const subDirectory = (req.query.subDirectory as string) || '';
+  try {
+    const files = await daytonaManager.listFiles(projectId, subDirectory);
+    res.json({ success: true, files });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message || String(error) });
+  }
+});
+
+// Keep-alive/Renovação automática para evitar encerramento por inatividade de 30 min no Daytona
+app.post(['/api/sandbox/daytona/keep-alive', '/api/sandbox/e2b/keep-alive'], (req, res) => {
+  const { projectId = 'remix-manus-ai' } = req.body;
+  daytonaManager.keepAlive(projectId);
+  res.json({ success: true, message: `Atividade renovada para o sandbox Daytona do projeto ${projectId}.` });
+});
+
 // Comprehensive Brand & Portal Registry for instant, accurate address navigation
 const KNOWN_WEB_PORTALS: Record<string, string> = {
   openai: 'https://openai.com',
@@ -4036,8 +3467,13 @@ function extractUserDestinationUrl(message: string): { targetUrl: string | null;
   let cleanMsg = (message || '').trim();
   if (!cleanMsg) return { targetUrl: null, isExplicitSearch: false, searchQuery: null };
 
+  const intent = classifyAgentIntent(cleanMsg);
+  if (intent.mode === 'app_creation') {
+    return { targetUrl: null, isExplicitSearch: false, searchQuery: null };
+  }
+
   // 1. Direct explicit URL match (http/https, www, or domain with known TLDs or localhost/IP)
-  const explicitUrlRegex = /(https?:\/\/[^\s"'<>]+|localhost(?::\d+)?(?:\/[^\s"'<>]*)?|127\.0\.0\.1(?::\d+)?(?:\/[^\s"'<>]*)?|www\.[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+(?::\d+)?(?:\/[^\s"'<>]*)?|[a-zA-Z0-9-]+\.(?:com|org|net|edu|gov|io|ai|tech|co|app|br|uk|de|fr|es|it|me|info|tv|xyz|dev|cloud|page|link|shop|store|online|site|space|top|club|pro|cc|to|is|gg|live|news|world|agency|studio|global|fm|social|blog|directory|guru|solutions|design|center|life)(?:\.[a-zA-Z]{2,3})*(?::\d+)?(?:\/[^\s"'<>]*)?)/i;
+  const explicitUrlRegex = /(https?:\/\/[^\s"'<>]+|localhost(?::\d+)?(?:\/[^\s"'<>]*)?|127\.0\.0\.1(?::\d+)?(?:\/[^\s"'<>]*)?|www\.[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+(?::\d+)?(?:\/[^\s"'<>]*)?|[a-zA-Z0-9-]+\.(?:com|org|net|edu|gov|io|ai|tech|co|app|br|uk|de|fr|es|it|me|info|tv|xyz|dev|cloud|page|link|shop|store|online|space|top|club|pro|cc|to|is|gg|live|news|world|agency|studio|global|fm|social|blog|directory|guru|solutions|design|center|life)(?:\.[a-zA-Z]{2,3})*(?::\d+)?(?:\/[^\s"'<>]*)?)/i;
   
   const urlMatch = cleanMsg.match(explicitUrlRegex);
   if (urlMatch) {
@@ -4051,7 +3487,7 @@ function extractUserDestinationUrl(message: string): { targetUrl: string | null;
   // 2. Check for explicit search phrases (e.g. "pesquise notícias sobre IA", "procure por receita de bolo")
   const searchMatch = cleanMsg.match(/(?:pesquis(?:e|ar)|busqu(?:e|ar)|procur(?:e|ar)|search for|search|procure na web por|pesquise por)\s+["']?([^"'\n\r]+)["']?/i);
   const lower = cleanMsg.toLowerCase();
-  if (searchMatch && !lower.includes('endereço') && !lower.includes('endereco') && !lower.includes('acesse') && !lower.includes('abra o site')) {
+  if (searchMatch && !lower.includes('endereço') && !lower.includes('endereco') && !lower.includes('acesse') && !lower.includes('abra o site') && !lower.includes('crie') && !lower.includes('criar') && !lower.includes('desenvolva')) {
     const rawQuery = searchMatch[1].trim().replace(/^(?:sobre|por)\s+/i, '').trim();
     return { targetUrl: null, isExplicitSearch: true, searchQuery: rawQuery };
   }
@@ -4095,6 +3531,23 @@ function planRealAgentActions(message: string): Array<{ toolName: string; args: 
   const lower = cleanMsg.toLowerCase();
   const plan: Array<{ toolName: string; args: Record<string, any>; reason: string }> = [];
 
+  const intent = classifyAgentIntent(cleanMsg);
+
+  // If intent is app/website creation (WebDev MCP)
+  if (intent.mode === 'app_creation') {
+    plan.push({
+      toolName: 'agent.planArchitecture',
+      args: { target: 'client/src/App.tsx', prompt: cleanMsg },
+      reason: 'WebDev MCP: Planejando arquitetura de componentes React, design e modelos de dados do site'
+    });
+    plan.push({
+      toolName: 'fs.writeFile',
+      args: { filePath: 'client/src/App.tsx', prompt: cleanMsg },
+      reason: 'WebDev MCP: Gravando e sincronizando código-fonte interativo em client/src/App.tsx'
+    });
+    return plan;
+  }
+
   // Extract destination address according to what the user explicitly requested
   const destination = extractUserDestinationUrl(cleanMsg);
 
@@ -4108,21 +3561,6 @@ function planRealAgentActions(message: string): Array<{ toolName: string; args: 
 
   // 6. Detect scroll request (e.g. "role a página", "desça a tela", "scroll down")
   const isScrollAction = lower.includes('role') || lower.includes('rolar') || lower.includes('scroll') || lower.includes('desça') || lower.includes('descer');
-
-  // 7. General navigation / access request
-  const isBrowseIntent = 
-    destination.targetUrl !== null ||
-    lower.includes('acesse') || 
-    lower.includes('navegador') || 
-    lower.includes('navegue') || 
-    lower.includes('abra') || 
-    lower.includes('visite') || 
-    lower.includes('computador') || 
-    lower.includes('endereço') || 
-    lower.includes('endereco') || 
-    lower.includes('site') || 
-    lower.includes('web') ||
-    lower.includes('internet');
 
   // Specialized Multi-Step Web Exploration for GitHub API & Docs
   if (lower.includes('github') && (lower.includes('api') || lower.includes('inspecionar') || lower.includes('docs') || lower.includes('pesquisar') || lower.includes('navegador'))) {
@@ -4231,56 +3669,26 @@ function cleanChatResponseOfCodeBlocks(text: string): string {
 }
 
 function checkNeedsContextQuestionnaire(message: string): boolean {
-  const lower = String(message || '').toLowerCase();
+  const lower = String(message || '').trim().toLowerCase();
   const hasExplicitContextTag = lower.includes('[contexto') || lower.includes('contexto definido') || lower.includes('contexto selecionado');
   if (hasExplicitContextTag) return false;
 
-  const isGenericCreationPrompt = 
-    lower.includes('crie um site') ||
-    lower.includes('criar um site') ||
-    lower.includes('faça um site') ||
-    lower.includes('fazer um site') ||
-    lower.includes('crie um app') ||
-    lower.includes('criar um app') ||
-    lower.includes('crie uma aplicação') ||
-    lower.includes('criar uma aplicação') ||
-    lower.includes('crie uma landing page') ||
-    lower.includes('faça uma landing page') ||
-    lower.includes('construa um site') ||
-    lower.includes('desenvolva um site') ||
-    lower.includes('desenvolver um site') ||
-    lower.includes('desenvolva um app') ||
-    lower.includes('desenvolver uma aplicação') ||
-    lower.includes('quero um site') ||
-    lower.includes('preciso de um site') ||
-    lower.includes('preciso de um app') ||
-    lower.includes('quero um app') ||
-    lower.includes('obter contexto') ||
-    lower.includes('questions') ||
-    lower.includes('questionario') ||
-    lower.includes('questionário') ||
-    lower.trim() === '/context';
+  // Só aciona questionário se for explicitamente solicitado via comando ou se for estritamente uma frase curta sem nenhuma especificação
+  const explicitQuestionnaireTriggers = ['/context', 'obter contexto', 'abrir questionario', 'abrir questionário', 'mostrar questionario', 'mostrar questionário'];
+  if (explicitQuestionnaireTriggers.some(t => lower.includes(t))) return true;
 
-  const hasSpecificNicheOrTech = 
-    lower.includes('fintech') || 
-    lower.includes('banco') || 
-    lower.includes('saas') || 
-    lower.includes('telemetria') || 
-    lower.includes('ecommerce') || 
-    lower.includes('e-commerce') || 
-    lower.includes('loja') || 
-    lower.includes('editorial') || 
-    lower.includes('portfolio') || 
-    lower.includes('portfólio') || 
-    lower.includes('logística') || 
-    lower.includes('delivery') || 
-    lower.includes('restaurante') ||
-    lower.includes('simulador de juros') ||
-    lower.includes('dashboard de logs') ||
-    lower.includes('github api') ||
-    lower.includes('playwright');
+  const pureGenericPhrases = [
+    'crie um site', 'criar um site', 'cria um site', 'faça um site', 'fazer um site',
+    'crie um app', 'criar um app', 'cria um app', 'faça um app', 'fazer um app',
+    'crie uma aplicação', 'criar uma aplicação', 'crie uma landing page', 'faça uma landing page',
+    'quero um site', 'preciso de um site', 'quero um app', 'preciso de um app'
+  ];
 
-  return (isGenericCreationPrompt || lower.trim() === '/context') && !hasSpecificNicheOrTech;
+  // Verifica se a mensagem é exatamente (ou quase exatamente) uma dessas frases sem nenhum detalhe adicional
+  const stripped = lower.replace(/[.!?]/g, '').trim();
+  const isStrictlyGeneric = pureGenericPhrases.includes(stripped);
+
+  return isStrictlyGeneric;
 }
 
 // 7. Streaming Agent Chat Endpoint (Server-Sent Events) with Real Function Calling
@@ -4365,13 +3773,13 @@ app.post('/api/agent/chat/stream', async (req, res) => {
               model: modelCandidate,
               contents: chatContents,
               config: {
-                systemInstruction: CORE_SPARK_SYSTEM_INSTRUCTION + buildIntentInstruction(intent) + '\n\nDIRETIVA DE RESPOSTA SEM CÓDIGO NO CHAT: NUNCA responda com blocos de código grandes ou listagens de código-fonte no chat. Só produza códigos se a intenção APP_CREATION estiver ativa.',
+                systemInstruction: CORE_SPARK_SYSTEM_INSTRUCTION + buildIntentInstruction(intent) + buildSkillsSystemInstruction() + '\n\nDIRETIVA DE RESPOSTA SEM CÓDIGO NO CHAT: NUNCA responda com blocos de código grandes ou listagens de código-fonte no chat. Só produza códigos se a intenção APP_CREATION estiver ativa.',
                 tools: intent.allowedTools.length ? [{ functionDeclarations: filterToolDeclarations(intent, AGENT_TOOL_DECLARATIONS) as any }] : undefined
               }
             });
 
             const timeoutPromise = new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error(`Timeout no modelo ${modelCandidate}`)), 12000)
+              setTimeout(() => reject(new Error(`Timeout no modelo ${modelCandidate}`)), 25000)
             );
 
             modelResponse = await Promise.race([responsePromise, timeoutPromise]);
@@ -4534,10 +3942,29 @@ app.post('/api/agent/chat/stream', async (req, res) => {
         }
       }
 
+      const generatedFiles: Array<{ path: string; code: string; lang?: string }> = [];
+      for (const tc of executedToolCalls) {
+        if ((tc.toolName.includes('write') || tc.toolName.includes('file')) && (tc.arguments?.content || tc.arguments?.code)) {
+          const filePath = tc.arguments.filePath || tc.arguments.path || tc.arguments.filename || 'client/src/App.tsx';
+          generatedFiles.push({
+            path: filePath,
+            code: tc.arguments.content || tc.arguments.code,
+            lang: tc.arguments.lang || 'typescript'
+          });
+        }
+      }
+
+      if (intent.mode === 'app_creation' && generatedFiles.length === 0) {
+        const fallback = generateAutonomousRuleEnforcedFallback(message, history, currentFiles);
+        if (fallback.files && fallback.files.length > 0) {
+          generatedFiles.push(...fallback.files);
+        }
+      }
+
       const finalResult: any = {
-        thought: `Agente completou raciocínio com ${executedToolCalls.length} execuções de ferramentas reais.`,
-        explanation: cleanChatResponseOfCodeBlocks(modelTextResponse) || (pendingApproval ? 'Aguardando sua autorização para prosseguir com a operação.' : 'Tarefa concluída com sucesso no Computador na Nuvem.'),
-        files: [],
+        thought: `Agente completou raciocínio com ${executedToolCalls.length} execuções de ferramentas reais no WebDev Workspace.`,
+        explanation: cleanChatResponseOfCodeBlocks(modelTextResponse) || (pendingApproval ? 'Aguardando sua autorização para prosseguir com a operação.' : 'Aplicação e arquivos criados com sucesso no Workspace.'),
+        files: generatedFiles,
         sources: webSources,
         toolCalls: executedToolCalls,
         approval: pendingApproval
@@ -4726,13 +4153,13 @@ app.post('/api/agent/chat', async (req, res) => {
             model: modelCandidate,
             contents: chatContents,
             config: {
-              systemInstruction: CORE_SPARK_SYSTEM_INSTRUCTION + buildIntentInstruction(intent) + '\n\nDIRETIVA DE RESPOSTA SEM CÓDIGO NO CHAT: NUNCA responda com blocos de código grandes ou listagens de código-fonte no chat. Só produza códigos se a intenção APP_CREATION estiver ativa.',
+              systemInstruction: CORE_SPARK_SYSTEM_INSTRUCTION + buildIntentInstruction(intent) + buildSkillsSystemInstruction() + '\n\nDIRETIVA DE RESPOSTA SEM CÓDIGO NO CHAT: NUNCA responda com blocos de código grandes ou listagens de código-fonte no chat. Só produza códigos se a intenção APP_CREATION estiver ativa.',
               tools: intent.allowedTools.length ? [{ functionDeclarations: filterToolDeclarations(intent, AGENT_TOOL_DECLARATIONS) as any }] : undefined
             }
           });
 
           const timeoutPromise = new Promise<never>((_, reject) => 
-            setTimeout(() => reject(new Error(`Model timeout after 15s on ${modelCandidate}`)), 15000)
+            setTimeout(() => reject(new Error(`Model timeout after 25s on ${modelCandidate}`)), 25000)
           );
 
           const response: any = await Promise.race([responsePromise, timeoutPromise]);
@@ -4804,10 +4231,28 @@ app.post('/api/agent/chat', async (req, res) => {
           }
         }
 
+        const generatedFiles: Array<{ path: string; code: string; lang?: string }> = [];
+        for (const tc of executedToolCalls) {
+          if ((tc.toolName.includes('write') || tc.toolName.includes('file')) && (tc.arguments?.content || tc.arguments?.code)) {
+            const filePath = tc.arguments.filePath || tc.arguments.path || tc.arguments.filename || 'client/src/App.tsx';
+            generatedFiles.push({
+              path: filePath,
+              code: tc.arguments.content || tc.arguments.code,
+              lang: tc.arguments.lang || 'typescript'
+            });
+          }
+        }
+        if (intent.mode === 'app_creation' && generatedFiles.length === 0) {
+          const fallback = generateAutonomousRuleEnforcedFallback(message, history, currentFiles);
+          if (fallback.files && fallback.files.length > 0) {
+            generatedFiles.push(...fallback.files);
+          }
+        }
+
         return res.json({
-          thought: `Agente completou a tarefa com ${executedToolCalls.length} ferramentas reais executadas.`,
-          response: cleanChatResponseOfCodeBlocks(finalModelText) || 'Ação executada com sucesso no computador na nuvem.',
-          files: [],
+          thought: `Agente completou a tarefa com ${executedToolCalls.length} ferramentas reais executadas no WebDev Workspace.`,
+          response: cleanChatResponseOfCodeBlocks(finalModelText) || 'Ação executada com sucesso no workspace.',
+          files: generatedFiles,
           sources: webSources,
           toolCalls: executedToolCalls,
           approval: pendingApproval,

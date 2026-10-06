@@ -31,7 +31,8 @@ import {
   BracketsCurly,
   Palette,
   Image,
-  TreeStructure
+  TreeStructure,
+  Browser
 } from "@phosphor-icons/react";
 
 /* ─────────────────────────────────────────────────────────
@@ -81,7 +82,7 @@ export function getContextualToolIcon(iconKey: string, label: string = "", chip:
 
   // 0. MCP Specific Labels
   if (l.includes("webdev mcp")) return <Code size={13} weight="bold" className="text-cyan-400 shrink-0" />;
-  if (l.includes("computer mcp")) return <Browsers size={13} weight="bold" className="text-blue-400 shrink-0" />;
+  if (l.includes("computer mcp")) return <Browser size={13} weight="bold" className="text-blue-400 shrink-0" />;
   if (l.includes("terminal bash mcp")) return <Terminal size={13} weight="bold" className="text-emerald-400 shrink-0" />;
 
   // 1. Browser & Web Navigations

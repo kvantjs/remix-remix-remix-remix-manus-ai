@@ -17,23 +17,59 @@ export type AgentIntent = {
 const TOOL_ALIASES: Record<string, string> = {
   web_search: 'web_search',
   websearch: 'web_search',
+  'computer.browser_search': 'web_search',
+  'computer.search': 'web_search',
   web_fetch: 'web_fetch',
   webfetch: 'web_fetch',
+  'computer.browser_api_call': 'web_fetch',
+  'computer.api_call': 'web_fetch',
   bash_exec: 'bash_exec',
   bash: 'bash_exec',
   terminal: 'bash_exec',
+  'terminal.bash_exec': 'bash_exec',
+  'terminal.exec': 'bash_exec',
   python_exec: 'python_exec',
   python: 'python_exec',
   file_list: 'file_list',
+  'webdev.list_files': 'file_list',
+  'webdev.list': 'file_list',
   file_read: 'file_read',
+  'webdev.read_file': 'file_read',
   file_write: 'file_write',
+  'webdev.write_file': 'file_write',
+  'webdev.create_file': 'file_write',
+  file_create_directory: 'file_create_directory',
+  'webdev.create_folder': 'file_create_directory',
+  'webdev.mkdir': 'file_create_directory',
+  mkdir: 'file_create_directory',
   file_delete: 'file_delete',
+  'webdev.delete_file': 'file_delete',
+  webdev_secret_set: 'webdev_secret_set',
+  'webdev.secret_set': 'webdev_secret_set',
+  webdev_secret_get: 'webdev_secret_get',
+  'webdev.secret_get': 'webdev_secret_get',
+  webdev_snapshot: 'webdev_snapshot',
+  'webdev.snapshot': 'webdev_snapshot',
+  'webdev.version_snapshot': 'webdev_snapshot',
+  webdev_rollback: 'webdev_rollback',
+  'webdev.rollback': 'webdev_rollback',
+  'webdev.version_rollback': 'webdev_rollback',
   browser_navigate: 'browser_navigate',
+  'computer.browser_navigate': 'browser_navigate',
+  'computer.navigate': 'browser_navigate',
   browser_inspect: 'browser_inspect',
+  'computer.browser_inspect': 'browser_inspect',
   browser_click: 'browser_click',
+  'computer.browser_click': 'browser_click',
+  'computer.click': 'browser_click',
   browser_type: 'browser_type',
+  'computer.browser_type': 'browser_type',
+  'computer.type': 'browser_type',
   browser_scroll: 'browser_scroll',
+  'computer.browser_scroll': 'browser_scroll',
+  'computer.scroll': 'browser_scroll',
   browser_open_result: 'browser_open_result',
+  'computer.browser_open_result': 'browser_open_result',
   job_create: 'job_create',
   job_status: 'job_status',
   job_cancel: 'job_cancel'
@@ -41,9 +77,9 @@ const TOOL_ALIASES: Record<string, string> = {
 
 const ALL_TOOLS = Object.values(TOOL_ALIASES).filter((name, index, list) => list.indexOf(name) === index);
 const WEB_TOOLS = ['web_search', 'web_fetch', 'browser_navigate', 'browser_inspect', 'browser_click', 'browser_scroll', 'browser_open_result'];
-const COMPUTER_TOOLS = [...WEB_TOOLS, 'browser_click', 'browser_type', 'bash_exec', 'python_exec', 'file_list', 'file_read', 'file_write', 'file_delete', 'job_create', 'job_status', 'job_cancel'];
-const APP_TOOLS = ['file_list', 'file_read', 'file_write', 'bash_exec', 'python_exec', 'job_create', 'job_status', 'job_cancel'];
-const PROJECT_TOOLS = ['file_list', 'file_read', 'file_write', 'file_delete', 'bash_exec', 'job_create', 'job_status', 'job_cancel'];
+const COMPUTER_TOOLS = [...WEB_TOOLS, 'browser_click', 'browser_type', 'bash_exec', 'python_exec', 'file_list', 'file_read', 'file_write', 'file_create_directory', 'file_delete', 'job_create', 'job_status', 'job_cancel', 'webdev_secret_set', 'webdev_secret_get', 'webdev_snapshot', 'webdev_rollback'];
+const APP_TOOLS = ['file_list', 'file_read', 'file_write', 'file_create_directory', 'webdev_secret_set', 'webdev_secret_get', 'webdev_snapshot', 'webdev_rollback', 'bash_exec', 'python_exec', 'job_create', 'job_status', 'job_cancel'];
+const PROJECT_TOOLS = ['file_list', 'file_read', 'file_write', 'file_create_directory', 'file_delete', 'webdev_secret_set', 'webdev_secret_get', 'webdev_snapshot', 'webdev_rollback', 'bash_exec', 'job_create', 'job_status', 'job_cancel'];
 
 function hasAny(text: string, terms: string[]) {
   return terms.some((term) => text.includes(term));
@@ -67,15 +103,28 @@ export function classifyAgentIntent(message: string): AgentIntent {
     return { mode: 'conversation', confidence: 'high', reason: 'Mensagem vazia não autoriza execução.', allowedTools: [] };
   }
 
-  const appCreation = hasAny(lower, [
-    'crie um app', 'criar um app', 'crie uma aplicação', 'criar uma aplicação', 'desenvolva um app',
-    'desenvolver uma aplicação', 'faça um site', 'fazer um site', 'crie um site', 'construa um site',
-    'construir uma aplicação', 'programe', 'programar', 'implemente', 'implementar', 'escreva o código',
-    'edite o código', 'modifique o arquivo', 'corrija o código', 'dashboard', 'landing page', 'react', 'typescript',
+  // 1. High Priority: Software, WebDev, UI and Website Creation/Modification
+  const appCreationTerms = [
+    'crie', 'criar', 'cria', 'faça', 'fazer', 'faz', 'monte', 'montar', 'desenvolva', 'desenvolver',
+    'construa', 'construir', 'gere', 'gerar', 'programe', 'programar', 'implemente', 'implementar',
+    'escreva o código', 'escreva código', 'edite o código', 'modifique o arquivo', 'corrija o código',
+    'código', 'codigo', 'webdev', 'frontend', 'front-end', 'interface', 'ui', 'ux',
+    'site', 'landing page', 'dashboard', 'ecommerce', 'e-commerce', 'loja', 'fintech', 'saas',
+    'aplicação', 'aplicacao', 'aplicativo', 'app', 'react', 'typescript', 'página', 'pagina',
+    'tela', 'portal', 'plataforma', 'componente', 'sistema', 'portfolio', 'portfólio',
     '[contexto', 'contexto definido', 'contexto selecionado'
-  ]);
-  if (appCreation) {
-    return { mode: 'app_creation', confidence: 'high', reason: 'Pedido contém intenção explícita de criar ou modificar software.', allowedTools: APP_TOOLS };
+  ];
+
+  const hasAppCreation = hasAny(lower, appCreationTerms);
+  const isExplicitWebResearchOnly = (lower.includes('pesquise na web') || lower.includes('pesquisar na web') || lower.includes('busque na internet')) && !hasAppCreation;
+
+  if (hasAppCreation && !isExplicitWebResearchOnly) {
+    return { 
+      mode: 'app_creation', 
+      confidence: 'high', 
+      reason: 'Pedido contém intenção de criação, desenvolvimento ou modificação de website/software (WebDev MCP).', 
+      allowedTools: APP_TOOLS 
+    };
   }
 
   const projectOperation = hasAny(lower, [
@@ -91,9 +140,9 @@ export function classifyAgentIntent(message: string): AgentIntent {
     'rode no terminal', 'comando shell', 'shell linux', 'navegador do agente', 'browser do agente',
     'clique em', 'preencha o formulário', 'digite no site', 'abra no navegador', 'acesse o site',
     'leia o arquivo', 'liste os arquivos', 'grave o arquivo', 'escreva no arquivo', 'sistema de arquivos',
-    'npx', 'playwright install', 'playwright', 'bash', 'terminal', 'instalar'
+    'npx', 'playwright install', 'playwright', 'bash', 'terminal'
   ]);
-  if (cloudComputer) {
+  if (cloudComputer && !hasAppCreation) {
     return { mode: 'cloud_computer', confidence: 'high', reason: 'Pedido autoriza uma operação no computador ou navegador da nuvem.', allowedTools: COMPUTER_TOOLS };
   }
 
@@ -106,7 +155,7 @@ export function classifyAgentIntent(message: string): AgentIntent {
     'notícias', 'noticias', 'preço atual', 'cotação', 'fonte', 'fontes', 'o que aconteceu hoje',
     'consulte a internet', 'verifique na web', 'compare dados atuais'
   ]);
-  if (research) {
+  if (research && !hasAppCreation) {
     return { mode: 'web_research', confidence: 'high', reason: 'Pedido solicita informação externa, atual ou verificável na web.', allowedTools: WEB_TOOLS };
   }
 
@@ -130,7 +179,7 @@ export function filterToolDeclarations(intent: AgentIntent, declarations: any[])
 
 export function buildIntentInstruction(intent: AgentIntent) {
   const tools = intent.allowedTools.length ? intent.allowedTools.join(', ') : 'nenhuma';
-  return `\n\nROTEADOR RIGOROSO DE INTENÇÃO — MODO ATIVO: ${intent.mode.toUpperCase()}\nMotivo: ${intent.reason}\nFerramentas autorizadas neste turno: ${tools}.\nREGRAS INVIOLÁVEIS:\n1. Não confunda conversa com autorização operacional. Em CONVERSATION, responda em linguagem natural e não chame ferramentas, navegador, terminal ou filesystem.\n2. Em WEB_RESEARCH, utilize web_search ou browser_search para obter resultados, LEIA o conteúdo da página acessada, PENSE e ANALISE criticamente as informações coletadas e elabore uma resposta rica, completa e sintetizada. Se necessário, acesse links adicionais com web_fetch ou browser_navigate para aprofundar seu conhecimento antes de concluir.\n3. Em CLOUD_COMPUTER, execute somente ações no computador/navegador descritas pelo usuário; não transforme uma pergunta em criação de software.\n4. Em APP_CREATION, trate a mensagem como engenharia de software; leia arquivos atuais antes de editar, escreva código apenas nos arquivos necessários e valide o resultado. Não navegue na web por iniciativa própria.\n5. Em EXPLICIT_TOOL_CALL, chame somente a ferramenta nomeada; se o pedido estiver incompleto, peça esclarecimento em vez de escolher outra ferramenta.\n6. Em PROJECT_OPERATION, trate arquivos, snapshots, diffs e versões como operações de projeto; não publique, restaure ou faça push sem confirmação explícita do usuário.\n7. Nunca alegue que uma ferramenta foi executada se ela não aparecer em toolCalls com resultado real.\n8. Se a intenção mudar no meio da tarefa, pare e peça confirmação antes de trocar de modo.\n`;
+  return `\n\nROTEADOR RIGOROSO DE INTENÇÃO — MODO ATIVO: ${intent.mode.toUpperCase()}\nMotivo: ${intent.reason}\nFerramentas autorizadas neste turno: ${tools}.\nREGRAS INVIOLÁVEIS:\n1. Não confunda conversa com autorização operacional. Em CONVERSATION, responda em linguagem natural e não chame ferramentas, navegador, terminal ou filesystem.\n2. Em WEB_RESEARCH, utilize web_search ou browser_search para obter resultados, LEIA o conteúdo da página acessada, PENSE e ANALISE criticamente as informações coletadas e elabore uma resposta rica, completa e sintetizada. Se necessário, acesse links adicionais com web_fetch ou browser_navigate para aprofundar seu conhecimento antes de concluir.\n3. Em CLOUD_COMPUTER, execute somente ações no computador/navegador descritas pelo usuário; não transforme uma pergunta em criação de software.\n4. Em APP_CREATION, crie aplicações e sites React+Vite ULTRA COMPLETOS DO ZERO para cada solicitação, sem repetir interfaces. O site DEVE ter fundo próprio e visível (nunca o padrão da aplicação). Escreva o código completo, rico em recursos e de verdade (sem simulações vazias ou parciais). Crie múltiplos arquivos e pastas estruturados se necessário (README.md completo e detalhado, .md de documentação, tipos .ts, metadata.json, etc.), defina e importe no topo todos os ícones utilizados no JSX (incluindo TrendUp as TrendingUp). Não navegue na web por iniciativa própria.\n5. Em EXPLICIT_TOOL_CALL, chame somente a ferramenta nomeada; se o pedido estiver incompleto, peça esclarecimento em vez de escolher outra ferramenta.\n6. Em PROJECT_OPERATION, trate arquivos, snapshots, diffs e versões como operações de projeto; não publique, restaure ou faça push sem confirmação explícita do usuário.\n7. Nunca alegue que uma ferramenta foi executada se ela não aparecer em toolCalls com resultado real.\n8. Se a intenção mudar no meio da tarefa, pare e peça confirmação antes de trocar de modo.\n`;
 }
 
 export function conversationFallback(message = '', history: Array<{ role?: string; content?: string }> = []) {

@@ -131,7 +131,7 @@ export function beginOAuth(req: Request, res: Response, requestedOrigin?: string
 async function exchangeCode(code: string, redirectUri: string) {
   const base = process.env.MANUS_OAUTH_API_URL;
   const clientId = process.env.MANUS_PROJECT_ID;
-  if (!base || !clientId) throw new Error('Configuração OAuth do Manus indisponível.');
+  if (!base || !clientId) throw new Error('Configuração OAuth do Sparkle indisponível.');
   const exchange = await fetch(`${base.replace(/\/$/, '')}/webdev.v1.WebDevAuthPublicService/ExchangeToken`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ clientId, grantType: 'authorization_code', code, redirectUri })

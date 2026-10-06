@@ -19,7 +19,7 @@ import {
 
 export function Sidebar({ theme, toggleTheme }: { theme: 'light' | 'dark'; toggleTheme: () => void }) {
   return (
-    <aside className="w-64 bg-bg-surface-panel border-r border-border-divider-subtle flex flex-col h-full shrink-0">
+    <aside className="w-[292px] bg-bg-surface-panel border-r border-border-divider-subtle flex flex-col h-full shrink-0">
       {/* Header */}
       <div className="p-4 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
@@ -44,13 +44,13 @@ export function Sidebar({ theme, toggleTheme }: { theme: 'light' | 'dark'; toggl
         </button>
 
         <div className="pt-2 pb-1">
-          <NavItem icon={<Desktop size={18} />} label="Computadores" />
-          <NavItem icon={<Users size={18} />} label="Agents" badge="Cue!" />
-          <NavItem icon={<FolderSimple size={18} />} label="Biblioteca" />
-          <NavItem icon={<Sparkle size={18} />} label="Criações" />
-          <NavItem icon={<Lightning size={18} />} label="Automações" />
-          <NavItem icon={<PuzzlePiece size={18} />} label="Plugins" />
-          <NavItem icon={<DotsThree size={18} />} label="Mais" />
+          <NavItem icon={<Desktop size={18} />} label="Computadores" color="#ffffff" />
+          <NavItem icon={<Users size={18} />} label="Agents" badge="Cue!" color="#ffffff" />
+          <NavItem icon={<FolderSimple size={18} />} label="Biblioteca" color="#d1d1d1" />
+          <NavItem icon={<Sparkle size={18} />} label="Criações" color="#f3f3f3" />
+          <NavItem icon={<Lightning size={18} />} label="Automações" color="#e2e2e2" />
+          <NavItem icon={<PuzzlePiece size={18} />} label="Plugins" color="#cccccc" />
+          <NavItem icon={<DotsThree size={18} />} label="Mais" color="#d6d6d6" />
         </div>
 
         {/* Projects */}
@@ -129,11 +129,14 @@ export function Sidebar({ theme, toggleTheme }: { theme: 'light' | 'dark'; toggl
   );
 }
 
-function NavItem({ icon, label, badge }: { icon: React.ReactNode; label: string; badge?: string }) {
+function NavItem({ icon, label, badge, color }: { icon: React.ReactNode; label: string; badge?: string; color?: string }) {
   return (
-    <button className="w-full flex items-center justify-between px-3 py-2 text-sm text-text-content-secondary hover:bg-bg-action-hover hover:text-text-content-primary rounded-lg transition-all group">
+    <button 
+      className="w-full flex items-center justify-between px-3 py-2 text-sm text-text-content-secondary hover:bg-bg-action-hover hover:text-text-content-primary rounded-lg transition-all group"
+      style={color ? { color } : undefined}
+    >
       <div className="flex items-center gap-3">
-        <span className="text-text-content-secondary/40 group-hover:text-text-content-primary transition-colors">{icon}</span>
+        <span className="text-text-content-secondary/40 group-hover:text-text-content-primary transition-colors" style={color ? { color } : undefined}>{icon}</span>
         <span>{label}</span>
       </div>
       {badge && (
@@ -146,10 +149,11 @@ function NavItem({ icon, label, badge }: { icon: React.ReactNode; label: string;
 }
 
 function TaskItem({ label, active }: { label: string; active?: boolean }) {
+  const displayLabel = label.length > 32 ? label.substring(0, 32) + '...' : label;
   return (
-    <button className={`w-full flex items-start gap-3 px-3 py-2 text-xs text-left rounded-lg transition-colors ${active ? 'bg-bg-action-hover text-text-content-primary' : 'text-text-content-secondary hover:bg-bg-action-hover hover:text-text-content-primary/60'}`}>
-      <ChatCircleText size={14} className="shrink-0 mt-0.5 opacity-40" />
-      <span className="line-clamp-2 leading-relaxed">{label}</span>
+    <button className={`w-full flex items-center gap-3 px-3 py-2 text-xs text-left rounded-lg transition-colors ${active ? 'bg-bg-action-hover text-text-content-primary' : 'text-text-content-secondary hover:bg-bg-action-hover hover:text-text-content-primary/60'}`} title={label}>
+      <ChatCircleText size={14} className="shrink-0 opacity-40" />
+      <span className="truncate">{displayLabel}</span>
     </button>
   );
 }

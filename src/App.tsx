@@ -12,7 +12,7 @@ import { ToolCallTrace } from './types/project';
 export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('manus-theme') as 'light' | 'dark') || 'dark';
+      return (localStorage.getItem('sparkle-theme') as 'light' | 'dark') || 'dark';
     }
     return 'dark';
   });
@@ -24,7 +24,7 @@ export default function App() {
   const toggleTheme = useCallback(() => {
     setTheme(prev => {
       const next = prev === 'dark' ? 'light' : 'dark';
-      localStorage.setItem('manus-theme', next);
+      localStorage.setItem('sparkle-theme', next);
       return next;
     });
   }, []);
@@ -33,8 +33,7 @@ export default function App() {
   const [customFiles, setCustomFiles] = useState<Record<string, string>>({});
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
 
-  const [workspaceTab, setWorkspaceTab] = useState<'computer' | 'workspace'>('computer');
-
+  const [workspaceTab, setWorkspaceTab] = useState<'computer' | 'workspace' | 'code_tab' | 'preview_tab' | 'terminal_tab'>('workspace');
 
   // Agent execution state for Computador do Kvant
   const [toolCalls, setToolCalls] = useState<ToolCallTrace[]>([]);
@@ -55,6 +54,8 @@ export default function App() {
       }
       return updated;
     });
+    setIsWorkspaceOpen(true);
+    setWorkspaceTab(prev => (prev === 'computer' ? 'workspace' : prev));
   }, []);
 
   const handleAgentStateChange = useCallback((state: {
@@ -120,6 +121,7 @@ export default function App() {
           <Workspace 
             onClose={handleCloseWorkspace} 
             customFiles={customFiles}
+            onFileUpdate={handleFileUpdate}
             onSendPrompt={handleSendPrompt}
             toolCalls={toolCalls}
             isWorking={isWorking}
