@@ -119,6 +119,15 @@ interface ExecutionStep {
 }
 
 
+interface AgentProgressNote {
+  id: string;
+  label: string;
+  text: string;
+  status: 'running' | 'complete' | 'warning';
+  timestamp: string;
+}
+
+
 type ToolPresentation = { label: string; chip: string; detail: string };
 
 function describeToolExecution(toolName: string, args: Record<string, any> = {}, fallback = ''): ToolPresentation {
@@ -343,6 +352,8 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
   const [currentStep, setCurrentStep] = useState('Analisando solicitação...');
   const [executionSteps, setExecutionSteps] = useState<ExecutionStep[]>([]);
   const executionStepsRef = useRef<ExecutionStep[]>([]);
+  const [progressNotes, setProgressNotes] = useState<AgentProgressNote[]>([]);
+  const progressNotesRef = useRef<AgentProgressNote[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -353,6 +364,34 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
       executionStepsRef.current = next;
       return next;
     });
+  };
+
+  const updateProgressNote = (label: string, text: string, status: AgentProgressNote['status'] = 'running') => {
+    const normalizedLabel = String(label || 'Etapa do agente').trim();
+    const normalizedText = String(text || '').trim() || 'Processando esta etapa...';
+    setProgressNotes(previous => {
+      const existingIndex = previous.findIndex(note => note.label === normalizedLabel);
+      const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const next = [...previous];
+      const note = { id: existingIndex >= 0 ? next[existingIndex].id : `note_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, label: normalizedLabel, text: normalizedText, status, timestamp };
+      if (existingIndex >= 0) next[existingIndex] = note;
+      else next.push(note);
+      const bounded = next.slice(-7);
+      progressNotesRef.current = bounded;
+      return bounded;
+    });
+  };
+
+  const addOpeningProgressNote = (prompt: string) => {
+    const cleanPrompt = prompt.replace(/\s+/g, ' ').trim();
+    const isCreation = /crie|criar|site|aplicaç|aplicac|dashboard|landing|loja|app/i.test(cleanPrompt);
+    updateProgressNote(
+      'Entendimento do pedido',
+      isCreation
+        ? `Entendi o objetivo: vou estruturar uma aplicação própria a partir de “${cleanPrompt.slice(0, 180)}${cleanPrompt.length > 180 ? '…' : ''}”. Primeiro vou definir a arquitetura e depois validar cada arquivo no preview.`
+        : `Entendi a solicitação: “${cleanPrompt.slice(0, 220)}${cleanPrompt.length > 220 ? '…' : ''}”. Vou organizar a execução em etapas verificáveis.`,
+      'complete'
+    );
   };
 
   const beginExecutionStep = (label: string, detail: string) => {
@@ -532,6 +571,9 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
     }
 
     setIsThinking(true);
+    progressNotesRef.current = [];
+    setProgressNotes([]);
+    addOpeningProgressNote(userPrompt);
     const initialSteps: ExecutionStep[] = [
       {
         id: `intent_${Date.now()}`,
@@ -597,6 +639,9 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                 try {
                   const data = JSON.parse(line.replace('data: ', '').trim());
                   if (currentEvent === 'deliberation') {
+                    const deliberationLabel = data.label || 'Deliberação profunda';
+                    const deliberationText = data.text || 'Avaliando critérios verificáveis.';
+                    updateProgressNote(deliberationLabel, data.complete ? `Etapa concluída: ${deliberationText}` : deliberationText, data.complete ? 'complete' : 'running');
                     setCurrentStep(data.text || data.label || 'Deliberação profunda em andamento');
                     beginExecutionStep(data.label || 'Deliberação profunda', data.text || 'Avaliando critérios verificáveis.');
                     if (data.complete) {
@@ -611,6 +656,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                       });
                     }
                   } else if (currentEvent === 'status') {
+                    updateProgressNote('Raciocínio e coordenação', data.text || 'Coordenando a próxima ação do agente.', 'running');
                     setCurrentStep(data.text);
                     beginExecutionStep('Raciocinando sobre a próxima ação', data.text);
                     if (onAgentStateChange) {
@@ -623,6 +669,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                       });
                     }
                   } else if (currentEvent === 'step') {
+                    updateProgressNote(data.toolName || 'Etapa de execução', data.text || 'Executando a próxima etapa do plano.', 'running');
                     setCurrentStep(data.text);
                     beginExecutionStep('Executando etapa do plano', data.text);
                     if (onAgentStateChange) {
@@ -635,6 +682,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                     }
                   } else if (currentEvent === 'tool_start') {
                     const presentation = describeToolExecution(data.toolName, data.arguments || {}, data.reason || '');
+                    updateProgressNote(presentation.label, `Iniciei esta etapa: ${presentation.detail || presentation.chip}`, 'running');
                     setCurrentStep(`${presentation.label}: ${presentation.chip}`);
                     beginExecutionStep(presentation.label, presentation.detail);
                     const activeTrace: ToolCallTrace = {
@@ -665,6 +713,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                       });
                     }
                   } else if (currentEvent === 'browser_progress') {
+                    updateProgressNote('Navegador ao vivo', data.actionDescription || data.status || 'Acompanhando mouse, rolagem e conteúdo da página.', 'running');
                     const progressTrace: ToolCallTrace = {
                       id: `active_browser_${data.toolName || 'action'}`,
                       toolName: data.toolName || 'browser_action',
@@ -696,6 +745,8 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                     }
                   } else if (currentEvent === 'tool_finish') {
                     const toolCall = data.toolCall;
+                    const finishedPresentation = describeToolExecution(toolCall.toolName, toolCall.arguments || {}, toolCall.screenData?.actionDescription || '');
+                    updateProgressNote(finishedPresentation.label, `Etapa concluída: ${finishedPresentation.detail || 'resultado incorporado ao contexto.'}`, toolCall.status === 'error' ? 'warning' : 'complete');
                     liveToolCalls.push(toolCall);
                     
                     // Live build: If the tool updated a file, sync with workspace immediately
@@ -710,11 +761,6 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                       }
                     }
 
-                    const finishedPresentation = describeToolExecution(
-                      toolCall.toolName,
-                      toolCall.arguments || {},
-                      toolCall.screenData?.actionDescription || ''
-                    );
                     completeExecutionStep(
                       finishedPresentation.label,
                       finishedPresentation.detail || 'Ação concluída; resultado incorporado ao contexto.',
@@ -1003,6 +1049,10 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
             />
           ))}
           
+          {isThinking && progressNotes.length > 0 && (
+            <AgentProgressNotes notes={progressNotes} />
+          )}
+
           {isThinking && (
             <LocalActiveThinkingState 
               elapsedSeconds={elapsedSeconds} 
@@ -1616,6 +1666,29 @@ function MessageItem({
         )}
 
       </div>
+    </div>
+  );
+}
+
+function AgentProgressNotes({ notes }: { notes: AgentProgressNote[] }) {
+  return (
+    <div className="w-full max-w-[820px] pl-8 space-y-2 animate-in fade-in duration-300">
+      {notes.map((note, index) => (
+        <div key={note.id} className="flex items-start gap-2.5 rounded-xl border border-white/5 bg-white/[0.025] px-3 py-2.5 shadow-sm" style={{ animation: `thinking-fade-up 280ms cubic-bezier(0.23,1,0.32,1) ${Math.min(index, 5) * 55}ms both` }}>
+          <div className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-md border border-white/10 bg-bg-surface-panel">
+            {note.status === 'running' ? <Spinner size={12} className="animate-spin text-text-content-primary/70" /> : note.status === 'warning' ? <ShieldWarning size={12} className="text-amber-300" /> : <CheckCircle size={12} className="text-emerald-300/80" />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-text-content-secondary/70">Nota do agente</span>
+              <span className="text-[9px] font-mono text-text-content-secondary/35">{note.timestamp}</span>
+            </div>
+            <p className="mt-0.5 break-words text-[12px] leading-relaxed text-text-content-primary/85 [overflow-wrap:anywhere]">
+              <span className="font-semibold text-text-content-primary/95">{note.label}: </span>{note.text}
+            </p>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
