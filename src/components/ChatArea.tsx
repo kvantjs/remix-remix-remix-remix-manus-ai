@@ -1049,16 +1049,16 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
             />
           ))}
           
-          {isThinking && progressNotes.length > 0 && (
-            <AgentProgressNotes notes={progressNotes} />
-          )}
-
-          {isThinking && (
+          {isThinking && !messages.some(m => m.isStreaming) && (
             <LocalActiveThinkingState 
               elapsedSeconds={elapsedSeconds} 
               step={currentStep}
               steps={executionSteps}
             />
+          )}
+
+          {isThinking && !messages.some(m => m.isStreaming) && progressNotes.length > 0 && (
+            <AgentProgressNotes notes={progressNotes} />
           )}
 
           {isAgentInBackground && !isThinking && !messages.some(m => m.isStreaming) && (
@@ -1672,21 +1672,16 @@ function MessageItem({
 
 function AgentProgressNotes({ notes }: { notes: AgentProgressNote[] }) {
   return (
-    <div className="w-full max-w-[820px] pl-8 space-y-2 animate-in fade-in duration-300">
+    <div className="w-full max-w-[820px] pl-8 space-y-1.5 animate-in fade-in duration-300">
       {notes.map((note, index) => (
-        <div key={note.id} className="flex items-start gap-2.5 rounded-xl border border-white/5 bg-white/[0.025] px-3 py-2.5 shadow-sm" style={{ animation: `thinking-fade-up 280ms cubic-bezier(0.23,1,0.32,1) ${Math.min(index, 5) * 55}ms both` }}>
-          <div className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-md border border-white/10 bg-bg-surface-panel">
-            {note.status === 'running' ? <Spinner size={12} className="animate-spin text-text-content-primary/70" /> : note.status === 'warning' ? <ShieldWarning size={12} className="text-amber-300" /> : <CheckCircle size={12} className="text-emerald-300/80" />}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-text-content-secondary/70">Nota do agente</span>
-              <span className="text-[9px] font-mono text-text-content-secondary/35">{note.timestamp}</span>
-            </div>
-            <p className="mt-0.5 break-words text-[12px] leading-relaxed text-text-content-primary/85 [overflow-wrap:anywhere]">
-              <span className="font-semibold text-text-content-primary/95">{note.label}: </span>{note.text}
-            </p>
-          </div>
+        <div key={note.id} className="flex min-w-0 items-start gap-2 py-1 text-left" style={{ animation: `thinking-fade-up 280ms cubic-bezier(0.23,1,0.32,1) ${Math.min(index, 5) * 55}ms both` }}>
+          <span className="mt-1.5 flex size-3.5 shrink-0 items-center justify-center text-text-content-secondary/60">
+            {note.status === 'running' ? <Spinner size={11} className="animate-spin" /> : note.status === 'warning' ? <ShieldWarning size={12} className="text-amber-300/80" /> : <CheckCircle size={12} className="text-text-content-secondary/70" />}
+          </span>
+          <p className="min-w-0 flex-1 break-words text-[12px] leading-relaxed text-text-content-primary/80 [overflow-wrap:anywhere]">
+            <span className="font-medium text-text-content-primary/90">Nota · {note.label}: </span>{note.text}
+            <span className="ml-2 whitespace-nowrap text-[9px] font-mono text-text-content-secondary/35">{note.timestamp}</span>
+          </p>
         </div>
       ))}
     </div>
