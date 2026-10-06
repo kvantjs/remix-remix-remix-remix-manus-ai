@@ -1133,19 +1133,27 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
           ))}
           
           {isThinking && !finalResponseReceived && (
-            <InitialThinkingAnimation elapsedSeconds={elapsedSeconds} />
-          )}
+            <div className="flex w-full flex-col gap-4" aria-live="polite">
+              {!initialThoughtComplete && (
+                <InitialThinkingAnimation elapsedSeconds={elapsedSeconds} />
+              )}
 
-          {isThinking && !finalResponseReceived && initialThoughtComplete && !cycleThinking && progressNotes.length > 0 && (
-            <AgentProgressNotes notes={progressNotes} />
-          )}
+              {/* Notes are a standalone status stream, not an assistant message
+                  and not part of the animated thinking trace. */}
+              {initialThoughtComplete && !cycleThinking && progressNotes.length > 0 && (
+                <AgentProgressNotes notes={progressNotes} />
+              )}
 
-          {isThinking && !finalResponseReceived && initialThoughtComplete && !cycleThinking && showExecutionAnimation && (
-            <LocalActiveThinkingState 
-              elapsedSeconds={elapsedSeconds} 
-              step={currentStep}
-              steps={executionSteps}
-            />
+              {/* The execution animation is deliberately rendered in its own
+                  region so it cannot visually merge with the notes above. */}
+              {initialThoughtComplete && !cycleThinking && showExecutionAnimation && (
+                <LocalActiveThinkingState
+                  elapsedSeconds={elapsedSeconds}
+                  step={currentStep}
+                  steps={executionSteps}
+                />
+              )}
+            </div>
           )}
 
           {isAgentInBackground && !isThinking && !messages.some(m => m.isStreaming) && (
@@ -1772,19 +1780,34 @@ function InitialThinkingAnimation({ elapsedSeconds }: { elapsedSeconds: number }
 
 function AgentProgressNotes({ notes }: { notes: AgentProgressNote[] }) {
   return (
-    <div className="w-full max-w-[820px] pl-8 space-y-1.5 animate-in fade-in duration-300">
-      {notes.map((note, index) => (
-        <div key={note.id} className="flex min-w-0 items-start gap-2 py-1 text-left" style={{ animation: `thinking-fade-up 280ms cubic-bezier(0.23,1,0.32,1) ${Math.min(index, 5) * 55}ms both` }}>
-          <span className="mt-1.5 flex size-3.5 shrink-0 items-center justify-center text-text-content-secondary/60">
-            {note.status === 'running' ? <Spinner size={11} className="animate-spin" /> : note.status === 'warning' ? <ShieldWarning size={12} className="text-amber-300/80" /> : <CheckCircle size={12} className="text-text-content-secondary/70" />}
-          </span>
-          <p className="min-w-0 flex-1 break-words text-[12px] leading-relaxed text-text-content-primary/80 [overflow-wrap:anywhere]">
-            <span className="font-medium text-text-content-primary/90">Nota · {note.label}: </span>{note.text}
-            <span className="ml-2 whitespace-nowrap text-[9px] font-mono text-text-content-secondary/35">{note.timestamp}</span>
-          </p>
+    <section
+      aria-label="Notas do agente"
+      className="w-full max-w-[820px] pl-8 animate-in fade-in duration-300"
+    >
+      <div className="border-l border-white/10 pl-4">
+        <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-text-content-secondary/65">
+          <span className="size-1.5 rounded-full bg-white/35" />
+          Notas
         </div>
-      ))}
-    </div>
+        <div className="space-y-2">
+          {notes.map((note, index) => (
+            <article
+              key={note.id}
+              className="flex min-w-0 items-start gap-2.5 rounded-lg bg-white/[0.025] px-3 py-2 text-left"
+              style={{ animation: `thinking-fade-up 280ms cubic-bezier(0.23,1,0.32,1) ${Math.min(index, 5) * 55}ms both` }}
+            >
+              <span className="mt-0.5 flex size-3.5 shrink-0 items-center justify-center text-text-content-secondary/60">
+                {note.status === 'running' ? <Spinner size={11} className="animate-spin" /> : note.status === 'warning' ? <ShieldWarning size={12} className="text-amber-300/80" /> : <CheckCircle size={12} className="text-text-content-secondary/70" />}
+              </span>
+              <p className="min-w-0 flex-1 break-words text-[12px] leading-relaxed text-text-content-primary/80 [overflow-wrap:anywhere]">
+                <span className="font-medium text-text-content-primary/90">{note.label}: </span>{note.text}
+                <span className="ml-2 whitespace-nowrap text-[9px] font-mono text-text-content-secondary/35">{note.timestamp}</span>
+              </p>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -1867,23 +1890,18 @@ function LocalActiveThinkingState({ elapsedSeconds, step, steps }: { elapsedSeco
   });
 
   return (
-    <div className="w-full max-w-[820px] space-y-4 animate-in fade-in duration-300">
-       <div className="flex items-center gap-2.5">
-        <img 
-          src="https://imgdb.io/i/6lwOlmk.png" 
-          alt="Logotipo do Agente" 
-          className="size-6 object-contain rounded-md shadow-xs bg-white/5 p-0.5 animate-pulse" 
-        />
-        <div className="flex items-center gap-2 text-xs font-medium">
-          <span className="text-text-content-primary">Manus</span>
-          <span className="text-[9px] text-text-content-secondary font-mono px-1.5 py-0.5 border border-solid" style={{ borderRadius: '4px', backgroundColor: '#1a1a1a', borderColor: '#303030', borderWidth: '2.1507px' }}>
-            Raciocinando · {elapsedSeconds || 1}s
-          </span>
+    <section
+      aria-label="Animação de execução do agente"
+      className="w-full max-w-[820px] animate-in fade-in duration-300"
+    >
+      {/* This is the animation/status lane. It is intentionally separate from
+          the Notes section above and has no assistant-message avatar. */}
+      <div className="ml-8 rounded-lg border border-white/8 bg-white/[0.018] px-3 py-2 transition-all duration-300 ease-out">
+        <div className="mb-2 flex items-center gap-2 text-[10px] font-medium text-text-content-secondary/70">
+          <Sparkle size={12} weight="fill" className="animate-pulse text-text-content-primary/60" />
+          <span>Pensando</span>
+          <span className="font-mono text-[9px] text-text-content-secondary/45">{elapsedSeconds || 1}s</span>
         </div>
-      </div>
-      
-      {/* Active trace rendering with explicit working=true */}
-      <div className="pl-8 bg-transparent transition-all duration-300 ease-out">
         {currentVariant === "Coding" ? (
           <ToolChips 
             steps={mappedToolSteps} 
@@ -1902,7 +1920,7 @@ function LocalActiveThinkingState({ elapsedSeconds, step, steps }: { elapsedSeco
           />
         )}
       </div>
-    </div>
+    </section>
   );
 }
 
