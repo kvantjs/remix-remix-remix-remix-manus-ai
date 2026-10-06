@@ -15,6 +15,7 @@ import {
   CaretRight, 
   DotsThree, 
   ArrowRight, 
+  ArrowBendDownRight,
   Lightning,
   Check,
   Code,
@@ -31,7 +32,12 @@ import {
   DownloadSimple,
   XCircle,
   Faders,
-  Spinner
+  Spinner,
+  ArrowsClockwise,
+  ThumbsUp,
+  ThumbsDown,
+  ArrowClockwise,
+  CheckCircle
 } from '@phosphor-icons/react';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { ToolCallTrace, AgentExecutionLog } from '../types/project';
@@ -44,7 +50,31 @@ import StreamingText from './StreamingText';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { Favicon, extractCleanDomain } from '@/lib/favicon';
 import PromptBar from './PromptBar';
-import { AgentContextQuestionnaire, QuestionnaireQuestion, DEFAULT_APP_QUESTIONS } from './AgentContextQuestionnaire';
+import { QuestionnaireQuestion, DEFAULT_APP_QUESTIONS } from './AgentContextQuestionnaire';
+import {
+  Questionnaire,
+  QuestionnaireActions,
+  QuestionnaireChoice,
+  QuestionnaireChoiceDescription,
+  QuestionnaireChoices,
+  QuestionnaireDescription,
+  QuestionnaireError,
+  QuestionnaireItem,
+  QuestionnaireNext,
+  QuestionnairePrevious,
+  QuestionnaireProgress,
+  QuestionnaireSubmit,
+  QuestionnaireTitle,
+} from "./ui/questionnaire";
+import {
+  Card,
+  CardHeader,
+  CardFooter,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardAction,
+} from "./ui/card";
 
 interface ChatMessage {
   id: string;
@@ -124,15 +154,20 @@ export function ChatArea({
       ],
       content: `Olá! Sou o **Agente Autônomo de Engenharia de Software e Design** do Kvant.
 
-Estou conectado a um **Computador na Nuvem Linux 100% real e operacional**, onde realizo ações ao vivo para atender às suas solicitações:
+Estou conectado a um **Runtime Próprio e Isolado em Nuvem Linux 100% operacional**, onde opero via **MCP (Model Context Protocol)** e **Habilidades (SKILLs)** de ponta:
 
-### O que o Computador do Agente faz em tempo real:
-1. **Navegador Web Real**: Abro o navegador para navegar em URLs reais, pesquisar no Google, rolar páginas, inspecionar fontes e extrair dados da web em tempo real.
-2. **Terminal Shell Bash**: Executo comandos no container Linux Ubuntu (Node.js, npm, curl, verificações de rede e processos).
-3. **Editor de Código do Workspace**: Escrevo e gravo código-fonte limpo com estados dinâmicos e sincronização com o preview.
-4. **Transmissão ao Vivo**: O computador da nuvem é operado com exclusividade pelo agente. Na aba **Computador do Agente**, você assiste à transmissão ao vivo das minhas ações em tempo real (navegações no Playwright, cliques, comandos no terminal e código gerado), sem necessidade de botões manuais.
+### Ferramentas MCP Integradas:
+1. **Computer MCP**: Abro o navegador real para navegar em URLs, pesquisar no Google, rolar páginas e interagir com sites ao vivo.
+2. **WebDev MCP**: Acesso total ao workspace para criar, editar e excluir arquivos, gerenciar pacotes, e sincronizar com o preview em tempo real.
+3. **Terminal Bash MCP**: Execução de comandos shell complexos, diagnósticos de rede e automação de scripts no container Linux.
 
-Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
+### Habilidades de Engenharia e Design:
+- **Design-to-Code**: Tradução perfeita de referências visuais para UI de alta fidelidade.
+- **Arquitetura Autônoma**: Planejamento de sistemas SaaS e Fintech do zero.
+- **Depuração Recursiva**: Auto-correção de erros no runtime e terminal.
+- **Contexto Profundo**: Processamento de requisitos via questionários inteligentes.
+
+Assista às minhas ações em tempo real na aba **Computador do Agente** enquanto eu construo seu projeto!`,
       suggestions: [
         'Pesquisar na web e inspecionar a API do GitHub no navegador do agente',
         'Executar diagnósticos de rede com curl e checar o terminal bash',
@@ -143,12 +178,6 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
   ]);
 
   const [streamedIds, setStreamedIds] = useState<Set<string>>(() => new Set(['1']));
-  const [activeQuestionnaireModal, setActiveQuestionnaireModal] = useState<{
-    title?: string;
-    description?: string;
-    questions?: QuestionnaireQuestion[];
-  } | null>(null);
-  const [isQuestionnaireMinimized, setIsQuestionnaireMinimized] = useState(false);
   const [isAgentInBackground, setIsAgentInBackground] = useState(false);
   const [bgElapsedSeconds, setBgElapsedSeconds] = useState(0);
 
@@ -180,6 +209,7 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
   const [executionSteps, setExecutionSteps] = useState<ExecutionStep[]>([]);
   const executionStepsRef = useRef<ExecutionStep[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const updateExecutionSteps = (updater: (steps: ExecutionStep[]) => ExecutionStep[]) => {
@@ -231,6 +261,30 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isThinking]);
+
+  // Auto-scroll to bottom while the agent is thinking or streaming response
+  useEffect(() => {
+    const container = scrollAreaRef.current;
+    if (!container) return;
+
+    const observer = new ResizeObserver(() => {
+      const isAnyStreaming = messages.some(m => m.isStreaming);
+      if (isThinking || isAnyStreaming) {
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: 'auto'
+        });
+      }
+    });
+
+    // Observe the content wrapper
+    const content = container.querySelector('.messages-container');
+    if (content) {
+      observer.observe(content);
+    }
+
+    return () => observer.disconnect();
+  }, [isThinking, messages]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -291,16 +345,15 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
 
   const handleResumeFromBackground = (summaryText: string) => {
     setIsAgentInBackground(false);
-    setActiveQuestionnaireModal(null);
-    setIsQuestionnaireMinimized(false);
     setMessages(prev => prev.map(m => m.status === 'in_background' ? { ...m, status: 'completed' } : m));
-    handleSendMessage(`[Contexto Definido]: ${summaryText}`);
+    
+    // Seamless context injection: Continue working without adding a visible user message to the UI
+    const injectedContext = `[Contexto Adquirido Autonomamente]: O usuário definiu as preferências: ${summaryText}. O subagente sincronizou os dados. Continue a tarefa agora.`;
+    handleSendMessage(injectedContext, true);
   };
 
   const handleResumeWithDefaults = () => {
     setIsAgentInBackground(false);
-    setActiveQuestionnaireModal(null);
-    setIsQuestionnaireMinimized(false);
     setMessages(prev => prev.map(m => m.status === 'in_background' ? { ...m, status: 'completed' } : m));
     handleSendMessage(`[Contexto Definido]: Prossiga com a melhor arquitetura de software, padrão Fintech/SaaS, paleta escura e recursos dinâmicos autônomos.`);
   };
@@ -312,25 +365,37 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
     }
   }, [externalPrompt]);
 
-  const handleSendMessage = async (userPrompt: string) => {
+  const handleSendMessage = async (userPrompt: string, isSilentContext: boolean = false) => {
     if (!userPrompt.trim() || isThinking) return;
+    const requestStartTime = Date.now();
 
-    if (userPrompt.trim().toLowerCase() === '/context' || userPrompt.trim().toLowerCase() === 'context') {
-      setActiveQuestionnaireModal({
-        title: 'Especificação de Contexto do Agente',
-        description: 'Defina o nicho, direção visual e prioridades para personalizar a criação:',
-        questions: DEFAULT_APP_QUESTIONS
-      });
+    if (!isSilentContext && (userPrompt.trim().toLowerCase() === '/context' || userPrompt.trim().toLowerCase() === 'context')) {
+      const contextMsg: ChatMessage = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        status: 'in_background',
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        content: 'Por favor, defina suas preferências no questionário abaixo para que eu possa planejar e construir o seu site/aplicação com total precisão:',
+        questionnaire: {
+          title: 'Especificação de Contexto do Agente',
+          description: 'Defina o nicho, direção visual e prioridades para personalizar a criação:',
+          questions: DEFAULT_APP_QUESTIONS
+        }
+      };
+      setMessages(prev => [...prev, contextMsg]);
+      setIsAgentInBackground(true);
       return;
     }
 
-    const userMsg: ChatMessage = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: userPrompt
-    };
+    if (!isSilentContext) {
+      const userMsg: ChatMessage = {
+        id: Date.now().toString(),
+        role: 'user',
+        content: userPrompt
+      };
+      setMessages(prev => [...prev, userMsg]);
+    }
 
-    setMessages(prev => [...prev, userMsg]);
     setIsThinking(true);
     const initialSteps: ExecutionStep[] = [
       {
@@ -416,7 +481,11 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
                     const activeTrace: ToolCallTrace = {
                       id: `active_${Date.now()}`,
                       toolName: data.toolName,
-                      server: 'playwright_chromium',
+                      server: data.toolName.includes('fs') || data.toolName.includes('file') || data.toolName.includes('write') || data.toolName.includes('read') 
+                        ? 'WebDev MCP' 
+                        : data.toolName.includes('browser') || data.toolName.includes('navigate') || data.toolName.includes('click') || data.toolName.includes('type') || data.toolName.includes('screenshot')
+                          ? 'Computer MCP'
+                          : 'Terminal Bash MCP',
                       arguments: data.arguments || {},
                       result: 'Executando no computador...',
                       timestamp: new Date().toLocaleTimeString(),
@@ -430,23 +499,37 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
                     if (onAgentStateChange) {
                       onAgentStateChange({
                         isWorking: true,
-                        statusText: `Agente executando ${data.toolName}`,
+                        statusText: `Agente chamando ${activeTrace.server}`,
                         contextText: data.reason,
                         toolCalls: [...liveToolCalls, activeTrace]
                       });
                     }
                   } else if (currentEvent === 'tool_finish') {
-                    liveToolCalls.push(data.toolCall);
+                    const toolCall = data.toolCall;
+                    liveToolCalls.push(toolCall);
+                    
+                    // Live build: If the tool updated a file, sync with workspace immediately
+                    if (onFileUpdate && toolCall.arguments?.content && (toolCall.toolName.includes('write') || toolCall.toolName.includes('create') || toolCall.toolName.includes('edit'))) {
+                      const filePath = toolCall.arguments.path || toolCall.arguments.filePath || toolCall.arguments.filename;
+                      if (filePath) {
+                        onFileUpdate([{
+                          path: filePath,
+                          code: toolCall.arguments.content,
+                          lang: toolCall.arguments.lang || 'typescript'
+                        }]);
+                      }
+                    }
+
                     completeExecutionStep(
-                      data.toolCall.toolName,
-                      data.toolCall.screenData?.actionDescription || 'Ação concluída; resultado incorporado ao contexto.',
-                      data.toolCall.status === 'warning' ? 'warning' : data.toolCall.status === 'error' ? 'warning' : 'complete'
+                      toolCall.toolName,
+                      toolCall.screenData?.actionDescription || 'Ação concluída; resultado incorporado ao contexto.',
+                      toolCall.status === 'warning' ? 'warning' : toolCall.status === 'error' ? 'warning' : 'complete'
                     );
                     if (onAgentStateChange) {
                       onAgentStateChange({
                         isWorking: true,
-                        statusText: `Agente concluiu ${data.toolCall.toolName}`,
-                        contextText: data.toolCall.screenData?.actionDescription || data.toolCall.toolName,
+                        statusText: `Agente concluiu ação no ${toolCall.server || 'MCP'}`,
+                        contextText: toolCall.screenData?.actionDescription || toolCall.toolName,
                         toolCalls: [...liveToolCalls]
                       });
                     }
@@ -496,6 +579,45 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
         });
       }
 
+      // FALLBACK: Auto-extract code blocks if no files were formally returned via tool calls
+      const assistantContent = payload.explanation || payload.response || 'Tarefa executada pelo agente.';
+      if (generatedFilesList.length === 0 && assistantContent.includes('```')) {
+        const codeBlockRegex = /```(tsx|typescript|jsx|javascript|html|css|json)\s*\n([\s\S]*?)```/gi;
+        let match;
+        while ((match = codeBlockRegex.exec(assistantContent)) !== null) {
+          const lang = match[1].toLowerCase();
+          const code = match[2].trim();
+          
+          // Only extract if it looks like a component or config
+          if (code.length > 50) {
+            let filename = 'Home.tsx';
+            if (lang === 'json') filename = 'package.json';
+            else if (code.includes('export default function App')) filename = 'App.tsx';
+            else if (code.includes('export default function')) filename = 'Home.tsx';
+
+            generatedFilesList.push({
+              path: `client/src/${filename}`,
+              code,
+              lang
+            });
+
+            // Simulate the tool call for the UI if it wasn't there
+            if (!liveToolCalls.some(tc => tc.toolName.includes('write') || tc.toolName.includes('file'))) {
+              liveToolCalls.push({
+                id: `auto_extract_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                toolName: 'webdev.write_file',
+                server: 'WebDev MCP',
+                arguments: { path: `client/src/${filename}`, content: code },
+                result: 'Código extraído e sincronizado com o workspace.',
+                timestamp: new Date().toLocaleTimeString(),
+                status: 'success',
+                screenData: { actionDescription: `Sincronizando ${filename} extraído da resposta` }
+              });
+            }
+          }
+        }
+      }
+
       const isBg = Boolean(payload.questionnaire) || payload.status === 'in_background';
       const assistantMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -503,7 +625,7 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
         isStreaming: true,
         status: isBg ? 'in_background' : payload.approval ? 'waiting_for_approval' : 'completed',
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        workingTime: payload.workingTime || `${elapsedSeconds || 24}s`,
+        workingTime: payload.workingTime || `${Math.max(elapsedSeconds, Math.round((Date.now() - requestStartTime) / 1000), 5)}s`,
         thought: payload.thought,
         sources: payload.sources || [],
         approval: payload.approval,
@@ -547,14 +669,12 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
       setMessages(prev => [...prev, assistantMsg]);
 
       if (payload.questionnaire) {
-        setActiveQuestionnaireModal(payload.questionnaire);
         setIsAgentInBackground(true);
-        setIsQuestionnaireMinimized(false);
         if (onAgentStateChange) {
           onAgentStateChange({
             isWorking: true,
             statusText: '⏳ Agente esperando uma resposta',
-            contextText: 'O agente está aguardando suas definições de opções no pop-up para prosseguir a criação.',
+            contextText: 'O agente está aguardando suas definições de opções no chat para prosseguir a criação.',
             toolCalls: [
               ...liveToolCalls,
               {
@@ -630,17 +750,10 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
             <ArrowsOut size={18} />
           </button>
           <div className="h-4 w-px bg-white/10" />
-          {isAgentInBackground ? (
-            <div className="flex items-center gap-1.5 text-xs font-medium bg-[#222226] border border-[#333338] px-2.5 py-1 rounded-md">
-               <Spinner size={14} className="text-yellow-400 shrink-0" />
-               <span className="text-yellow-400">Esperando resposta</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 text-text-content-secondary text-xs font-medium bg-bg-action-hover border border-border-divider-subtle px-2.5 py-1 rounded-md">
-               <Lightning size={14} />
-               <span>Ativo</span>
-            </div>
-          )}
+          <div className="flex items-center gap-2 text-text-content-secondary text-xs font-medium bg-bg-action-hover border border-border-divider-subtle px-2.5 py-1 rounded-md">
+             <Lightning size={14} />
+             <span>Ativo</span>
+          </div>
           <button title="Compartilhar" className="hover:text-[#dcdcdc] transition-colors cursor-pointer">
             <ShareNetwork size={18} />
           </button>
@@ -651,8 +764,11 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
       </header>
 
       {/* Messages Stream */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col items-center bg-[#1a1a1a]">
-        <div className="w-full max-w-3xl px-6 py-8 space-y-10">
+      <div 
+        ref={scrollAreaRef}
+        className="flex-1 overflow-y-auto custom-scrollbar flex flex-col items-center bg-[#1a1a1a]"
+      >
+        <div className="w-full max-w-3xl px-6 py-8 space-y-10 messages-container">
           {messages.map((msg) => (
             <MessageItem 
               key={msg.id} 
@@ -661,7 +777,9 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
               onStreamingDone={handleStreamingDone}
               onSelectSuggestion={handleSendMessage}
               onInspectInComputer={onInspectInComputer}
-              onOpenQuestionnaire={(q) => setActiveQuestionnaireModal(q)}
+              onFinishQuestionnaire={(answers, summaryText) => {
+                handleResumeFromBackground(summaryText);
+              }}
               onApprovalDecision={(messageId, approved) => {
                 setMessages(prev => prev.map(m => m.id === messageId ? {
                   ...m,
@@ -685,6 +803,24 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
             />
           )}
 
+          {isAgentInBackground && !isThinking && !messages.some(m => m.isStreaming) && (
+             <div className="flex items-center gap-3 pl-8 py-2 animate-in fade-in slide-in-from-left-2 duration-500">
+               <div className="size-8 rounded-lg bg-bg-surface-panel border border-border-divider-subtle flex items-center justify-center relative">
+                 <img src="https://imgdb.io/i/6lwOlmk.png" className="size-5 object-contain" alt="" />
+                 <div className="absolute -bottom-0.5 -right-0.5 size-3 bg-[#1a1a1a] rounded-full flex items-center justify-center border border-white/5">
+                   <div className="size-1.5 bg-amber-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(251,191,36,0.5)]" />
+                 </div>
+               </div>
+               <div className="flex flex-col gap-0.5">
+                 <span className="text-[10px] font-bold text-text-content-primary/80 uppercase tracking-widest">Subagente em Espera</span>
+                 <span className="text-[10px] text-text-content-secondary/60 font-mono flex items-center gap-1.5">
+                    <span className="size-1 bg-amber-400/40 rounded-full animate-pulse" />
+                    Aguardando escolhas do usuário no questionário · {bgElapsedSeconds}s
+                 </span>
+               </div>
+             </div>
+          )}
+
           <div ref={messagesEndRef} />
         </div>
         <div className="h-28 shrink-0" />
@@ -698,7 +834,7 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
           onSend={(text) => handleSendMessage(text)} 
           onStop={handleStop}
           isThinking={isThinking} 
-          placeholder={isAgentInBackground ? "Agente esperando uma resposta..." : "Mensagem para o agente manus ou digite @ para fontes e / para comandos..."}
+          placeholder="Mensagem para o agente manus ou digite @ para fontes e / para comandos..."
         />
         
         <p className="mt-2 text-center text-[10px] text-[#dcdcdc]/30">
@@ -706,33 +842,208 @@ Basta me dizer no chat o que você quer que eu faça na web ou no computador!`,
         </p>
       </div>
 
-      {/* Floating Small Pop-up Questionnaire (STRICTLY inside ChatArea, bottom-right) */}
-      {activeQuestionnaireModal && !isQuestionnaireMinimized && (
-        <div className="absolute bottom-28 right-6 z-40 max-w-84 w-[calc(100%-3rem)] sm:w-80 animate-in fade-in slide-in-from-bottom-3 duration-300 drop-shadow-2xl">
-          <AgentContextQuestionnaire
-            title={activeQuestionnaireModal.title}
-            description={activeQuestionnaireModal.description}
-            questions={activeQuestionnaireModal.questions}
-            onClose={() => setIsQuestionnaireMinimized(true)}
-            onSubmitContext={(_answers, summaryText) => {
-              handleResumeFromBackground(summaryText);
-            }}
-          />
-        </div>
-      )}
 
-      {/* Floating Minimized Badge inside ChatArea */}
-      {activeQuestionnaireModal && isQuestionnaireMinimized && (
-        <button
-          type="button"
-          onClick={() => setIsQuestionnaireMinimized(false)}
-          className="absolute bottom-28 right-6 z-40 flex items-center gap-2 px-3 py-2 rounded-xl bg-[#18181b] border border-[#27272a] text-xs font-medium shadow-2xl hover:bg-[#202024] hover:border-zinc-500 transition-all cursor-pointer group animate-in fade-in"
-        >
-          <Spinner size={14} className="text-yellow-400 shrink-0" />
-          <span className="text-yellow-400">Agente esperando uma resposta ({activeQuestionnaireModal.questions?.length || 3} perguntas)</span>
-          <span className="text-[10px] bg-white/10 text-zinc-300 px-1.5 py-0.5 rounded font-mono border border-white/10">Abrir</span>
-        </button>
-      )}
+    </div>
+  );
+}
+
+function InlineChatQuestionnaire({
+  questionnaire,
+  onSubmit,
+}: {
+  questionnaire?: {
+    title?: string;
+    description?: string;
+    questions?: QuestionnaireQuestion[];
+  };
+  onSubmit: (answers: Record<string, string>, summaryText: string) => void;
+}) {
+  const questions =
+    questionnaire?.questions && questionnaire.questions.length > 0
+      ? questionnaire.questions
+      : DEFAULT_APP_QUESTIONS;
+
+  const [currentStep, setCurrentStep] = useState(0);
+  const [selectedChoices, setSelectedChoices] = useState<Record<string, string>>({});
+  const [otherThoughts, setOtherThoughts] = useState("");
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [showTextArea, setShowTextArea] = useState(false);
+
+  const currentQuestion = questions[currentStep];
+  const isLastStep = currentStep === questions.length - 1;
+
+  const handleSelect = (questionName: string, value: string) => {
+    setSelectedChoices(prev => ({ ...prev, [questionName]: value }));
+  };
+
+  const handleNext = () => {
+    if (isLastStep) {
+      setShowTextArea(true);
+    } else {
+      setCurrentStep(prev => prev + 1);
+    }
+  };
+
+  const handleSubmit = () => {
+    const answers: Record<string, string> = {};
+    const summaryLines: string[] = [];
+
+    for (const question of questions) {
+      const value = selectedChoices[question.name];
+      const choiceObj = question.choices.find((c) => c.value === value);
+      const label = choiceObj?.label ?? "Não selecionado";
+      answers[question.name] = label;
+      summaryLines.push(`${question.title.replace('?', '').trim()}: ${label}`);
+    }
+
+    if (otherThoughts.trim()) {
+      summaryLines.push(`Outros pensamentos: ${otherThoughts}`);
+    }
+
+    const summaryText = summaryLines.join(" | ");
+    setIsSubmitted(true);
+    onSubmit(answers, summaryText);
+  };
+
+  if (isSubmitted) {
+    return (
+      <div className="w-full max-w-2xl border border-emerald-500/20 bg-[#1f1f1f] rounded-2xl p-4 my-2 animate-in fade-in zoom-in-95 duration-300">
+        <div className="flex items-center gap-2 text-emerald-400 font-semibold text-sm mb-3">
+          <CheckCircle size={18} weight="fill" />
+          <span>Preferências Configuradas</span>
+        </div>
+        <div className="space-y-1.5">
+          {questions.map((q) => (
+            <div key={q.name} className="flex justify-between items-center bg-white/5 rounded-lg px-3 py-1.5 border border-white/5" style={{ borderRadius: '4px' }}>
+              <span className="text-[9px] text-white/40 uppercase font-mono truncate mr-2">{q.title.replace('?', '')}</span>
+              <span className="text-[11px] text-white font-medium truncate">{selectedChoices[q.name] ? q.choices.find(c => c.value === selectedChoices[q.name])?.label : "—"}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full max-w-lg border border-white/10 bg-[#1f1f1f] overflow-hidden my-3 shadow-xl animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ borderRadius: '6px' }}>
+      <div className="p-4 space-y-4">
+        {/* Header & Progress */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5 text-white">
+            <div className="size-5 rounded-full border border-white/20 flex items-center justify-center bg-[#1f1f1f]">
+              <Question size={11} weight="bold" />
+            </div>
+            <span className="text-[10px] font-bold uppercase tracking-widest opacity-50">O Manus tem uma pergunta</span>
+          </div>
+          <div className="text-[10px] font-mono text-white/20 bg-white/5 px-2 py-0.5 rounded-full">
+            {showTextArea ? 'Final' : `${currentStep + 1} de ${questions.length}`}
+          </div>
+        </div>
+
+        {/* Dynamic Content */}
+        {!showTextArea ? (
+          <div key={`step-${currentStep}`} className="space-y-3 animate-in fade-in slide-in-from-right-2 duration-300" style={{ borderRadius: '4px' }}>
+            <div className="min-h-[28px]">
+              <div className="text-[14px] font-medium text-[#e9e9e9] leading-tight" style={{ fontFamily: 'system-ui' }}>
+                <StreamingText 
+                  content={currentQuestion.title} 
+                  speedMs={8} 
+                  isStreaming={true}
+                />
+              </div>
+              {currentQuestion.description && (
+                <div className="text-[11px] text-white/40 mt-1">
+                  <StreamingText 
+                    content={currentQuestion.description} 
+                    speedMs={5} 
+                    isStreaming={true}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              {currentQuestion.choices.map((choice) => {
+                const isSelected = selectedChoices[currentQuestion.name] === choice.value;
+                return (
+                  <button
+                    key={choice.value}
+                    onClick={() => handleSelect(currentQuestion.name, choice.value)}
+                    className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border text-left transition-all duration-200 group ${
+                      isSelected 
+                        ? 'bg-white/5 border-white/20 shadow-inner' 
+                        : 'bg-transparent border-white/5 hover:bg-white/[0.02] hover:border-white/10'
+                    }`}
+                    style={{ borderRadius: '4px' }}
+                  >
+                    <div className={`size-3 rounded-full border flex items-center justify-center transition-colors ${
+                      isSelected ? 'border-white/80' : 'border-white/20 group-hover:border-white/40'
+                    }`}>
+                      {isSelected && <div className="size-1 rounded-full bg-white animate-in fade-in zoom-in-50" />}
+                    </div>
+                    <span className={`text-[12px] transition-colors truncate ${isSelected ? 'text-white font-medium' : 'text-white/60'}`}>
+                      {choice.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3 animate-in fade-in slide-in-from-right-2 duration-300" style={{ borderRadius: '4px' }}>
+             <div className="min-h-[28px] text-[14px] font-medium text-[#e9e9e9] leading-tight" style={{ fontFamily: 'system-ui' }}>
+              <StreamingText 
+                content="Deseja adicionar mais algum detalhe ou pensamento adicional?" 
+                speedMs={8} 
+                isStreaming={true}
+              />
+            </div>
+            <textarea
+              autoFocus
+              placeholder="Outros pensamentos..."
+              value={otherThoughts}
+              onChange={(e) => setOtherThoughts(e.target.value)}
+              className="w-full bg-white/[0.03] border border-white/5 rounded-xl p-3 text-sm text-white placeholder:text-white/20 outline-none focus:border-white/10 transition-colors resize-none h-20"
+              style={{ borderRadius: '4px' }}
+            />
+          </div>
+        )}
+
+        {/* Footer Actions */}
+        <div className="flex justify-between items-center pt-2 border-t border-white/5">
+          <button
+            onClick={() => {
+              if (showTextArea) setShowTextArea(false);
+              else if (currentStep > 0) setCurrentStep(prev => prev - 1);
+            }}
+            disabled={currentStep === 0 && !showTextArea}
+            className="text-[11px] font-medium text-white/30 hover:text-white disabled:opacity-0 transition-all cursor-pointer"
+          >
+            Voltar
+          </button>
+          
+          {!showTextArea ? (
+            <button
+              onClick={handleNext}
+              disabled={!selectedChoices[currentQuestion.name]}
+              className="px-4 py-1.5 rounded-lg bg-white text-black font-bold text-[11px] hover:bg-white/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95 flex items-center gap-1.5"
+              style={{ borderRadius: '4px' }}
+            >
+              <span style={{ fontFamily: 'Karla, sans-serif' }}>{isLastStep ? 'Próximo' : 'Continuar'}</span>
+              <CaretRight size={11} weight="bold" />
+            </button>
+          ) : (
+            <button
+              onClick={handleSubmit}
+              className="px-5 py-1.5 rounded-lg bg-emerald-600 text-white font-bold text-[11px] hover:bg-emerald-500 transition-all active:scale-95 flex items-center gap-1.5 shadow-lg shadow-emerald-900/20"
+              style={{ borderRadius: '4px' }}
+            >
+              <span style={{ fontFamily: 'Karla, sans-serif' }}>Concluir</span>
+              <Check size={11} weight="bold" />
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -743,7 +1054,7 @@ function MessageItem({
   onInspectInComputer,
   onApprovalDecision,
   onStreamingDone,
-  onOpenQuestionnaire,
+  onFinishQuestionnaire,
   isAlreadyStreamed
 }: { 
   message: ChatMessage; 
@@ -751,10 +1062,11 @@ function MessageItem({
   onInspectInComputer?: () => void;
   onApprovalDecision?: (messageId: string, approved: boolean) => void;
   onStreamingDone?: (id: string) => void;
-  onOpenQuestionnaire?: (q: any) => void;
+  onFinishQuestionnaire?: (answers: Record<string, string>, summaryText: string) => void;
   isAlreadyStreamed?: boolean;
 }) {
   const isAssistant = message.role === 'assistant';
+  const isWaiting = message.status === 'in_background' || Boolean(message.questionnaire && message.status !== 'completed');
   const [showCodeSnippet, setShowCodeSnippet] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -771,20 +1083,29 @@ function MessageItem({
     );
   }
 
-  // Map tool calls to ToolStep[] and files to ToolDiff[] for the final response
-  const finalToolSteps: ToolStep[] = (message.toolCalls || []).map((tc) => {
-    let chipText = '';
-    if (tc.arguments?.filePath) chipText = tc.arguments.filePath;
-    else if (tc.arguments?.url) chipText = tc.arguments.url;
-    else if (tc.arguments?.command) chipText = tc.arguments.command;
-    else if (tc.arguments?.query) chipText = tc.arguments.query;
-    else if (tc.screenData?.actionDescription) chipText = tc.screenData.actionDescription;
-    else chipText = tc.server || tc.toolName;
+    // Map tool calls to specific MCP servers for display
+    let finalToolSteps: ToolStep[] = (message.toolCalls || []).map((tc) => {
+      let chipText = '';
+      if (tc.arguments?.filePath) chipText = tc.arguments.filePath;
+      else if (tc.arguments?.url) chipText = tc.arguments.url;
+      else if (tc.arguments?.command) chipText = tc.arguments.command;
+      else if (tc.arguments?.query) chipText = tc.arguments.query;
+      else if (tc.screenData?.actionDescription) chipText = tc.screenData.actionDescription;
+      else chipText = tc.server || tc.toolName;
 
-    return {
-      icon: tc.toolName,
-      label: tc.toolName,
-      chip: chipText,
+      // Determine MCP name for the UI label
+      let mcpLabel = tc.server;
+      if (!mcpLabel || mcpLabel === 'playwright_chromium') {
+        if (tc.toolName.includes('fs') || tc.toolName.includes('file') || tc.toolName.includes('write') || tc.toolName.includes('read')) mcpLabel = 'WebDev MCP';
+        else if (tc.toolName.includes('browser') || tc.toolName.includes('navigate') || tc.toolName.includes('click')) mcpLabel = 'Computer MCP';
+        else if (tc.toolName.includes('bash') || tc.toolName.includes('terminal')) mcpLabel = 'Terminal Bash MCP';
+        else mcpLabel = 'Computer MCP';
+      }
+
+      return {
+        icon: tc.toolName,
+        label: mcpLabel,
+        chip: chipText,
       mono: tc.toolName.includes('fs') || tc.toolName.includes('cmd') || tc.toolName.includes('exec') || tc.toolName.includes('file') || tc.toolName.includes('shell'),
       detailMono: true,
       detail: [
@@ -795,6 +1116,36 @@ function MessageItem({
       ]
     };
   });
+
+  if (finalToolSteps.length === 0 && message.executionSteps && message.executionSteps.length > 0) {
+    finalToolSteps = message.executionSteps.map((es) => {
+      let icon = "think";
+      const l = es.label.toLowerCase();
+      if (l.includes("escrev") || l.includes("write") || l.includes("edit") || l.includes("cri") || l.includes("file")) icon = "write";
+      else if (l.includes("execut") || l.includes("run") || l.includes("cmd") || l.includes("terminal") || l.includes("build") || l.includes("npm")) icon = "run";
+      else if (l.includes("leit") || l.includes("read") || l.includes("view")) icon = "read";
+
+      return {
+        icon,
+        label: es.label,
+        chip: es.detail || "Concluído",
+        mono: icon === "write" || icon === "run",
+        detailMono: true,
+        detail: es.detail ? [{ text: es.detail }] : []
+      };
+    });
+  } else if (finalToolSteps.length === 0 && message.logs && message.logs.length > 0) {
+    finalToolSteps = message.logs.map((log) => {
+      return {
+        icon: log.type === 'command' ? 'run' : log.type === 'error' ? 'lint' : 'think',
+        label: log.type === 'command' ? 'Comando Executado' : 'Ação do Agente',
+        chip: log.content,
+        mono: log.type === 'command',
+        detailMono: true,
+        detail: [{ text: `${log.time || ''} - ${log.content}` }]
+      };
+    });
+  }
 
   const finalDiffs: ToolDiff[] = (message.files || []).map((f) => ({
     file: f.path,
@@ -826,18 +1177,17 @@ function MessageItem({
       </div>
 
       <div className="pl-8 space-y-4">
-        {/* Tool Chips da Resposta Final do Agente */}
-        {finalToolSteps.length > 0 && (
-          <ToolChips
-            steps={finalToolSteps}
-            diffs={finalDiffs.length > 0 ? finalDiffs : undefined}
-            diffLines={Object.keys(finalDiffLines).length > 0 ? finalDiffLines : undefined}
-            labels={{ header: `${finalToolSteps.length} ferramentas executadas pelo agente` }}
-          />
-        )}
-
-        {message.executionSteps && message.executionSteps.length > 0 && (
-          <ExecutionTimeline steps={message.executionSteps} completed />
+        {/* Tool Chips da Resposta Final do Agente (Actions Only - Top, Expanded) */}
+        {!isWaiting && finalToolSteps.length > 0 && (
+          <div className="animate-in fade-in slide-in-from-top-1 duration-500 fill-mode-both">
+            <ToolChips
+              steps={finalToolSteps}
+              diffs={[]}
+              diffLines={{}}
+              initialOpen={!isAlreadyStreamed && !message.isStreaming === false}
+              labels={{ header: `${finalToolSteps.length} ferramenta(s) executada(s) pelo agente` }}
+            />
+          </div>
         )}
 
         {/* Clean Executive Response Text with Streaming Text Animation */}
@@ -847,18 +1197,33 @@ function MessageItem({
             isStreaming={Boolean(message.isStreaming && !isAlreadyStreamed)}
             initialDone={!message.isStreaming || Boolean(isAlreadyStreamed)}
             onDone={() => onStreamingDone?.(message.id)}
-            sources={message.sources?.map(s => ({
+            sources={!isWaiting ? message.sources?.map(s => ({
               name: s.title,
               domain: extractCleanDomain(s.url) || s.url,
               href: s.url
-            }))}
-            followUps={message.suggestions}
-            onFollowUp={(text) => onSelectSuggestion(text)}
+            })) : undefined}
           />
         </div>
 
+        {/* Execution Timeline (Ran Tools - Bottom, Collapsed) - Only show after streaming is done */}
+        {!isWaiting && (isAlreadyStreamed || !message.isStreaming) && message.executionSteps && message.executionSteps.length > 0 && (
+          <div className="pt-2 animate-in fade-in slide-in-from-bottom-2 duration-500 fill-mode-both">
+            <ExecutionTimeline steps={message.executionSteps} completed />
+          </div>
+        )}
+
+        {/* Inline Selection Questionnaire Component (@reui/c-questionnaire-7) */}
+        {isWaiting && (isAlreadyStreamed || !message.isStreaming) && (
+          <InlineChatQuestionnaire 
+            questionnaire={message.questionnaire}
+            onSubmit={(answers, summaryText) => {
+              onFinishQuestionnaire?.(answers, summaryText);
+            }}
+          />
+        )}
+
         {/* Generated Files Notification Box (Vibecoding Clean UI) */}
-        {message.files && message.files.length > 0 && (
+        {!isWaiting && message.files && message.files.length > 0 && (
           <div className="bg-bg-surface-panel border border-border-divider-subtle rounded-xl p-3.5 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -909,7 +1274,7 @@ function MessageItem({
         )}
 
         {/* Web Search Sources & Citations (Grounding) */}
-        {message.sources && message.sources.length > 0 && (
+        {!isWaiting && message.sources && message.sources.length > 0 && (
           <div className="bg-bg-surface-panel border border-border-divider-subtle rounded-xl p-3.5 space-y-2.5">
             <div className="flex items-center gap-2 text-xs font-semibold text-text-content-primary">
               <Favicon urlOrDomain={message.sources[0]?.url} size={14} fallbackIcon={<Globe size={14} className="text-cyan-400" />} />
@@ -951,7 +1316,7 @@ function MessageItem({
         )}
 
         {/* Human Approval Required Gate */}
-        {message.approval && (
+        {!isWaiting && message.approval && (
           <div className="bg-amber-950/20 border border-amber-500/30 rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-amber-400 font-semibold text-xs">
@@ -1010,7 +1375,7 @@ function MessageItem({
         )}
 
         {/* Downloadable Artifacts Box */}
-        {message.artifacts && message.artifacts.length > 0 && (
+        {!isWaiting && message.artifacts && message.artifacts.length > 0 && (
           <div className="bg-bg-surface-panel border border-border-divider-subtle rounded-xl p-3.5 space-y-2">
             <div className="flex items-center gap-2 text-xs font-semibold text-text-content-primary animate-pulse">
               <DownloadSimple size={14} className="text-green-400" />
@@ -1038,144 +1403,120 @@ function MessageItem({
           </div>
         )}
 
-        {/* Compact Context Questionnaire Card (opens pop-up) */}
-        {message.questionnaire && (
-          <div className="bg-[#18181b] border border-[#27272a] hover:border-zinc-500 rounded-xl p-3.5 flex items-center justify-between transition-all shadow-sm">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="size-9 rounded-lg bg-white/5 border border-white/10 text-white flex items-center justify-center shrink-0">
-                <Faders size={18} />
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold text-white truncate">
-                    {message.questionnaire.title || 'Questionário de Contexto do Agente'}
-                  </span>
-                  <span className="text-[9.5px] bg-white/5 text-zinc-300 border border-white/10 px-1.5 py-0.2 rounded font-mono font-medium">
-                    Pop-up
-                  </span>
-                </div>
-                <p className="text-[11px] text-[#a1a1aa] truncate mt-0.5">
-                  {message.questionnaire.description || 'Defina o nicho, direção visual e prioridades para o agente'}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => onOpenQuestionnaire?.(message.questionnaire)}
-              className="bg-white hover:bg-zinc-200 text-black text-xs font-semibold px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-sm cursor-pointer shrink-0 ml-3"
-            >
-              <Faders size={13} />
-              <span>Abrir Opções</span>
-            </button>
-          </div>
-        )}
-
-        {/* Proactive Clarifications (Treinamento rule) */}
-        {message.clarifications && message.clarifications.length > 0 && (
-          <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3.5 space-y-2 text-xs">
-            <div className="flex items-center gap-2 text-amber-400 font-semibold text-xs">
-              <Question size={14} />
-              <span>Pontos de Clarificação da Demanda</span>
-            </div>
-            <p className="text-[11px] text-text-content-secondary/60">
-              Para refinar ainda mais a arquitetura na próxima etapa, confirme se deseja especificar:
-            </p>
-            <div className="space-y-1.5 pt-1">
-              {message.clarifications.map((q, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => onSelectSuggestion(q)}
-                  className="w-full text-left p-2 rounded-lg bg-bg-canvas-main/50 hover:bg-bg-action-hover border border-border-divider-subtle text-text-content-primary/80 hover:text-text-content-primary transition-colors flex items-center justify-between text-xs"
-                >
-                  <span>{q}</span>
-                  <ArrowRight size={12} className="text-text-content-secondary/50 shrink-0" />
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Waiting for Response Status Bar */}
-        {(message.status === 'in_background' || (message.questionnaire && message.status !== 'completed')) && (
-          <div className="flex items-center justify-between pt-2.5 border-t border-border-divider-subtle">
-            <div className="flex items-center gap-2 text-xs font-medium">
-              <Spinner size={15} className="text-yellow-400 shrink-0" />
-              <span className="font-semibold text-yellow-400">Agente esperando uma resposta</span>
-              <span className="text-[11px] text-zinc-400 font-normal">
-                (aguardando suas definições de opções no pop-up)
-              </span>
-            </div>
-            <button
-              onClick={() => onOpenQuestionnaire?.(message.questionnaire)}
-              className="text-xs text-zinc-300 hover:text-white font-medium flex items-center gap-1.5 cursor-pointer bg-white/10 hover:bg-white/15 px-2.5 py-1 rounded-lg transition-colors border border-white/10"
-            >
-              <span>Abrir opções</span>
-              <ArrowRight size={12} />
-            </button>
-          </div>
-        )}
-
         {/* Task Completion Bar */}
-        {message.status === 'completed' && (
-          <div className="flex items-center justify-between pt-2 border-t border-border-divider-subtle">
+        {!isWaiting && (isAlreadyStreamed || !message.isStreaming) && message.suggestions && message.suggestions.length > 0 && (
+          <div className="pt-2 animate-in fade-in slide-in-from-bottom-2 duration-500 delay-100">
+             <div className="flex flex-wrap gap-2">
+                {message.suggestions.map((suggestion, sIdx) => (
+                  <button
+                    key={sIdx}
+                    onClick={() => onSelectSuggestion(suggestion)}
+                    className="px-3 py-1.5 rounded-full bg-white/[0.03] border border-border-divider-subtle/50 text-[11.5px] text-text-content-secondary hover:text-text-content-primary hover:bg-white/[0.08] hover:border-border-divider-subtle transition-all cursor-pointer flex items-center gap-2 group"
+                  >
+                    <ArrowBendDownRight size={12} className="text-text-content-secondary/60 group-hover:text-amber-400 transition-colors" weight="bold" />
+                    <span>{suggestion}</span>
+                    <ArrowRight size={10} className="opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+                  </button>
+                ))}
+             </div>
+          </div>
+        )}
+
+        {isWaiting && (isAlreadyStreamed || !message.isStreaming) && (
+          <div className="flex items-center justify-between pt-3 mt-1 border-t border-white/5 animate-in fade-in slide-in-from-bottom-1 duration-500 fill-mode-both">
              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-1.5 text-green-400 text-xs font-medium">
-                  <div className="size-4 bg-green-500/20 rounded-full flex items-center justify-center">
-                    <Check size={10} />
+                <div className="flex items-center gap-1.5 text-amber-400/90 text-[11px] font-medium">
+                  <div className="size-3.5 border border-amber-400/30 rounded-full flex items-center justify-center">
+                    <div className="size-1.5 bg-amber-400 rounded-full animate-pulse" />
                   </div>
-                  <span>Tarefa concluída</span>
+                  <span>Manus continuará após sua resposta</span>
                 </div>
-                <div className="flex items-center gap-2 text-text-content-secondary/40 text-xs">
+                <div className="flex items-center gap-1 text-text-content-secondary/40">
                   <button 
                     onClick={() => {
                       navigator.clipboard?.writeText(message.content);
                       setCopied(true);
                       setTimeout(() => setCopied(false), 2000);
                     }}
-                    className="hover:text-text-content-primary transition-colors" 
+                    className="hover:text-text-content-primary transition-colors flex items-center justify-center size-7 rounded-lg hover:bg-white/5 cursor-pointer" 
                     title="Copiar resposta"
                   >
-                    {copied ? <Check size={13} className="text-green-400" /> : <Copy size={13} />}
+                    {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
                   </button>
-                  <span className="text-[10px] font-mono">{message.time}</span>
+                  <button 
+                    onClick={() => onSelectSuggestion("Refazer resposta")}
+                    className="hover:text-text-content-primary transition-colors flex items-center justify-center size-7 rounded-lg hover:bg-white/5 cursor-pointer" 
+                    title="Gerar nova resposta"
+                  >
+                    <ArrowClockwise size={14} />
+                  </button>
                 </div>
              </div>
 
-             <div className="flex items-center gap-2 text-text-content-secondary/40">
-               <span className="text-[10px]">Avaliar resultado:</span>
-               <div className="flex gap-0.5 cursor-pointer">
-                 {[1,2,3,4,5].map(i => (
-                    <Star key={i} size={11} className="hover:text-yellow-400 transition-colors" />
-                 ))}
-               </div>
+             <div className="flex items-center gap-3 text-text-content-secondary/40">
+                <span className="text-[10px] font-mono opacity-60">{message.time}</span>
              </div>
           </div>
         )}
 
-        {/* Dynamic Follow-up Suggestions */}
-        {message.suggestions && message.suggestions.length > 0 && (
-          <div className="space-y-2 pt-2">
-            <span className="text-[10px] font-bold text-text-content-secondary/45 uppercase tracking-wider block">
-              Próximos passos recomendados
-            </span>
-            {message.suggestions.map((s: string, i: number) => (
-              <button 
-                key={i} 
-                onClick={() => onSelectSuggestion(s)}
-                className="w-full text-left p-3 rounded-xl bg-bg-surface-panel/30 border border-border-divider-subtle hover:bg-bg-action-hover transition-all flex items-center justify-between group cursor-pointer"
-              >
-                <span className="text-xs text-text-content-secondary group-hover:text-text-content-primary">{s}</span>
-                <ArrowRight size={13} className="text-text-content-secondary/20 group-hover:text-text-content-secondary/60 group-hover:translate-x-0.5 transition-all" />
-              </button>
-            ))}
+        {!isWaiting && (isAlreadyStreamed || !message.isStreaming) && message.status === 'completed' && (
+          <div className="flex items-center justify-between pt-3 mt-1 border-t border-white/5 animate-in fade-in slide-in-from-bottom-1 duration-500 delay-200 fill-mode-both">
+             <div className="flex items-center gap-4">
+                <div className="flex items-center gap-1.5 text-green-400/90 text-[11px] font-medium">
+                  <div className="size-3.5 bg-green-500/20 rounded-full flex items-center justify-center">
+                    <Check size={9} weight="bold" />
+                  </div>
+                  <span>Tarefa concluída</span>
+                </div>
+                <div className="flex items-center gap-1 text-text-content-secondary/40">
+                  <button 
+                    onClick={() => {
+                      navigator.clipboard?.writeText(message.content);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    }}
+                    className="hover:text-text-content-primary transition-colors flex items-center justify-center size-7 rounded-lg hover:bg-white/5 cursor-pointer" 
+                    title="Copiar resposta"
+                  >
+                    {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
+                  </button>
+                  <button 
+                    className="hover:text-text-content-primary transition-colors flex items-center justify-center size-7 rounded-lg hover:bg-white/5 cursor-pointer" 
+                    title="Compartilhar resultado"
+                  >
+                    <ShareNetwork size={14} />
+                  </button>
+                  <button 
+                    onClick={() => onSelectSuggestion("Refazer resposta")}
+                    className="hover:text-text-content-primary transition-colors flex items-center justify-center size-7 rounded-lg hover:bg-white/5 cursor-pointer" 
+                    title="Gerar nova resposta"
+                  >
+                    <ArrowClockwise size={14} />
+                  </button>
+                </div>
+             </div>
+
+             <div className="flex items-center gap-3 text-text-content-secondary/40">
+                <div className="flex items-center gap-1 mr-1">
+                  <button className="hover:text-emerald-400 transition-colors cursor-pointer p-0.5">
+                    <ThumbsUp size={13} />
+                  </button>
+                  <button className="hover:text-rose-400 transition-colors cursor-pointer p-0.5">
+                    <ThumbsDown size={13} />
+                  </button>
+                </div>
+                <span className="text-[10px] font-mono opacity-60">{message.time}</span>
+             </div>
           </div>
         )}
+
       </div>
     </div>
   );
 }
 
 function LocalActiveThinkingState({ elapsedSeconds, step, steps }: { elapsedSeconds: number; step: string; steps: ExecutionStep[] }) {
-  const [phase, setPhase] = useState<0 | 1 | 2 | 3>(0);
+  const [phase, setPhase] = useState<0 | 1 | 2 | 3 | 4>(0);
 
   useEffect(() => {
     if (steps.length === 0) {
@@ -1185,10 +1526,16 @@ function LocalActiveThinkingState({ elapsedSeconds, step, steps }: { elapsedSeco
 
   useEffect(() => {
     if (phase === 0) {
-      const t = setTimeout(() => setPhase(1), 3200); // 3.2s for Pensando
+      const t = setTimeout(() => setPhase(1), 2200); // 2.2s for Pensando/Processando
       return () => clearTimeout(t);
     } else if (phase === 1) {
-      const t = setTimeout(() => setPhase(2), 4200); // 4.2s for Raciocinando
+      const t = setTimeout(() => setPhase(2), 3200); // 3.2s for Planejando
+      return () => clearTimeout(t);
+    } else if (phase === 2) {
+      const t = setTimeout(() => setPhase(3), 4200); // 4.2s for Raciocinando
+      return () => clearTimeout(t);
+    } else if (phase === 3) {
+      const t = setTimeout(() => setPhase(4), 5200); // 5.2s for Verificando
       return () => clearTimeout(t);
     }
   }, [phase]);
@@ -1213,9 +1560,10 @@ function LocalActiveThinkingState({ elapsedSeconds, step, steps }: { elapsedSeco
 
   // Determine active variant based on sequential cognitive phase:
   // Phase 0: "Steps" (Thinking)
-  // Phase 1: "Reasoning" (Raciocínio)
-  // Phase 2: "Steps" (Thinking novamente)
-  // Phase 3: Context-aware variant ("Search", "Coding", or "Steps")
+  // Phase 1: "Planning" (Planejando)
+  // Phase 2: "Reasoning" (Raciocínio)
+  // Phase 3: "Verification" (Verificando)
+  // Phase 4+: Context-aware variant ("Search", "Coding", or "Steps")
   let contextVariant = "Steps";
   if (isCurrentlyCoding || hasCodingInHistory || isQueryRelatedToCoding) {
     contextVariant = "Coding";
@@ -1226,14 +1574,17 @@ function LocalActiveThinkingState({ elapsedSeconds, step, steps }: { elapsedSeco
   }
 
   // Enforce natural cognitive stage progression so every animation is clearly visible:
-  // Phase 0: "Steps" (Pensando - 3.2s) -> Phase 1: "Reasoning" (Raciocinando - 4.2s) -> Phase 2+: Action execution ("Coding" or "Search")
   let currentVariant = "Steps";
   if (phase === 0) {
     currentVariant = "Steps";
   } else if (phase === 1) {
+    currentVariant = "Planning";
+  } else if (phase === 2) {
     currentVariant = "Reasoning";
+  } else if (phase === 3) {
+    currentVariant = "Verification";
   } else {
-    currentVariant = contextVariant === "Steps" ? "Coding" : contextVariant;
+    currentVariant = contextVariant;
   }
 
   // In Phase < 3, if no real steps exist yet, we show the initial trace. As soon as steps arrive, we map ALL of them dynamically!
@@ -1303,10 +1654,10 @@ function LocalActiveThinkingState({ elapsedSeconds, step, steps }: { elapsedSeco
       <div key={`thinking_trace_${currentVariant}`} className="pl-8 bg-transparent transition-all duration-300 ease-out">
         {currentVariant === "Coding" ? (
           <ToolChips 
-            steps={mappedToolSteps.length > 0 ? mappedToolSteps : undefined} 
-            diffs={diffs.length > 0 ? diffs : undefined}
-            diffLines={Object.keys(diffLines).length > 0 ? diffLines : undefined}
-            labels={{ header: `${steps.length} chamadas de ferramentas (${elapsedSeconds || 1}s)` }}
+            steps={mappedToolSteps} 
+            diffs={diffs}
+            diffLines={diffLines}
+            labels={{ header: `${mappedToolSteps.length} chamada(s) de ferramenta (${elapsedSeconds || 1}s)` }}
           />
         ) : (
           <ThinkingState 
@@ -1349,7 +1700,7 @@ function ExecutionTimeline({
   const searchVariant = steps.some((step) => /search|pesquis|google/i.test(`${step.label} ${step.detail}`));
   const codingVariant = steps.some((step) => /edit|c[oó]digo|npm|terminal|arquivo/i.test(`${step.label} ${step.detail}`));
   const working = !completed && stage < sequence.length - 1;
-  const autoExpanded = true;
+  const autoExpanded = false;
   const expanded = manualExpanded ?? autoExpanded;
   const visibleSteps = steps;
   const focusedStep = [...steps].reverse().find((step) => step.status === 'running') || steps.at(-1);

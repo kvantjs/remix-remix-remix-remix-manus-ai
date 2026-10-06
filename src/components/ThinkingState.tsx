@@ -40,13 +40,22 @@ const VARIANTS: Record<
   { active: string; done: string; rows: Row[]; query?: string }
 > = {
   Steps: {
-    active: "Pensando",
-    done: "Pensamento concluído",
+    active: "Processando",
+    done: "Processamento concluído",
     rows: [
       { primary: "Analisando solicitação e contexto do projeto" },
       { primary: "Mapeando arquivos e estrutura de código" },
       { primary: "Avaliando estratégia de execução e regras" },
       { primary: "Preparando plano de ação do agente" },
+    ],
+  },
+  Planning: {
+    active: "Planejando",
+    done: "Plano estruturado",
+    rows: [
+      { primary: "Definindo fluxo de engenharia de ponta" },
+      { primary: "Mapeando dependências e ferramentas MCP" },
+      { primary: "Estruturando componentes e lógica de estado" },
     ],
   },
   Reasoning: {
@@ -55,6 +64,15 @@ const VARIANTS: Record<
     rows: [
       { primary: "Avaliando dependências do sistema e verificando regras no ambiente..." },
       { primary: "Garantindo compatibilidade de código e otimizando a solução antes da execução." },
+    ],
+  },
+  Verification: {
+    active: "Verificando",
+    done: "Verificação concluída",
+    rows: [
+      { primary: "Validando integridade do código gerado" },
+      { primary: "Checando conformidade com as diretrizes de design" },
+      { primary: "Testando fluxos de interatividade e estados" },
     ],
   },
   Search: {
@@ -156,6 +174,12 @@ export default function ThinkingState({
         >
           <path d="M6 9l6 6 6-6" />
         </svg>
+
+        {working && (
+          <div className="absolute -bottom-1 left-0 right-0 h-[1.5px] bg-white/5 overflow-hidden rounded-full">
+            <div className="h-full bg-linear-to-r from-transparent via-white/40 to-transparent animate-execution-sheen w-full" />
+          </div>
+        )}
       </button>
 
       {/* expandable trace content */}
@@ -181,7 +205,7 @@ export default function ThinkingState({
             /* Frameless Transparent Web Search Trace */
             <div className="space-y-2 pl-3 border-l border-border-divider-subtle/40 ml-1 text-xs">
               <div className="flex items-center gap-2 font-mono text-[11px] text-text-content-secondary">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-text-content-secondary shrink-0">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white/40 shrink-0">
                   <circle cx="11" cy="11" r="7" />
                   <path d="M21 21l-4.3-4.3" />
                 </svg>
@@ -230,15 +254,18 @@ export default function ThinkingState({
           ) : (
             /* Frameless Transparent Standard Step Trace */
             <div className="space-y-1 pl-3 border-l border-border-divider-subtle/40 ml-1">
-              {v.rows.map((row, i) => (
-                <div key={`step_${row.primary}_${i}`} className="flex items-center gap-2.5 py-1 text-xs text-text-content-primary/80 transition-colors">
-                  <span className="size-1.5 rounded-full bg-text-content-secondary/60 animate-pulse shrink-0" />
-                  <span className="font-medium text-[12px] truncate">{row.primary}</span>
-                  {row.secondary && (
-                    <span className="text-[11px] font-mono text-text-content-secondary/60 shrink-0 ml-auto">{row.secondary}</span>
-                  )}
-                </div>
-              ))}
+              {v.rows.map((row, i) => {
+                const isActive = working && i === v.rows.length - 1;
+                return (
+                  <div key={`step_${row.primary}_${i}`} className="flex items-center gap-2.5 py-1 text-xs text-text-content-primary/80 transition-colors">
+                    <span className={`size-1.5 rounded-full ${isActive ? 'bg-amber-400 animate-pulse' : 'bg-text-content-secondary/60'} shrink-0`} />
+                    <span className={`font-medium text-[12px] truncate ${isActive ? 'text-text-content-primary' : ''}`}>{row.primary}</span>
+                    {row.secondary && (
+                      <span className="text-[11px] font-mono text-text-content-secondary/60 shrink-0 ml-auto">{row.secondary}</span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

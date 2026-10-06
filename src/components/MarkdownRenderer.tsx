@@ -231,8 +231,8 @@ function parseMarkdownToReact(content: string): React.ReactNode[] {
         <ol key={`ol-${key}`} className="space-y-2 my-2.5 pl-1">
           {orderedListItems.map((item, idx) => (
             <li key={`ol-item-${idx}`} className="flex items-start gap-2.5 text-[13px] leading-relaxed text-text-content-primary/90">
-              <span className="font-mono text-[11px] font-semibold text-white bg-[#1a1a1a] border border-[#464646] px-1.5 py-0.5 rounded shrink-0 mt-0.5 min-w-[20px] text-center">
-                {item.num}
+              <span className="text-[13px] font-semibold text-text-content-primary shrink-0 mt-0.5 min-w-[18px] text-start">
+                {item.num}.
               </span>
               <div className="flex-1 min-w-0">
                 {item.content}
@@ -352,7 +352,7 @@ function parseMarkdownToReact(content: string): React.ReactNode[] {
       flushAll(idx);
       elements.push(
         <h3 key={`h3-${idx}`} className="text-[13.5px] font-bold text-text-content-primary mt-4 mb-1.5 tracking-tight border-b border-white/5 pb-1 flex items-center gap-1.5">
-          <span className="size-1.5 rounded-full bg-blue-400 shrink-0" />
+          <span className="size-1.5 rounded-full bg-white shrink-0" />
           <span>{parseInlineMarkdown(trimmed.slice(4))}</span>
         </h3>
       );
@@ -392,7 +392,7 @@ function parseMarkdownToReact(content: string): React.ReactNode[] {
       elements.push(
         <blockquote
           key={`quote-${idx}`}
-          className="border-l-2 border-blue-500/80 bg-blue-500/5 pl-3 py-1.5 my-2 text-xs italic text-text-content-primary/80 rounded-r"
+          className="border-l-2 border-white/20 bg-white/5 pl-3 py-1.5 my-2 text-xs italic text-text-content-primary/80 rounded-r"
         >
           {parseInlineMarkdown(trimmed.slice(2))}
         </blockquote>
@@ -421,7 +421,7 @@ function parseMarkdownToReact(content: string): React.ReactNode[] {
       inUnorderedList = true;
       unorderedListItems.push(
         <li key={`ul-li-${idx}`} className="flex items-start gap-2 text-[13px] leading-relaxed text-text-content-primary/90">
-          <span className="size-1.5 rounded-full bg-blue-400/80 shrink-0 mt-2" />
+          <span className="size-1.5 rounded-full bg-white/80 shrink-0 mt-2" />
           <div className="flex-1 min-w-0">{parseInlineMarkdown(unorderedMatch[1])}</div>
         </li>
       );

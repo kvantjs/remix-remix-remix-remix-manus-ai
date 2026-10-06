@@ -251,7 +251,7 @@ export function InlineCodeSnippet({ code }: { code: string }) {
         ? 'bg-amber-950/30 text-amber-300 border-amber-500/20'
         : isKeyword 
         ? 'bg-purple-950/30 text-purple-300 border-purple-500/20'
-        : 'bg-bg-action-hover text-blue-300'
+        : 'bg-bg-action-hover text-white/90'
     }`}>
       {code}
     </code>

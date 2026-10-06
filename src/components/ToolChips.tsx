@@ -79,6 +79,11 @@ export function getContextualToolIcon(iconKey: string, label: string = "", chip:
   const combined = `${k} ${l} ${c}`;
   const iconClass = "text-text-content-secondary shrink-0";
 
+  // 0. MCP Specific Labels
+  if (l.includes("webdev mcp")) return <Code size={13} weight="bold" className="text-cyan-400 shrink-0" />;
+  if (l.includes("computer mcp")) return <Browsers size={13} weight="bold" className="text-blue-400 shrink-0" />;
+  if (l.includes("terminal bash mcp")) return <Terminal size={13} weight="bold" className="text-emerald-400 shrink-0" />;
+
   // 1. Browser & Web Navigations
   if (combined.includes("navigate") || combined.includes("goto") || combined.includes("open url") || combined.includes("acessar")) {
     return <Compass size={13} weight="bold" className={iconClass} />;
@@ -256,13 +261,14 @@ const DIFF_LINES: Record<string, ToolDiffLine[]> = {
 };
 
 export default function ToolChips({
-  steps = ROWS,
-  diffs = DIFFS,
-  diffLines = DIFF_LINES,
+  steps = [],
+  diffs = [],
+  diffLines = {},
   labels,
   className,
   onOpenChange,
   onToggleRow,
+  initialOpen = true,
 }: {
   /** Accepted for gallery/registry parity; ToolChips has no visual variants. */
   variant?: string;
@@ -273,6 +279,7 @@ export default function ToolChips({
   className?: string;
   onOpenChange?: (open: boolean) => void;
   onToggleRow?: (label: string, open: boolean) => void;
+  initialOpen?: boolean;
 } = {}) {
   const DEFAULT_DYNAMIC_LABELS: ToolChipsLabels = {
     header: `${steps.length} ferramentas executadas`,
@@ -280,8 +287,13 @@ export default function ToolChips({
   };
   const copy = { ...DEFAULT_DYNAMIC_LABELS, ...labels };
   const [step, setStep] = useState(0);
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(initialOpen);
   const [openRows, setOpenRows] = useState<Set<string>>(new Set());
+
+  // Sync open state with initialOpen prop to allow external control (e.g. auto-collapse)
+  useEffect(() => {
+    setOpen(initialOpen);
+  }, [initialOpen]);
 
   const [preview, setPreview] = useState<{
     file: string;
@@ -356,7 +368,7 @@ export default function ToolChips({
             {steps.map((row, rowIdx) => {
               const rowOpen = openRows.has(row.label);
               return (
-                <div key={`${row.label}_${rowIdx}`} style={{ animation: "fade-up 300ms cubic-bezier(0.23,1,0.32,1) both" }}>
+                <div key={`${row.label}_${rowIdx}`} style={{ animation: `fade-up 400ms cubic-bezier(0.23,1,0.32,1) ${rowIdx * 150}ms both` }}>
                   <button
                     type="button"
                     aria-expanded={rowOpen}

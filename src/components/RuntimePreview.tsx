@@ -130,7 +130,7 @@ export function RuntimePreview({ activeCode, onSendPrompt }: RuntimePreviewProps
           )}
 
           {/* DYNAMIC REACT RUNTIME CANVAS */}
-          <div key={refreshKey} className="flex-1 overflow-auto bg-[#121212] text-white">
+          <div key={`${activeCode}-${refreshKey}`} className="flex-1 overflow-auto bg-[#121212] text-white">
             {activeCode ? (
               <DynamicRuntimeRunner code={activeCode} />
             ) : (

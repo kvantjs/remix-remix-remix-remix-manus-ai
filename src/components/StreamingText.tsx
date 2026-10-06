@@ -64,8 +64,6 @@ export interface StreamingTextProps {
   content?: StreamingToken[] | string;
   /** cited sources shown in the chip, avatar stack, and expanded list */
   sources?: StreamingSource[];
-  /** follow-up prompt suggestions shown once the stream completes */
-  followUps?: string[];
   /** prominent copy strings */
   labels?: Partial<StreamingLabels>;
   /** restart the stream after a hold; default false */
@@ -79,15 +77,12 @@ export interface StreamingTextProps {
   /** whether the message is actively streaming right now */
   isStreaming?: boolean;
   onDone?: () => void;
-  /** fired when a follow-up prompt is chosen */
-  onFollowUp?: (text: string, index: number) => void;
   children?: React.ReactNode;
 }
 
 export default function StreamingText({
   content = "",
   sources,
-  followUps,
   labels,
   loop = false,
   fill = true,
@@ -95,7 +90,6 @@ export default function StreamingText({
   initialDone = false,
   isStreaming = false,
   onDone,
-  onFollowUp,
   children,
 }: StreamingTextProps = {}) {
   const l = { ...DEFAULT_LABELS, ...labels };
@@ -141,7 +135,7 @@ export default function StreamingText({
 
     const interval = setTimeout(() => {
       setCount((c) => {
-        const next = Math.min(tokens.length, c + 2); // advance 2 tokens for fluid feel
+        const next = Math.min(tokens.length, c + 1); // advance 1 token for progressive word-by-word stream
         return next;
       });
     }, speedMs);
@@ -231,38 +225,6 @@ export default function StreamingText({
                 </a>
               ))}
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* follow-ups suggestions */}
-      {done && followUps && followUps.length > 0 && (
-        <div
-          className="mt-3 transition-opacity duration-400"
-          style={{ opacity: done ? 1 : 0, pointerEvents: done ? "auto" : "none" }}
-        >
-          <p className="text-[11.5px] font-medium text-slate-400">{l.followUps}</p>
-          <div className="mt-1 flex flex-col gap-1">
-            {followUps.map((text, i) => (
-              <button
-                key={text}
-                onClick={() => onFollowUp?.(text, i)}
-                className="flex items-center gap-2 rounded-[7px] border-b border-white/5
-                  px-2 py-1.5 text-left text-[12px] text-slate-200 transition-colors
-                  duration-100 hover:bg-white/5 hover:text-white cursor-pointer"
-                style={
-                  done
-                    ? { animation: `fade-up 350ms cubic-bezier(0.23,1,0.32,1) ${i * 70}ms both` }
-                    : { opacity: 0 }
-                }
-              >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-slate-500">
-                  <path d="M9 10l-5 5 5 5" />
-                  <path d="M20 4v7a4 4 0 0 1-4 4H4" />
-                </svg>
-                <span>{text}</span>
-              </button>
-            ))}
           </div>
         </div>
       )}
