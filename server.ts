@@ -3967,6 +3967,13 @@ app.post('/api/agent/chat/stream', async (req, res) => {
       });
     }
     sendEvent('status', { text: 'Iniciando raciocínio do Agente...', intent });
+    // This is intentionally emitted for every intent, including plain
+    // conversation. The UI uses it as the single live agent note, so the
+    // trace is not limited to Computer MCP sessions.
+    sendEvent('stage_note', {
+      label: 'Entendimento do pedido',
+      text: `Estou analisando sua mensagem e aplicando as regras do modo ${intent.mode} antes de responder.`
+    });
 
     // Check if context questionnaire is needed before anything else
     if (checkNeedsContextQuestionnaire(message)) {

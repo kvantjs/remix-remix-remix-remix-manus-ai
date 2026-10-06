@@ -358,7 +358,6 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
   const [showExecutionAnimation, setShowExecutionAnimation] = useState(false);
   const [initialThoughtComplete, setInitialThoughtComplete] = useState(false);
   const [finalResponseReceived, setFinalResponseReceived] = useState(false);
-  const executionCycleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -594,14 +593,12 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
     progressNotesRef.current = [];
     deliveredFilePathsRef.current = new Set();
     setFinalResponseReceived(false);
-    if (executionCycleTimerRef.current) clearTimeout(executionCycleTimerRef.current);
-    setShowExecutionAnimation(false);
-    setInitialThoughtComplete(false);
-    executionCycleTimerRef.current = setTimeout(() => {
-      setInitialThoughtComplete(true);
-      addOpeningProgressNote(userPrompt);
-      setShowExecutionAnimation(true);
-    }, 850);
+    // Every assistant response gets the same live note + animation lane. Do
+    // not defer this behind a timer: fast conversation responses used to end
+    // before the 850ms delay and therefore appeared without any agent trace.
+    setInitialThoughtComplete(true);
+    addOpeningProgressNote(userPrompt);
+    setShowExecutionAnimation(true);
     const initialSteps: ExecutionStep[] = [
       {
         id: `intent_${Date.now()}`,
@@ -857,7 +854,6 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                     beginExecutionStep('Aguardando sua autorização', data.approval?.reason || 'O agente pausou antes de uma ação sensível.');
                     completeExecutionStep('Aguardando sua autorização', data.approval?.reason || 'Ação pausada até sua decisão.', 'warning');
                   } else if (currentEvent === 'complete') {
-                    if (executionCycleTimerRef.current) clearTimeout(executionCycleTimerRef.current);
                     setShowExecutionAnimation(false);
                     setInitialThoughtComplete(false);
                     setFinalResponseReceived(true);
