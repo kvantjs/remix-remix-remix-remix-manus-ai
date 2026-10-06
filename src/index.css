@@ -608,7 +608,7 @@ body {
 }
 
 .workspace-panel {
-  width: min(56%, 760px);
+  width: min(54%, 760px);
   min-width: 360px;
   max-width: 760px;
   position: relative;
@@ -1095,4 +1095,12 @@ body {
     margin-inline: auto;
     flex: 0 0 auto;
   }
+}
+
+/* Agent trace text is allowed to wrap, while tool labels remain visually compact. */
+.execution-timeline .thinking-shimmer,
+.execution-timeline p,
+.workspace-panel .workspace-top-tabs,
+.workspace-panel .workspace-subnav-tabs {
+  overflow-wrap: anywhere;
 }

@@ -1670,7 +1670,7 @@ function LocalActiveThinkingState({ elapsedSeconds, step, steps }: { elapsedSeco
   });
 
   return (
-    <div className="w-full max-w-[820px] space-y-4 animate-in fade-in duration-300">
+    <div className="w-full min-w-0 max-w-full overflow-hidden space-y-4 animate-in fade-in duration-300">
        <div className="flex items-center gap-2.5">
         <img
           src="https://imgdb.io/i/6lwOlmk.png"
@@ -1686,7 +1686,7 @@ function LocalActiveThinkingState({ elapsedSeconds, step, steps }: { elapsedSeco
       </div>
 
       {/* Transitions smoothly between variants with a stable variant key */}
-      <div key={`thinking_trace_${currentVariant}`} className="pl-8 bg-transparent transition-all duration-300 ease-out">
+      <div key={`thinking_trace_${currentVariant}`} className="min-w-0 max-w-full overflow-hidden pl-8 bg-transparent transition-all duration-300 ease-out">
         {currentVariant === "Coding" ? (
           <ToolChips
             steps={mappedToolSteps}
@@ -1746,7 +1746,7 @@ function ExecutionTimeline({
     const isRunning = step.status === 'running';
     const isWarning = step.status === 'warning';
     return (
-      <div key={`${step.id}_${index}`} className={`relative flex min-h-7 w-full items-center gap-2 rounded-md px-1.5 py-0.5 text-left transition-colors duration-200 ${isRunning ? 'bg-bg-action-hover/50' : 'hover:bg-bg-action-hover/30'}`} style={{ animation: `thinking-fade-up 320ms cubic-bezier(0.23,1,0.32,1) ${index * 120}ms both` }}>
+      <div key={`${step.id}_${index}`} className={`relative flex min-h-7 w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-md px-1.5 py-0.5 text-left transition-colors duration-200 ${isRunning ? 'bg-bg-action-hover/50' : 'hover:bg-bg-action-hover/30'}`} style={{ animation: `thinking-fade-up 320ms cubic-bezier(0.23,1,0.32,1) ${index * 120}ms both` }}>
         {searchVariant ? (
           <Favicon
             urlOrDomain={step.detail || step.label}
@@ -1760,25 +1760,25 @@ function ExecutionTimeline({
         ) : (
           getContextualToolIcon(step.label, step.label, step.detail)
         )}
-        <span className={`min-w-0 truncate text-[11px] ${searchVariant ? 'text-text-content-primary/80' : 'text-text-content-primary/70'} ${codingVariant ? 'font-mono' : 'font-medium'}`}>{step.label}</span>
-        {step.detail && <span className="min-w-0 truncate text-[10px] text-text-content-secondary/60">{step.detail}</span>}
+        <span className={`min-w-0 max-w-[42%] truncate text-[11px] ${searchVariant ? 'text-text-content-primary/80' : 'text-text-content-primary/70'} ${codingVariant ? 'font-mono' : 'font-medium'}`}>{step.label}</span>
+        {step.detail && <span className="min-w-0 flex-1 truncate text-[10px] text-text-content-secondary/60">{step.detail}</span>}
         {step.timestamp && <span className="ml-auto shrink-0 text-[9px] font-mono text-text-content-secondary/40">{step.timestamp}</span>}
       </div>
     );
   };
 
   return (
-    <div className={`execution-timeline flex w-full max-w-[780px] flex-col bg-transparent p-0 ${completed ? 'mt-1' : ''}`} style={{ minHeight: working || expanded ? 148 : undefined, transition: 'min-height 400ms cubic-bezier(0.23,1,0.32,1)' }}>
-      <div className="flex items-center gap-2">
-        <button type="button" aria-expanded={expanded} onClick={() => setManualExpanded((current) => !(current ?? autoExpanded))} className="-mx-1.5 flex w-fit items-center gap-2 rounded-lg px-1.5 py-1 text-left transition-colors hover:bg-bg-action-hover">
+    <div className={`execution-timeline flex w-full min-w-0 max-w-full overflow-hidden flex-col bg-transparent p-0 ${completed ? 'mt-1' : ''}`} style={{ minHeight: working || expanded ? 148 : undefined, transition: 'min-height 400ms cubic-bezier(0.23,1,0.32,1)' }}>
+      <div className="min-w-0 max-w-full flex items-center gap-2">
+        <button type="button" aria-expanded={expanded} onClick={() => setManualExpanded((current) => !(current ?? autoExpanded))} className="-mx-1.5 flex min-w-0 max-w-full items-center gap-2 rounded-lg px-1.5 py-1 text-left transition-colors hover:bg-bg-action-hover">
           <span className={`flex size-4 shrink-0 items-center justify-center transition-colors ${working ? 'text-text-content-primary/60' : 'text-text-content-secondary/40'}`}><Sparkle size={14} weight="fill" /></span>
-          <span role="status" className="text-[13px] font-medium">
+          <span role="status" className="min-w-0 max-w-full break-words whitespace-normal text-[13px] font-medium">
             {working ? <span className="thinking-shimmer">{activeLabel}</span> : <span className="text-text-content-primary/60">{doneLabel}</span>}
           </span>
           <CaretDown size={13} className={`text-text-content-secondary/40 transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`} />
         </button>
       </div>
-      <p className="pl-6 text-[10px] text-text-content-secondary/60">{working ? (focusedStep?.detail || focusedStep?.label || activeStep || 'Preparing the next step...') : 'The trace settled and remains expandable.'}</p>
+      <p className="min-w-0 max-w-full overflow-hidden break-words whitespace-normal pl-6 text-[10px] text-text-content-secondary/60">{working ? (focusedStep?.detail || focusedStep?.label || activeStep || 'Preparing the next step...') : 'The trace settled and remains expandable.'}</p>
 
       <div className="grid transition-[grid-template-rows,opacity] duration-400" style={{ gridTemplateRows: expanded ? '1fr' : '0fr', opacity: expanded ? 1 : 0, transitionTimingFunction: 'cubic-bezier(0.23,1,0.32,1)' }}>
         <div className="overflow-hidden">
