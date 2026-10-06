@@ -4445,7 +4445,10 @@ async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      // This Express process owns the HTTP listener; Vite's HMR websocket is
+      // not attached to it and only creates a noisy failed connection in AI
+      // Studio. File changes are still picked up by the middleware on reload.
+      server: { middlewareMode: true, hmr: false },
       appType: 'spa',
     });
     app.use(vite.middlewares);
