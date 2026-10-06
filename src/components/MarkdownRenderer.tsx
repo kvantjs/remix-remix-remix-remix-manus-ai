@@ -16,13 +16,32 @@ interface MarkdownRendererProps {
 export function MarkdownRenderer({ content, className = '' }: MarkdownRendererProps) {
   if (!content) return null;
 
-  const elements = parseMarkdownToReact(content);
+  const elements = parseMarkdownToReact(normalizeMarkdownContent(content));
 
   return (
-    <div className={`space-y-2 text-text-content-primary/90 ${className}`}>
+    <div className={`min-w-0 max-w-full space-y-2 break-words [overflow-wrap:anywhere] text-text-content-primary/90 ${className}`}>
       {elements}
     </div>
   );
+}
+
+
+/** Normaliza respostas vindas de modelos antes da análise estrutural. */
+export function normalizeMarkdownContent(content: string): string {
+  let normalized = String(content || '')
+    .replace(/\uFEFF/g, '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
+
+  // Alguns provedores devolvem quebras escapadas como texto literal.
+  if (!normalized.includes('\n') && normalized.includes('\\n')) {
+    normalized = normalized.replace(/\\n/g, '\n');
+  }
+
+  // Evita que uma cerca de código aberta faça o restante da resposta desaparecer.
+  const fenceCount = (normalized.match(/^\s*```/gm) || []).length;
+  if (fenceCount % 2 === 1) normalized += '\n```';
+  return normalized.trim();
 }
 
 /**
@@ -414,7 +433,7 @@ function parseMarkdownToReact(content: string): React.ReactNode[] {
     }
 
     // 7. Unordered list (- item, * item, + item)
-    const unorderedMatch = trimmed.match(/^[-*+]\s+(.*)$/);
+    const unorderedMatch = trimmed.match(/^(?:[-*+]|•)\s+(.*)$/);
     if (unorderedMatch) {
       flushOrderedList(idx);
       flushTable(idx);

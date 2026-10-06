@@ -374,7 +374,7 @@ export default function ToolChips({
                     type="button"
                     aria-expanded={rowOpen}
                     onClick={() => toggleRow(row.label)}
-                    className="group/row -mx-[3px] flex h-7 w-[calc(100%+6px)] min-w-0 items-center gap-2 rounded-lg px-2 text-left transition-all duration-150 hover:bg-white/5 cursor-pointer"
+                    className="group/row -mx-[3px] flex min-h-7 w-[calc(100%+6px)] min-w-0 items-start gap-2 rounded-lg px-2 py-1 text-left transition-all duration-150 hover:bg-white/5 cursor-pointer"
                   >
                     <span className="relative flex size-5 shrink-0 items-center justify-center">
                       <span className={`transition-opacity duration-100 flex size-5 items-center justify-center rounded-[3px] bg-cover bg-center border border-white/10 shadow-xs ${rowOpen ? "opacity-0" : "group-hover/row:opacity-0"}`} style={{ backgroundImage: `url('https://imgdb.io/i/axsNhBY.png')` }}>
@@ -386,10 +386,10 @@ export default function ToolChips({
                         className={`absolute text-text-content-secondary transition-all duration-150 ${rowOpen ? "opacity-100 rotate-90" : "opacity-0 group-hover/row:opacity-100"}`}
                       />
                     </span>
-                    <span className="shrink-0 text-[12.5px] font-medium text-text-content-primary">{row.label}</span>
+                    <span className="min-w-0 max-w-[42%] shrink-0 break-words text-[12.5px] font-medium text-text-content-primary">{row.label}</span>
                     <span
-                      className={`inline-flex h-5.5 min-w-0 flex-1 items-center truncate rounded-md bg-white/[0.04] border border-white/[0.06] px-2
-                        text-[11px] text-text-content-secondary transition-colors duration-100 group-hover/row:bg-white/[0.08] group-hover/row:text-text-content-primary
+                      className={`inline-flex min-h-5.5 min-w-0 flex-1 items-start rounded-md bg-white/[0.04] border border-white/[0.06] px-2 py-0.5
+                        break-words [overflow-wrap:anywhere] whitespace-pre-wrap text-[11px] text-text-content-secondary transition-colors duration-100 group-hover/row:bg-white/[0.08] group-hover/row:text-text-content-primary
                         ${row.mono ? "font-mono" : ""}`}
                     >
                       {row.chip}
@@ -410,7 +410,7 @@ export default function ToolChips({
                         {row.detail.map((line, lineIdx) => (
                           <span
                             key={`${line.text}_${lineIdx}`}
-                            className={`truncate text-[11px] leading-[1.6] ${row.detailMono ? "font-mono" : ""} ${line.tone === "add" ? "text-emerald-400" : "text-text-content-secondary/80"}`}
+                            className={`break-words [overflow-wrap:anywhere] whitespace-pre-wrap text-[11px] leading-[1.6] ${row.detailMono ? "font-mono" : ""} ${line.tone === "add" ? "text-emerald-400" : "text-text-content-secondary/80"}`}
                           >
                             {line.text}
                           </span>

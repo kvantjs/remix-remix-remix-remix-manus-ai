@@ -118,6 +118,52 @@ interface ExecutionStep {
   timestamp?: string;
 }
 
+
+type ToolPresentation = { label: string; chip: string; detail: string };
+
+function describeToolExecution(toolName: string, args: Record<string, any> = {}, fallback = ''): ToolPresentation {
+  const name = String(toolName || '').toLowerCase();
+  const command = String(args.command || args.cmd || args.script || '').trim();
+  const filePath = String(args.filePath || args.path || args.filename || '').trim();
+  const url = String(args.url || '').trim();
+  const query = String(args.query || args.q || '').trim();
+  const target = String(args.selector || args.selectorOrText || args.text || '').trim();
+
+  if (name.includes('bash') || name.includes('terminal') || name.includes('shell') || name.includes('exec') || name.includes('python')) {
+    const shown = command || (name.includes('python') ? 'script Python' : 'comando shell');
+    return { label: 'Executando comandos no terminal', chip: shown, detail: `Terminal: ${shown}` };
+  }
+  if (name.includes('write') || name.includes('create_file') || name.includes('fs.write')) {
+    const shown = filePath || 'arquivo do workspace';
+    return { label: 'Gravando arquivo no workspace', chip: shown, detail: `Arquivo de destino: ${shown}` };
+  }
+  if (name.includes('read') || name.includes('file_list') || name.includes('list_files') || name.includes('inspect')) {
+    const shown = filePath || String(args.directoryPath || args.directory || 'workspace');
+    return { label: name.includes('list') ? 'Listando arquivos do workspace' : 'Lendo arquivo do workspace', chip: shown, detail: `Alvo consultado: ${shown}` };
+  }
+  if (name.includes('search')) {
+    const shown = query || 'consulta na web';
+    return { label: 'Pesquisando informações na web', chip: shown, detail: `Consulta: ${shown}` };
+  }
+  if (name.includes('navigate') || name.includes('browser')) {
+    const shown = url || 'página no navegador';
+    return { label: 'Navegando no navegador do agente', chip: shown, detail: `URL acessada: ${shown}` };
+  }
+  if (name.includes('click')) {
+    const shown = target || 'elemento da página';
+    return { label: 'Clicando em elemento da página', chip: shown, detail: `Alvo do clique: ${shown}` };
+  }
+  if (name.includes('type') || name.includes('fill')) {
+    const shown = target || 'campo do formulário';
+    return { label: 'Preenchendo campo no navegador', chip: shown, detail: `Campo: ${shown}` };
+  }
+  if (name.includes('verify') || name.includes('check') || name.includes('build')) {
+    return { label: 'Verificando compilação e funcionamento', chip: fallback || 'validação do runtime', detail: fallback || 'Executando validações do runtime.' };
+  }
+  const safeFallback = fallback || 'ação autorizada pelo plano';
+  return { label: 'Executando ação do agente', chip: safeFallback, detail: safeFallback };
+}
+
 interface ChatAreaProps {
   onFileUpdate?: (files: Array<{ path: string; code: string; lang?: string }>) => void;
   externalPrompt?: string | null;
@@ -588,8 +634,9 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                       });
                     }
                   } else if (currentEvent === 'tool_start') {
-                    setCurrentStep(`Executando ${data.toolName}: ${data.reason}`);
-                    beginExecutionStep(data.toolName, data.reason || 'Executando no computador da nuvem.');
+                    const presentation = describeToolExecution(data.toolName, data.arguments || {}, data.reason || '');
+                    setCurrentStep(`${presentation.label}: ${presentation.chip}`);
+                    beginExecutionStep(presentation.label, presentation.detail);
                     const activeTrace: ToolCallTrace = {
                       id: `active_${Date.now()}`,
                       toolName: data.toolName,
@@ -633,9 +680,14 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                       }
                     }
 
-                    completeExecutionStep(
+                    const finishedPresentation = describeToolExecution(
                       toolCall.toolName,
-                      toolCall.screenData?.actionDescription || 'Ação concluída; resultado incorporado ao contexto.',
+                      toolCall.arguments || {},
+                      toolCall.screenData?.actionDescription || ''
+                    );
+                    completeExecutionStep(
+                      finishedPresentation.label,
+                      finishedPresentation.detail || 'Ação concluída; resultado incorporado ao contexto.',
                       toolCall.status === 'warning' ? 'warning' : toolCall.status === 'error' ? 'warning' : 'complete'
                     );
 
@@ -1211,13 +1263,7 @@ function MessageItem({
 
     // Map tool calls to specific MCP servers for display
     let finalToolSteps: ToolStep[] = (message.toolCalls || []).map((tc) => {
-      let chipText = '';
-      if (tc.arguments?.filePath) chipText = tc.arguments.filePath;
-      else if (tc.arguments?.url) chipText = tc.arguments.url;
-      else if (tc.arguments?.command) chipText = tc.arguments.command;
-      else if (tc.arguments?.query) chipText = tc.arguments.query;
-      else if (tc.screenData?.actionDescription) chipText = tc.screenData.actionDescription;
-      else chipText = tc.server || tc.toolName;
+      const presentation = describeToolExecution(tc.toolName, tc.arguments || {}, tc.screenData?.actionDescription || '');
 
       // Determine MCP name for the UI label
       let mcpLabel = tc.server;
@@ -1230,15 +1276,16 @@ function MessageItem({
 
       return {
         icon: tc.toolName,
-        label: mcpLabel,
-        chip: chipText,
+        label: presentation.label,
+        chip: presentation.chip,
       mono: tc.toolName.includes('fs') || tc.toolName.includes('cmd') || tc.toolName.includes('exec') || tc.toolName.includes('file') || tc.toolName.includes('shell'),
       detailMono: true,
       detail: [
         { text: `Status: ${tc.status === 'success' ? '✓ Sucesso' : '✗ Erro'}` },
         ...(tc.arguments ? [{ text: `Argumentos: ${JSON.stringify(tc.arguments)}` }] : []),
         ...(tc.screenData?.title ? [{ text: `Página: ${tc.screenData.title}` }] : []),
-        ...(tc.screenData?.actionDescription ? [{ text: tc.screenData.actionDescription }] : [])
+        { text: presentation.detail },
+        ...(tc.screenData?.actionDescription && tc.screenData.actionDescription !== presentation.detail ? [{ text: tc.screenData.actionDescription }] : [])
       ]
     };
   });
@@ -1710,7 +1757,7 @@ function ExecutionTimeline({
     const isRunning = step.status === 'running';
     const isWarning = step.status === 'warning';
     return (
-      <div key={`${step.id}_${index}`} className={`relative flex min-h-7 w-full items-center gap-2 rounded-md px-1.5 py-0.5 text-left transition-colors duration-200 ${isRunning ? 'bg-bg-action-hover/50' : 'hover:bg-bg-action-hover/30'}`} style={{ animation: `thinking-fade-up 320ms cubic-bezier(0.23,1,0.32,1) ${index * 120}ms both` }}>
+      <div key={`${step.id}_${index}`} className={`relative flex min-h-7 w-full min-w-0 items-start gap-2 rounded-md px-1.5 py-1 text-left transition-colors duration-200 ${isRunning ? 'bg-bg-action-hover/50' : 'hover:bg-bg-action-hover/30'}`} style={{ animation: `thinking-fade-up 320ms cubic-bezier(0.23,1,0.32,1) ${index * 120}ms both` }}>
         {searchVariant ? (
           <Favicon 
             urlOrDomain={step.detail || step.label} 
@@ -1724,8 +1771,8 @@ function ExecutionTimeline({
         ) : (
           getContextualToolIcon(step.label, step.label, step.detail)
         )}
-        <span className={`min-w-0 truncate text-[11px] ${searchVariant ? 'text-text-content-primary/80' : 'text-text-content-primary/70'} ${codingVariant ? 'font-mono' : 'font-medium'}`}>{step.label}</span>
-        {step.detail && <span className="min-w-0 truncate text-[10px] text-text-content-secondary/60">{step.detail}</span>}
+        <span className={`min-w-0 flex-1 break-words [overflow-wrap:anywhere] text-[11px] ${searchVariant ? 'text-text-content-primary/80' : 'text-text-content-primary/70'} ${codingVariant ? 'font-mono' : 'font-medium'}`}>{step.label}</span>
+        {step.detail && <span className="min-w-0 flex-1 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[10px] text-text-content-secondary/70">{step.detail}</span>}
         {step.timestamp && <span className="ml-auto shrink-0 text-[9px] font-mono text-text-content-secondary/40">{step.timestamp}</span>}
       </div>
     );
