@@ -665,7 +665,31 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
               } else if (line.startsWith('data: ')) {
                 try {
                   const data = JSON.parse(line.replace('data: ', '').trim());
-                  if (currentEvent === 'deliberation') {
+                  if (currentEvent === 'computer_starting') {
+                    setCurrentStep(data.text || 'Inicializando o computador do agente...');
+                    beginExecutionStep('Inicializando computador do agente', 'Boot de 5 segundos; nenhuma ação será executada durante a inicialização.');
+                    if (onAgentStateChange) {
+                      onAgentStateChange({
+                        isWorking: true,
+                        statusText: data.text || 'Inicializando o computador do agente...',
+                        contextText: 'O computador está iniciando. As ações serão liberadas somente após o boot de 5 segundos.',
+                        toolCalls: [...liveToolCalls],
+                        browserStatus: 'loading'
+                      });
+                    }
+                  } else if (currentEvent === 'computer_ready') {
+                    completeExecutionStep('Inicializando computador do agente', data.text || 'Computador iniciado; execução liberada.');
+                    setCurrentStep(data.text || 'Computador iniciado; execução liberada.');
+                    if (onAgentStateChange) {
+                      onAgentStateChange({
+                        isWorking: true,
+                        statusText: data.text || 'Computador do agente pronto.',
+                        contextText: 'Boot concluído. O agente pode iniciar ações autorizadas.',
+                        toolCalls: [...liveToolCalls],
+                        browserStatus: 'interactive'
+                      });
+                    }
+                  } else if (currentEvent === 'deliberation') {
                     activateExecutionAnimation();
                     const deliberationLabel = data.label || 'Deliberação profunda';
                     const deliberationText = data.text || 'Avaliando critérios verificáveis.';

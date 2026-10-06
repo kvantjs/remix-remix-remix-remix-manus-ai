@@ -3942,6 +3942,16 @@ app.post('/api/agent/chat/stream', async (req, res) => {
   playwrightBrowser.setProgressListener((progress) => sendEvent('browser_progress', progress));
 
   try {
+    if (intent.mode === 'cloud_computer') {
+      sendEvent('computer_starting', {
+        durationMs: 5000,
+        text: 'Inicializando o computador do agente... nenhuma ação será executada durante o boot.'
+      });
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      sendEvent('computer_ready', {
+        text: 'Computador do agente iniciado. A execução está liberada.'
+      });
+    }
     sendEvent('status', { text: 'Iniciando raciocínio do Agente...', intent });
 
     // Check if context questionnaire is needed before anything else

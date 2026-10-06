@@ -222,7 +222,27 @@ export function KvantComputer({
   const [isExternalWeb, setIsExternalWeb] = useState<boolean>(true);
   const [liveScreenshot, setLiveScreenshot] = useState<string | null>(null);
   const [browserStatus, setBrowserStatus] = useState<'loading' | 'interactive' | 'error' | 'blocked'>('interactive');
+  const [bootSecondsRemaining, setBootSecondsRemaining] = useState(0);
+  const isBooting = bootSecondsRemaining > 0;
   
+  // A inicialização do computador é deliberadamente visível e bloqueia qualquer ação por 5 segundos.
+  useEffect(() => {
+    if (!/inicializando o computador do agente/i.test(statusText)) return;
+    setIsComputerActive(true);
+    setBrowserStatus('loading');
+    setBootSecondsRemaining(5);
+    let remaining = 5;
+    const timer = window.setInterval(() => {
+      remaining -= 1;
+      setBootSecondsRemaining(Math.max(remaining, 0));
+      if (remaining <= 0) {
+        window.clearInterval(timer);
+        setBrowserStatus('interactive');
+      }
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [statusText]);
+
   // Update browserStatus from props if provided
   useEffect(() => {
     if (externalBrowserStatus) {
@@ -305,7 +325,7 @@ export function KvantComputer({
   })();
 
   // Define if the computer is currently in an idle/finished state
-  const isIdle = isComputerActive && (forceIdle || (!isWorking && !isLoading && !userControlMode && !liveScreenshot && !customCode));
+  const isIdle = isComputerActive && !isBooting && (forceIdle || (!isWorking && !isLoading && !userControlMode && !liveScreenshot && !customCode));
 
   // Reset forceIdle when active work or interaction begins
   useEffect(() => {
@@ -416,7 +436,7 @@ export function KvantComputer({
 
   // Agent live action animation on the browser
   const runAgentLiveActionAnimation = (actionType: 'navigate' | 'click' | 'scroll' | 'type', targetVal: string) => {
-    if (userControlMode) return targetVal;
+    if (userControlMode || isBooting) return targetVal;
     clearAllAnimationTimers();
     setIsLoading(true);
 
@@ -584,6 +604,7 @@ export function KvantComputer({
 
   // Listen to chat prompt / context to navigate
   useEffect(() => {
+    if (isBooting) return;
     if (contextText && contextText !== lastContextTextRef.current) {
       lastContextTextRef.current = contextText;
       const isExplicitNavigation = /https?:\/\/|www\.|(?:acesse|acessar|abra|abrir|navegue|navegar|visite|visitar|pesquis(?:e|ar)|busqu(?:e|ar)|procure|search|open|go\s+to)\b/i.test(contextText);
@@ -608,10 +629,11 @@ export function KvantComputer({
         setIsLive(true);
       }
     }
-  }, [contextText, customCode, isComputerActive]);
+  }, [contextText, customCode, isComputerActive, isBooting]);
 
   // Synchronize when Agent runs tool calls in Chat
   useEffect(() => {
+    if (isBooting) return;
     if (toolCalls && toolCalls.length > 0) {
       if (!isComputerActive) {
         handleTurnOnComputer();
@@ -707,7 +729,7 @@ export function KvantComputer({
         setIsLoading(false);
       }
     }
-  }, [toolCalls, currentUrl]);
+  }, [toolCalls, currentUrl, isBooting]);
 
   const handleBack = () => {
     if (historyIndex > 0) {
@@ -752,7 +774,7 @@ export function KvantComputer({
       <div className="h-8 px-4 bg-bg-surface-panel border-b border-border-divider-subtle flex items-center justify-between text-xs shrink-0 select-none">
         <div className="flex items-center gap-2 overflow-hidden truncate">
           <span className="text-text-content-secondary font-normal text-[11.5px] tracking-tight">
-            {!isComputerActive ? 'Computador do Kvant Inativo' : (isLoading ? 'Manus está interagindo...' : 'Manus está usando o Navegador')}
+            {!isComputerActive ? 'Computador do Kvant Inativo' : (isBooting ? 'Computador está iniciando...' : (isLoading ? 'Manus está interagindo...' : 'Manus está usando o Navegador'))}
           </span>
           <span className="text-border-divider-subtle text-xs">|</span>
           <span className="text-text-content-secondary/80 font-mono text-[11px] truncate tracking-tight">
@@ -824,6 +846,22 @@ export function KvantComputer({
               <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed max-w-sm">
                 Envie uma instrução ao agente no chat para ligar o computador e iniciar as automações.
               </p>
+          </div>
+        ) : isBooting ? (
+          <div className="flex-1 bg-[#101820] flex flex-col items-center justify-center p-6 text-center select-none overflow-hidden">
+            <div className="w-full max-w-sm space-y-5">
+              <div className="mx-auto flex size-16 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-300/5">
+                <OrbBloop size={42} audioMode="ambient" demoMode={true} state={BloopState.think} bloopColorMain={BLOOP_PALETTES[BloopPaletteName.blue].main} bloopColorLow={BLOOP_PALETTES[BloopPaletteName.blue].low} bloopColorMid={BLOOP_PALETTES[BloopPaletteName.blue].mid} bloopColorHigh={BLOOP_PALETTES[BloopPaletteName.blue].high} />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-white">Inicializando computador do agente</h3>
+                <p className="mt-1 text-xs text-cyan-100/60">Preparando ambiente seguro. Nenhuma ação será executada durante o boot.</p>
+              </div>
+              <div className="space-y-2">
+                <div className="h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-cyan-400 transition-all duration-1000" style={{ width: `${((5 - bootSecondsRemaining) / 5) * 100}%` }} /></div>
+                <div className="flex justify-between text-[10px] font-mono text-white/45"><span>Boot do Computer MCP</span><span>{bootSecondsRemaining}s restantes</span></div>
+              </div>
+            </div>
           </div>
         ) : isIdle ? (
           /* ACTIVE BUT IDLE COMPUTER SCREEN (NOTHING TO SHOW) */
@@ -1108,6 +1146,11 @@ export function KvantComputer({
               <div className="flex items-center gap-2 text-zinc-400">
                 <span className="size-2 rounded-full bg-zinc-600" />
                 <span>O computador do Kvant está inativo</span>
+              </div>
+            ) : isBooting ? (
+              <div className="flex items-center gap-1.5 text-cyan-300/80">
+                <div className="size-2 rounded-full bg-cyan-400 animate-pulse" />
+                <span>Inicializando computador do agente · {bootSecondsRemaining}s restantes</span>
               </div>
             ) : isWorking ? (
               <div className="flex items-center gap-1.5 text-zinc-400">
