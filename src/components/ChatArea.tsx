@@ -1618,19 +1618,9 @@ function LocalActiveThinkingState({ elapsedSeconds, step, steps }: { elapsedSeco
     contextVariant = "Reasoning";
   }
 
-  // Paced cognitive stage progression matching elapsedSeconds so animations stay active for the exact duration of agent thinking
-  let currentVariant = "Steps";
-  if (elapsedSeconds < 4) {
-    currentVariant = "Steps";
-  } else if (elapsedSeconds < 9) {
-    currentVariant = "Planning";
-  } else if (elapsedSeconds < 16) {
-    currentVariant = "Reasoning";
-  } else if (elapsedSeconds < 24) {
-    currentVariant = "Verification";
-  } else {
-    currentVariant = contextVariant;
-  }
+  // A variante agora acompanha o processo real. Não trocamos a árvore pelo relógio,
+  // porque isso desmontava a timeline e fazia todas as etapas entrarem novamente.
+  const currentVariant = contextVariant;
 
   const mappedRows = steps.length > 0 ? steps.map(s => ({
     primary: s.label,
@@ -1695,7 +1685,7 @@ function LocalActiveThinkingState({ elapsedSeconds, step, steps }: { elapsedSeco
       </div>
       
       {/* Active trace rendering with explicit working=true */}
-      <div key={`thinking_trace_${currentVariant}`} className="pl-8 bg-transparent transition-all duration-300 ease-out">
+      <div className="pl-8 bg-transparent transition-all duration-300 ease-out">
         {currentVariant === "Coding" ? (
           <ToolChips 
             steps={mappedToolSteps} 
