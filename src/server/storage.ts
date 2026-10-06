@@ -29,7 +29,7 @@ async function presign(operation: 'put' | 'get', key: string) {
 export async function createUpload(user: AuthenticatedUser, requestedKey: string, metadata: { name?: string; mimeType?: string; sizeBytes?: number }) {
   const key = safeObjectKey(requestedKey);
   const uploadUrl = await presign('put', key);
-  const stableUrl = `/sparkle-storage/${key}`;
+  const stableUrl = `/manus-storage/${key}`;
   const objectId = crypto.randomUUID();
   if (databaseAvailable()) {
     await query(
@@ -44,7 +44,7 @@ export async function createUpload(user: AuthenticatedUser, requestedKey: string
 
 export async function createDownloadUrl(requestedKey: string) {
   const key = safeObjectKey(requestedKey);
-  return { key, stableUrl: `/sparkle-storage/${key}`, downloadUrl: await presign('get', key), expiresInSeconds: 3600 };
+  return { key, stableUrl: `/manus-storage/${key}`, downloadUrl: await presign('get', key), expiresInSeconds: 3600 };
 }
 
 export async function listObjects(user: AuthenticatedUser) {

@@ -10,7 +10,7 @@
   --font-serif: "Libre Baskerville", "Noto Serif", serif;
   --font-mono: "Geist Mono", "JetBrains Mono", monospace;
   
-  /* Sparkle AI Base Palette */
+  /* Manus AI Base Palette */
   --color-base-black-deep: #0a0a0a;
   --color-base-black-elevated: #161616;
   --color-base-charcoal-light: #232323;
@@ -166,7 +166,7 @@ body {
   animation: spin-slow 3s linear infinite;
 }
 
-/* Sparkle specific selection */
+/* Manus specific selection */
 ::selection {
   background: rgba(52, 50, 45, 0.5);
   color: inherit;
@@ -531,8 +531,7 @@ body {
 }
 
 
-
-/* Custom Vortex Loader */
+/* --- Loader Styles --- */
 .sp-vortex-loader {
   width: 2rem;
   height: 2rem;

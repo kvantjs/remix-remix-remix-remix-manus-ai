@@ -6,16 +6,26 @@ import './index.css';
 // Ensure standard React hooks and React object are globally available on window
 // to prevent any 'useEffect is not defined' in dynamically evaluated runtime code
 if (typeof window !== 'undefined') {
-  window['React'] = React;
-  window['useEffect'] = React.useEffect;
-  window['useState'] = React.useState;
-  window['useRef'] = React.useRef;
-  window['useMemo'] = React.useMemo;
-  window['useCallback'] = React.useCallback;
-  window['useContext'] = React.useContext;
-  window['useReducer'] = React.useReducer;
-  window['useId'] = React.useId;
-  window['useLayoutEffect'] = React.useLayoutEffect;
+  // @ts-ignore
+  window.React = React;
+  // @ts-ignore
+  window.useEffect = React.useEffect;
+  // @ts-ignore
+  window.useState = React.useState;
+  // @ts-ignore
+  window.useRef = React.useRef;
+  // @ts-ignore
+  window.useMemo = React.useMemo;
+  // @ts-ignore
+  window.useCallback = React.useCallback;
+  // @ts-ignore
+  window.useContext = React.useContext;
+  // @ts-ignore
+  window.useReducer = React.useReducer;
+  // @ts-ignore
+  window.useId = React.useId;
+  // @ts-ignore
+  window.useLayoutEffect = React.useLayoutEffect;
 }
 
 const rootElement = document.getElementById('root');

@@ -12,7 +12,7 @@ import { ToolCallTrace } from './types/project';
 export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('sparkle-theme') as 'light' | 'dark') || 'dark';
+      return (localStorage.getItem('manus-theme') as 'light' | 'dark') || 'dark';
     }
     return 'dark';
   });
@@ -24,7 +24,7 @@ export default function App() {
   const toggleTheme = useCallback(() => {
     setTheme(prev => {
       const next = prev === 'dark' ? 'light' : 'dark';
-      localStorage.setItem('sparkle-theme', next);
+      localStorage.setItem('manus-theme', next);
       return next;
     });
   }, []);

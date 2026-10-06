@@ -267,7 +267,7 @@ export function KvantComputer({
     y: 190,
     visible: true,
     isClicking: false,
-    label: 'Sparkle',
+    label: 'Manus',
     status: 'Agente no controle'
   });
   
@@ -277,6 +277,7 @@ export function KvantComputer({
 
   const [userControlMode, setUserControlMode] = useState<boolean>(false);
   const [forceLiveIframe, setForceLiveIframe] = useState<boolean>(false);
+  const [forceIdle, setForceIdle] = useState<boolean>(false);
   const prevIsWorkingRef = useRef(isWorking);
 
   // Check if customFiles has an active React code file
@@ -300,6 +301,16 @@ export function KvantComputer({
     return /captcha|recaptcha|hcaptcha|turnstile|cloudflare|challenge|just a moment|human|robot|bot|security check|verificaç|verifique|desafio|ddos|nowsecure|perimeterx|datadome|arkose|puzzle|shield|atencao|atenção/i.test(textToScan);
   })();
 
+  // Define if the computer is currently in an idle/finished state
+  const isIdle = isComputerActive && (forceIdle || (!isWorking && !isLoading && !userControlMode && !liveScreenshot && !customCode));
+
+  // Reset forceIdle when active work or interaction begins
+  useEffect(() => {
+    if (isWorking || isLoading || userControlMode) {
+      setForceIdle(false);
+    }
+  }, [isWorking, isLoading, userControlMode]);
+
   // Automatically "close" the browser and clear content when the agent finishes its work
   useEffect(() => {
     if (prevIsWorkingRef.current && !isWorking) {
@@ -316,14 +327,15 @@ export function KvantComputer({
   // Inactivity fallback: If no interaction or state change happens for 30s, 
   // automatically close the browser and show the Idle screen.
   useEffect(() => {
-    // Only track inactivity if the computer is active and showing content
-    if (!isComputerActive || (!liveScreenshot && !customCode && iframeLoaded)) return;
+    // Only track inactivity if the computer is active and NOT already idle
+    if (!isComputerActive || isIdle) return;
 
     // Reset timer on any significant state change (monitored via dependencies)
     const inactivityTimer = setTimeout(() => {
       // Small safety check: don't close if user is manually controlling or it's a security challenge
       if (userControlMode || isCaptchaOrChallenge) return;
 
+      setForceIdle(true);
       setLiveScreenshot(null);
       setIframeLoaded(false);
       setForceLiveIframe(false);
@@ -342,7 +354,8 @@ export function KvantComputer({
     liveScreenshot, 
     customCode, 
     isComputerActive,
-    currentUrl
+    currentUrl,
+    isIdle
   ]);
 
   const shouldShowLiveIframe = forceLiveIframe || userControlMode || isCaptchaOrChallenge || !liveScreenshot;
@@ -424,7 +437,7 @@ export function KvantComputer({
         y: 45,
         visible: true,
         isClicking: false,
-        label: 'Sparkle',
+        label: 'Manus',
         status: `Acessando ${displayHostname}...`
       });
 
@@ -458,7 +471,7 @@ export function KvantComputer({
           y: 200,
           visible: true,
           isClicking: false,
-          label: 'Sparkle',
+          label: 'Manus',
           status: `Interagindo em ${displayHostname}`
         });
       }, 1400);
@@ -494,7 +507,7 @@ export function KvantComputer({
         y: 240,
         visible: true,
         isClicking: false,
-        label: 'Sparkle',
+        label: 'Manus',
         status: `Clicando em "${targetVal}"...`
       });
 
@@ -517,7 +530,7 @@ export function KvantComputer({
         y: 260,
         visible: true,
         isClicking: false,
-        label: 'Sparkle',
+        label: 'Manus',
         status: 'Rolando a página...'
       });
 
@@ -542,7 +555,7 @@ export function KvantComputer({
         y: 160,
         visible: true,
         isClicking: true,
-        label: 'Sparkle',
+        label: 'Manus',
         status: `Digitando: "${targetVal}"`
       });
       setActiveTypingBanner(targetVal);
@@ -716,11 +729,11 @@ export function KvantComputer({
       <div className="h-8 px-4 bg-bg-surface-panel border-b border-border-divider-subtle flex items-center justify-between text-xs shrink-0 select-none">
         <div className="flex items-center gap-2 overflow-hidden truncate">
           <span className="text-text-content-secondary font-normal text-[11.5px] tracking-tight">
-            {!isComputerActive ? 'Computador do Core Inativo' : (isLoading ? 'Sparkle está interagindo...' : 'Sparkle está usando o Navegador')}
+            {!isComputerActive ? 'Computador do Kvant Inativo' : (isLoading ? 'Manus está interagindo...' : 'Manus está usando o Navegador')}
           </span>
           <span className="text-border-divider-subtle text-xs">|</span>
           <span className="text-text-content-secondary/80 font-mono text-[11px] truncate tracking-tight">
-            {!isComputerActive ? 'core://computador-inativo' : currentUrl}
+            {!isComputerActive ? 'manus://computador-inativo' : currentUrl}
           </span>
         </div>
 
@@ -775,13 +788,13 @@ export function KvantComputer({
               {/* Image requested by user with no background container */}
               <img 
                 src="https://imgdb.io/i/kescF0A.png" 
-                alt="O computador do Core está inativo" 
+                alt="O computador do Kvant está inativo" 
                 className="w-56 sm:w-64 md:w-72 h-auto object-contain drop-shadow-md"
               />
 
               {/* Title text */}
               <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight">
-                Computador Sparkle v1.0.1
+                Computador Manus v1.0.1
               </h3>
 
               {/* Subtext */}
@@ -789,7 +802,7 @@ export function KvantComputer({
                 Envie uma instrução ao agente no chat para ligar o computador e iniciar as automações.
               </p>
           </div>
-        ) : (!isWorking && !isLoading && !userControlMode && !liveScreenshot && !customCode) ? (
+        ) : isIdle ? (
           /* ACTIVE BUT IDLE COMPUTER SCREEN (NOTHING TO SHOW) */
           <div className="flex-1 bg-bg-canvas-main flex flex-col items-center justify-center p-6 text-center select-none overflow-y-auto space-y-4 animate-in fade-in duration-500">
               <img 
@@ -870,7 +883,7 @@ export function KvantComputer({
                             <div className="bg-[#50a2ff] px-2 py-0.5 rounded-md mb-1">
                               <p className="text-xs font-bold text-[#ffffff] tracking-wide uppercase">{agentCursor.status || 'Interagindo com a página...'}</p>
                             </div>
-                            <p className="text-[10px] text-[#cecece] font-mono"><span className="text-[#828282] mr-1">›</span>Agente Sparkle em controle remoto</p>
+                            <p className="text-[10px] text-[#cecece] font-mono"><span className="text-[#828282] mr-1">›</span>Agente Manus em controle remoto</p>
                           </div>
                         </div>
                       </div>
@@ -948,17 +961,12 @@ export function KvantComputer({
               </div>
             )}
 
-            {userControlMode && (
-              <div className="absolute left-3 bottom-3 z-40 flex items-center gap-2 rounded-full border border-zinc-500/30 bg-[#1a1a1a]/90 px-3 py-1.5 text-[10px] text-zinc-300 shadow-xl backdrop-blur-md">
-                <Hand size={12} />
-                <span>Você está no controle · clique e navegue normalmente</span>
-              </div>
-            )}
+            {/* Removed "Você está no controle" banner per simplicity request */}
           </div>
         )}
 
         {/* AGENT MOUSE CURSOR: Positioned over the remote desktop */}
-        {agentCursor.visible && isComputerActive && (isWorking || isLoading || userControlMode || liveScreenshot || customCode) && (
+        {agentCursor.visible && isComputerActive && !isLoading && !isIdle && (isWorking || userControlMode || liveScreenshot || customCode) && (
           <span 
             className="absolute pointer-events-none transition-all duration-300 ease-out z-50 bg-transparent !bg-transparent border-none !border-none shadow-none !shadow-none"
             style={{
@@ -1076,7 +1084,7 @@ export function KvantComputer({
             {!isComputerActive ? (
               <div className="flex items-center gap-2 text-zinc-400">
                 <span className="size-2 rounded-full bg-zinc-600" />
-                <span>O computador do Core está inativo</span>
+                <span>O computador do Kvant está inativo</span>
               </div>
             ) : isWorking ? (
               <div className="flex items-center gap-1.5 text-zinc-400">
