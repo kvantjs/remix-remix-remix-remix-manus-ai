@@ -3,7 +3,6 @@ import {
   SkipBack, 
   SkipForward, 
   Check, 
-  Lock, 
   Spinner, 
   Globe, 
   Hand, 
@@ -209,43 +208,16 @@ export function KvantComputer({
   agentIntent,
   browserStatus: externalBrowserStatus
 }: KvantComputerProps) {
+  // --- 1. React State & Reference Hooks (Declared first to follow React guidelines and avoid TDZ errors) ---
   const [currentUrl, setCurrentUrl] = useState<string>('https://news.ycombinator.com');
-
-  // Trigger computer activation when research or computer intent is detected
-  useEffect(() => {
-    if (agentIntent && (agentIntent.mode === 'web_research' || agentIntent.mode === 'cloud_computer') && !isComputerActive) {
-      handleTurnOnComputer();
-    }
-  }, [agentIntent]);
-
   const [pageTitle, setPageTitle] = useState<string>('Hacker News');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isExternalWeb, setIsExternalWeb] = useState<boolean>(true);
   const [liveScreenshot, setLiveScreenshot] = useState<string | null>(null);
   const [browserStatus, setBrowserStatus] = useState<'loading' | 'interactive' | 'error' | 'blocked'>('interactive');
-  
-  // Update browserStatus from props if provided
-  useEffect(() => {
-    if (externalBrowserStatus) {
-      setBrowserStatus(externalBrowserStatus);
-    }
-  }, [externalBrowserStatus]);
   const [iframeLoaded, setIframeLoaded] = useState<boolean>(false);
-
-  // Computer active / inactive state (Inactive by default per user request)
   const [isComputerActive, setIsComputerActive] = useState<boolean>(false);
-
-  const handleTurnOnComputer = (targetUrlAfterBoot?: string) => {
-    setIsComputerActive(true);
-    if (targetUrlAfterBoot) {
-      setCurrentUrl(targetUrlAfterBoot);
-      setPageTitle(new URL(targetUrlAfterBoot).hostname || targetUrlAfterBoot);
-    }
-  };
-
-  const handleTurnOffComputer = () => {
-    setIsComputerActive(false);
-  };
+  const [forceIdle, setForceIdle] = useState<boolean>(false);
 
   // History stack for navigation & scrubber
   const [navHistory, setNavHistory] = useState<NavHistoryItem[]>([
@@ -276,19 +248,23 @@ export function KvantComputer({
   const [typedKeys, setTypedKeys] = useState<string[]>([]);
   const [activeTypingBanner, setActiveTypingBanner] = useState<string | null>(null);
 
-  // Exclusive agent mode notification when user tries to click the remote desktop
-  const [showObserverNotice, setShowObserverNotice] = useState<boolean>(false);
   const [userControlMode, setUserControlMode] = useState<boolean>(false);
   const [forceLiveIframe, setForceLiveIframe] = useState<boolean>(false);
-  const noticeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const prevIsWorkingRef = useRef(isWorking);
+
+  // --- 2. Derived Computations (Safe from Temporal Dead Zone errors as all hooks are declared) ---
+  const customCode = 
+    customFiles?.['client/src/App.tsx'] || 
+    customFiles?.['App.tsx'] ||
+    (customFiles && Object.keys(customFiles).length > 0 ? Object.values(customFiles)[0] : undefined);
 
   // Multi-source CAPTCHA and Security Challenge Scanner
   const isCaptchaOrChallenge = (() => {
     const textToScan = [
-      currentUrl,
-      pageTitle,
-      statusText,
-      contextText,
+      currentUrl ?? '',
+      pageTitle ?? '',
+      statusText ?? '',
+      contextText ?? '',
       toolCalls?.[toolCalls.length - 1]?.screenData?.title || '',
       toolCalls?.[toolCalls.length - 1]?.screenData?.actionDescription || '',
       toolCalls?.[toolCalls.length - 1]?.arguments?.url || ''
@@ -296,6 +272,101 @@ export function KvantComputer({
 
     return /captcha|recaptcha|hcaptcha|turnstile|cloudflare|challenge|just a moment|human|robot|bot|security check|verificaç|verifique|desafio|ddos|nowsecure|perimeterx|datadome|arkose|puzzle|shield|atencao|atenção/i.test(textToScan);
   })();
+
+  // Centralized Idle state flag
+  const isIdle = forceIdle || (!isWorking && !isLoading && !userControlMode && !liveScreenshot && !customCode);
+
+  // Trigger computer activation when research or computer intent is detected
+  useEffect(() => {
+    if (agentIntent && (agentIntent.mode === 'web_research' || agentIntent.mode === 'cloud_computer') && !isComputerActive) {
+      handleTurnOnComputer();
+    }
+  }, [agentIntent]);
+
+  // Update browserStatus from props if provided
+  useEffect(() => {
+    if (externalBrowserStatus) {
+      setBrowserStatus(externalBrowserStatus);
+    }
+  }, [externalBrowserStatus]);
+
+  const handleTurnOnComputer = (targetUrlAfterBoot?: string) => {
+    setIsComputerActive(true);
+    setForceIdle(false);
+    if (targetUrlAfterBoot) {
+      setCurrentUrl(targetUrlAfterBoot);
+      setPageTitle(new URL(targetUrlAfterBoot).hostname || targetUrlAfterBoot);
+    }
+  };
+
+  const handleTurnOffComputer = () => {
+    setIsComputerActive(false);
+    setForceIdle(true);
+  };
+
+  // Reset forceIdle to false on any active agent/user interaction or prompt change
+  useEffect(() => {
+    if (isWorking || isLoading || userControlMode) {
+      setForceIdle(false);
+    }
+  }, [isWorking, isLoading, userControlMode]);
+
+  useEffect(() => {
+    if (toolCalls && toolCalls.length > 0) {
+      setForceIdle(false);
+    }
+  }, [toolCalls?.length]);
+
+  useEffect(() => {
+    if (contextText) {
+      setForceIdle(false);
+    }
+  }, [contextText]);
+
+  // Automatically "close" the browser and clear content when the agent finishes its work
+  useEffect(() => {
+    if (prevIsWorkingRef.current && !isWorking) {
+      // Immediately set the computer to Idle/Processamento Concluído as requested
+      setLiveScreenshot(null);
+      setIframeLoaded(false);
+      setForceIdle(true);
+    }
+    prevIsWorkingRef.current = isWorking;
+  }, [isWorking]);
+
+  // Inactivity fallback: If no interaction or state change happens for 30s, 
+  // automatically close the browser and show the Processamento Concluído screen.
+  useEffect(() => {
+    // Only track inactivity if the computer is active and we are NOT already idle
+    if (!isComputerActive || isIdle) return;
+
+    // Reset timer on any significant state change (monitored via dependencies)
+    const inactivityTimer = setTimeout(() => {
+      // Small safety check: don't close if user is manually controlling or it's a security challenge
+      if (userControlMode || isCaptchaOrChallenge) return;
+
+      setLiveScreenshot(null);
+      setIframeLoaded(false);
+      setForceLiveIframe(false);
+      setForceIdle(true);
+    }, 30000); // 30 seconds
+
+    return () => clearTimeout(inactivityTimer);
+  }, [
+    isWorking, 
+    isLoading, 
+    userControlMode, 
+    isCaptchaOrChallenge,
+    agentCursor.x, 
+    agentCursor.y, 
+    agentCursor.status,
+    toolCalls?.length, 
+    liveScreenshot, 
+    customCode, 
+    isComputerActive,
+    currentUrl,
+    isIdle
+  ]);
 
   const shouldShowLiveIframe = forceLiveIframe || userControlMode || isCaptchaOrChallenge || !liveScreenshot;
 
@@ -313,12 +384,6 @@ export function KvantComputer({
   useEffect(() => {
     return () => clearAllAnimationTimers();
   }, []);
-
-  // Check if customFiles has an active React code file
-  const customCode = 
-    customFiles?.['client/src/App.tsx'] || 
-    customFiles?.['App.tsx'] ||
-    (customFiles && Object.keys(customFiles).length > 0 ? Object.values(customFiles)[0] : undefined);
 
   // Listen to postMessage from the proxied live website
   useEffect(() => {
@@ -651,34 +716,9 @@ export function KvantComputer({
     }
   };
 
-  // Observer notice on user attempt to click directly in viewport
-  const handleUserAttemptClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    setShowObserverNotice(true);
-    if (noticeTimeoutRef.current) clearTimeout(noticeTimeoutRef.current);
-    noticeTimeoutRef.current = setTimeout(() => {
-      setShowObserverNotice(false);
-    }, 2800);
-
-    const rect = chromiumWindowRef.current?.getBoundingClientRect();
-    if (rect) {
-      const relX = Math.max(20, Math.min(rect.width - 20, e.clientX - rect.left));
-      const relY = Math.max(40, Math.min(rect.height - 20, e.clientY - rect.top));
-      setAgentCursor(prev => ({
-        ...prev,
-        x: relX,
-        y: relY,
-        status: 'Controle exclusivo do agente'
-      }));
-    }
-  };
-
   const toggleUserControl = () => {
     setUserControlMode((current) => {
       const next = !current;
-      setShowObserverNotice(false);
       setLiveScreenshot(null);
       setIframeLoaded(false);
       setAgentCursor((cursor) => ({
@@ -757,14 +797,14 @@ export function KvantComputer({
           <div className="flex-1 bg-bg-canvas-main flex flex-col items-center justify-center p-6 text-center select-none overflow-y-auto space-y-4">
               {/* Image requested by user with no background container */}
               <img 
-                src="https://imgdb.io/i/KnGlMFk.png" 
+                src="https://imgdb.io/i/kescF0A.png" 
                 alt="O computador do Core está inativo" 
                 className="w-56 sm:w-64 md:w-72 h-auto object-contain drop-shadow-md"
               />
 
               {/* Title text */}
               <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight">
-                O computador do Core está inativo
+                Computador Sparkle v1.0.1
               </h3>
 
               {/* Subtext */}
@@ -772,10 +812,26 @@ export function KvantComputer({
                 Envie uma instrução ao agente no chat para ligar o computador e iniciar as automações.
               </p>
           </div>
+        ) : isIdle ? (
+          /* ACTIVE BUT IDLE COMPUTER SCREEN (NOTHING TO SHOW) */
+          <div className="flex-1 bg-bg-canvas-main flex flex-col items-center justify-center p-6 text-center select-none overflow-y-auto space-y-4 animate-in fade-in duration-500">
+              <img 
+                src="https://imgdb.io/i/-E1nG20.png" 
+                alt="Nada para mostrar" 
+                className="w-56 sm:w-64 md:w-72 h-auto object-contain drop-shadow-md"
+              />
+
+              <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+                Processamento Concluído
+              </h3>
+
+              <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed max-w-sm">
+                Não há nada para ser mostrado no momento. O agente encerrou a navegação e o sistema está em modo de espera.
+              </p>
+          </div>
         ) : (
           <div 
-            onClick={userControlMode || isCaptchaOrChallenge || forceLiveIframe ? undefined : handleUserAttemptClick}
-            className={`relative flex-1 bg-white overflow-hidden flex flex-col min-h-0 ${userControlMode || isCaptchaOrChallenge || forceLiveIframe ? 'cursor-default select-auto' : 'cursor-not-allowed select-none'}`}
+            className={`relative flex-1 bg-white overflow-hidden flex flex-col min-h-0 ${userControlMode || isCaptchaOrChallenge || forceLiveIframe ? 'cursor-default select-auto pointer-events-auto' : 'pointer-events-none select-none'}`}
           >
             {isLoading && (
               <div className="absolute top-0 left-0 right-0 h-0.5 bg-blue-500 z-30 animate-pulse" />
@@ -819,9 +875,9 @@ export function KvantComputer({
                     </div>
 
                     {isLoading && (
-                      <div className="absolute inset-0 z-10 bg-cyan-500/5 backdrop-blur-[1.5px] flex flex-col items-center justify-center animate-in fade-in duration-300">
-                        <div className="bg-slate-900/90 border border-cyan-500/30 rounded-2xl px-6 py-4 shadow-2xl flex items-center gap-4 scale-110">
-                          <div className="size-6 flex items-center justify-center">
+                      <div className="absolute inset-0 z-10 bg-[#1a1a1a] backdrop-blur-[1.5px] flex flex-col items-center justify-center animate-in fade-in duration-300">
+                        <div className="bg-[#202020] border border-[#404040] rounded-2xl px-6 py-4 shadow-2xl flex items-center gap-4 scale-110">
+                          <div className="size-6 flex items-center justify-center bg-[#404040] rounded-lg">
                             <OrbBloop
                               size={24}
                               audioMode="ambient"
@@ -833,19 +889,21 @@ export function KvantComputer({
                               bloopColorHigh={BLOOP_PALETTES[BloopPaletteName.blue].high}
                             />
                           </div>
-                          <div className="flex flex-col">
-                            <span className="text-xs font-bold text-white tracking-wide uppercase">{agentCursor.status || 'Interagindo com a página...'}</span>
-                            <span className="text-[10px] text-cyan-300/80 font-mono">Agente Sparkle em controle remoto</span>
+                          <div className="flex flex-col bg-[#404040] p-2 rounded-xl">
+                            <div className="bg-[#50a2ff] px-2 py-0.5 rounded-md mb-1">
+                              <p className="text-xs font-bold text-[#ffffff] tracking-wide uppercase">{agentCursor.status || 'Interagindo com a página...'}</p>
+                            </div>
+                            <p className="text-[10px] text-[#cecece] font-mono"><span className="text-[#828282] mr-1">›</span>Agente Sparkle em controle remoto</p>
                           </div>
                         </div>
                       </div>
                     )}
 
                     {browserStatus === 'loading' && !isLoading && (
-                      <div className="absolute inset-0 z-10 bg-black/5 backdrop-blur-[0.5px] flex flex-col items-center justify-center animate-in fade-in duration-300">
-                        <div className="bg-white/95 border border-slate-200 rounded-full px-5 py-2.5 shadow-xl flex items-center gap-3">
-                          <Spinner size={16} className="animate-spin text-blue-500" />
-                          <span className="text-[11px] font-bold text-slate-800 uppercase tracking-tight">Carregando Domínio Real...</span>
+                      <div className="absolute inset-0 z-10 bg-[#1a1a1a] flex flex-col items-center justify-center animate-in fade-in duration-300">
+                        <div className="flex flex-col items-center gap-4">
+                          <div className="sp-vortex-loader" />
+                          <span className="text-[11px] font-bold text-white/50 uppercase tracking-widest animate-pulse">Carregando Domínio Real...</span>
                         </div>
                       </div>
                     )}
@@ -891,14 +949,16 @@ export function KvantComputer({
                       }}
                     />
                     {!iframeLoaded && (
-                      <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#f4f6f8] p-6">
-                        <div className="max-w-sm rounded-2xl border border-slate-200 bg-white/90 px-5 py-4 text-center shadow-xl backdrop-blur-sm">
-                          <div className="mx-auto mb-3 flex size-9 items-center justify-center rounded-full bg-slate-900 text-white overflow-hidden p-1.5">
-                            <Favicon urlOrDomain={currentUrl} size={18} fallbackIcon={<Globe size={16} />} />
+                      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#1a1a1a] p-6 animate-in fade-in duration-500">
+                        <div className="flex flex-col items-center gap-6">
+                          <div className="relative">
+                             <div className="absolute -inset-4 bg-white/5 rounded-full blur-xl animate-pulse" />
+                             <div className="sp-vortex-loader" />
                           </div>
-                          <p className="text-xs font-semibold text-slate-800">Navegador do agente conectado</p>
-                          <p className="mt-1 text-[10px] leading-relaxed text-slate-500">Preparando a captura visual de <span className="font-mono text-slate-600">{pageTitle || currentUrl}</span>.</p>
-                          <div className="mx-auto mt-3 h-1 w-32 overflow-hidden rounded-full bg-slate-200"><div className="h-full w-1/2 rounded-full bg-cyan-500 execution-sheen" /></div>
+                          <div className="text-center space-y-1.5">
+                            <p className="text-xs font-semibold text-white/90 tracking-wide">Navegador do agente conectado</p>
+                            <p className="text-[10px] text-white/40 max-w-[200px] leading-relaxed">Sincronizando ambiente visual para <span className="font-mono text-white/60">{pageTitle || currentUrl}</span></p>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -908,30 +968,6 @@ export function KvantComputer({
             ) : (
                 <div className={`w-full h-full flex-1 relative overflow-auto bg-[#1a1a1a] text-[#f8f8f6] ${userControlMode ? 'pointer-events-auto' : 'pointer-events-none'}`}>
                 <DynamicRuntimeRunner code={customCode} />
-              </div>
-            )}
-
-            {/* Observer Mode / Exclusive Agent Notice (Appears if user clicks into screen) */}
-            {showObserverNotice && !userControlMode && (
-              <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center p-4 z-40 animate-in fade-in duration-200">
-                <div className="bg-[#18181b] border border-cyan-500/30 rounded-xl p-4 max-w-sm w-full shadow-2xl text-center space-y-2.5 animate-in zoom-in-95">
-                  <div className="size-10 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center mx-auto">
-                    <Lock size={18} />
-                  </div>
-                  <div className="text-sm font-semibold text-white">Controle Exclusivo do Agente</div>
-                  <p className="text-xs text-zinc-400 leading-relaxed">
-                    Apenas o <strong>Agente Sparkle</strong> opera este computador na nuvem. Envie instruções pelo chat para navegar ou interagir.
-                  </p>
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowObserverNotice(false);
-                    }}
-                    className="px-4 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-medium transition-colors cursor-pointer"
-                  >
-                    Entendido
-                  </button>
-                </div>
               </div>
             )}
 
@@ -945,50 +981,32 @@ export function KvantComputer({
         )}
 
         {/* AGENT MOUSE CURSOR: Positioned over the remote desktop */}
-        {agentCursor.visible && isComputerActive && (
-          <div 
-            className="absolute pointer-events-none transition-all duration-300 ease-out z-50"
+        {agentCursor.visible && isComputerActive && !isIdle && (isWorking || isLoading || userControlMode || liveScreenshot || customCode) && (
+          <span 
+            className="absolute pointer-events-none transition-all duration-300 ease-out z-50 bg-transparent !bg-transparent border-none !border-none shadow-none !shadow-none"
             style={{
               left: `${agentCursor.x}px`,
-              top: `${agentCursor.y}px`
+              top: `${agentCursor.y}px`,
+              backgroundColor: 'transparent'
             }}
           >
-            <div className="relative flex items-center">
+            <span className="relative flex items-center bg-transparent !bg-transparent" style={{ backgroundColor: 'transparent' }}>
               {agentCursor.isClicking && (
-                <div className="absolute inset-0 size-6 -left-0.5 -top-0.5 rounded-full bg-cyan-400/40 animate-ping" />
+                <span className="absolute inset-0 size-10 -left-2 -top-2 rounded-full bg-blue-500/20 animate-ping" />
               )}
-              <HandPointing size={22} weight="fill" className={`text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] transition-transform ${agentCursor.isClicking ? 'scale-90' : 'scale-100'}`} />
-              
-              {agentCursor.status && (
-                <div className="absolute left-6 top-0 bg-slate-900/90 text-white text-[9px] px-2 py-0.5 rounded border border-white/10 whitespace-nowrap backdrop-blur-sm shadow-xl font-medium tracking-tight">
-                  {agentCursor.status}
-                </div>
-              )}
-            </div>
-          </div>
+              <img 
+                src="https://imgdb.io/i/QpsKRP4.png" 
+                alt="Agent Cursor"
+                className={`size-6 object-contain transition-transform duration-200 bg-transparent !bg-transparent ${agentCursor.isClicking ? 'scale-75 brightness-110' : 'scale-100'}`}
+                style={{ backgroundColor: 'transparent' }}
+              />
+            </span>
+          </span>
         )}
 
-        {/* Agent Keystroke HUD */}
-        {typedKeys.length > 0 && (
-          <div className="absolute top-14 left-1/2 -translate-x-1/2 bg-black/90 backdrop-blur-md border border-zinc-500/40 rounded-xl px-4 py-2 shadow-2xl flex items-center gap-2 z-50 animate-in fade-in zoom-in-95">
-            <span className="text-zinc-400 text-[10px] font-mono uppercase tracking-wider">Teclas do Agente:</span>
-            <div className="flex items-center gap-1">
-              {typedKeys.map((key, i) => (
-                <kbd key={i} className="px-2 py-1 bg-white/10 border border-white/20 rounded text-cyan-300 text-xs font-mono font-bold shadow-xs animate-in zoom-in">
-                  {key}
-                </kbd>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Agent Keystroke HUD removed per user request */}
 
-        {/* Agent Typing Banner */}
-        {activeTypingBanner && (
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-[#09090b]/95 text-zinc-300 text-xs px-4 py-1.5 rounded-full border border-zinc-500/40 shadow-2xl flex items-center gap-2 z-50 animate-in fade-in">
-            <span className="size-2 rounded-full bg-zinc-400 animate-ping" />
-            <span>Agente digitando: <strong>"{activeTypingBanner}"</strong></span>
-          </div>
-        )}
+        {/* Agent Typing Banner removed per user request */}
 
       </div>
 
@@ -1024,14 +1042,14 @@ export function KvantComputer({
             <div className="flex-1 relative flex items-center h-4 group">
               <div className="h-1 w-full bg-[#262626] rounded-full overflow-hidden">
                 <div 
-                  className="h-full bg-white rounded-full transition-all duration-150"
+                  className="h-full bg-blue-500 rounded-full transition-all duration-150 shadow-[0_0_8px_rgba(59,130,246,0.5)]"
                   style={{ width: `${scrubberValue}%` }}
                 />
               </div>
 
               <div 
-                className="absolute size-3 rounded-full bg-white ring-2 ring-white/20 shadow-md transition-all duration-150 pointer-events-none"
-                style={{ left: `calc(${scrubberValue}% - 6px)` }}
+                className="absolute size-1.5 rounded-full bg-blue-500 ring-1 ring-blue-400/30 shadow-md shadow-blue-500/30 transition-all duration-150 pointer-events-none group-hover:scale-110"
+                style={{ left: `calc(${scrubberValue}% - 3px)` }}
               />
 
               <input 
@@ -1066,11 +1084,11 @@ export function KvantComputer({
                   setPageTitle(latest.title);
                 }
               }}
-              className="flex items-center gap-1.5 text-xs text-zinc-400 font-medium shrink-0 cursor-pointer"
+              className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white font-medium shrink-0 cursor-pointer transition-colors"
               title="Voltar ao vivo"
             >
-              <span className={`size-1.5 rounded-full ${isLive ? 'bg-white animate-pulse shadow-[0_0_8px_rgba(255,255,255,0.4)]' : 'bg-zinc-500'}`} />
-              <span className={`text-[11px] ${isLive ? 'text-zinc-200 font-semibold' : 'text-zinc-500'}`}>Ao vivo</span>
+              <span className={`size-1.5 rounded-full ${isLive ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-zinc-500/40'}`} />
+              <span className={`text-[11px] ${isLive ? 'text-white font-semibold drop-shadow-[0_0_6px_rgba(255,255,255,0.3)]' : 'text-zinc-500'}`}>Ao vivo</span>
             </div>
           </div>
         )}

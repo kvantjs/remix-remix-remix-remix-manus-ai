@@ -530,251 +530,50 @@ body {
   .thinking-spinner { animation: none; }
 }
 
-/* User Focused Element Style Rules */
-.dark div#root:nth-of-type(1) > div:nth-of-type(1) > aside:nth-of-type(1) > div:nth-of-type(1) {
-  background-color: #202020;
-}
-.dark div#root:nth-of-type(1) > div:nth-of-type(1) > aside:nth-of-type(1) > nav:nth-of-type(1) {
-  background-color: #202020;
-}
-.dark div#root:nth-of-type(1) > div:nth-of-type(1) > aside:nth-of-type(1) > div:nth-of-type(2) {
-  background-color: #222222;
-}
-.dark div#root:nth-of-type(1) > div:nth-of-type(1) > aside:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) {
-  background-color: #272727;
-}
-.dark div#root:nth-of-type(1) > div:nth-of-type(1) > aside:nth-of-type(1) > nav:nth-of-type(1) > div:nth-of-type(3) > button:nth-of-type(1) {
-  background-color: #292929;
-}
-.dark div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) {
-  background-color: #171717;
-}
-.dark div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) {
-  background-color: #171717;
-}
-.dark div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) {
-  background-color: #1a1a1a;
-  padding-left: 4px;
+
+
+/* Custom Vortex Loader */
+.sp-vortex-loader {
+  width: 2rem;
+  height: 2rem;
+  clear: both;
+  margin: 1rem auto;
+  border: 0.0625rem #fff solid;
+  border-radius: .25rem;
+  overflow: hidden;
+  position: relative;
 }
 
-/* Additional User Focused Element Style Rules */
-.dark div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > button:nth-of-type(1) {
-  background-color: #202020;
-  border-color: #323232;
-  color: #b6b6b6;
-}
-.dark div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) {
-  background-color: #202020;
-  border-color: #323232;
-  color: #c2c2c2;
-}
-.dark div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > svg:nth-of-type(1) {
-  color: #d8d8d8;
-}
-.dark div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > span:nth-of-type(1) {
-  color: #ffffff;
-}
-.dark div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) {
-  background-color: #1a1a1a !important;
-  border-width: 0px !important;
-  border-color: #1a1a1a !important;
-}
-.light div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) {
-  background-color: #1a1a1a !important;
-  border-width: 0px !important;
-  border-color: #1a1a1a !important;
-}
-.dark div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) {
-  background-color: #1a1a1a !important;
-}
-.light div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) {
-  background-color: #1a1a1a !important;
-}
-.dark div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) {
-  border-width: 0px !important;
-}
-.light div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) {
-  border-width: 0px !important;
+.sp-vortex-loader:after, .sp-vortex-loader:before {
+  content: '';
+  border-radius: 50%;
+  position: absolute;
+  width: inherit;
+  height: inherit;
+  animation: spVortex 2s infinite linear;
 }
 
-.light div#root:nth-of-type(1) > div:nth-of-type(1) > aside:nth-of-type(1) > div:nth-of-type(1) {
-  background-color: #FAF9F6;
-}
-.light div#root:nth-of-type(1) > div:nth-of-type(1) > aside:nth-of-type(1) > nav:nth-of-type(1) {
-  background-color: #FAF9F6;
-}
-.light div#root:nth-of-type(1) > div:nth-of-type(1) > aside:nth-of-type(1) > div:nth-of-type(2) {
-  background-color: #F4F3F0;
-}
-.light div#root:nth-of-type(1) > div:nth-of-type(1) > aside:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) {
-  background-color: #EAE9E5;
-}
-.light div#root:nth-of-type(1) > div:nth-of-type(1) > aside:nth-of-type(1) > nav:nth-of-type(1) > div:nth-of-type(3) > button:nth-of-type(1) {
-  background-color: #EAE9E5;
-}
-.light div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) {
-  background-color: #FAF9F6;
-}
-.light div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) {
-  background-color: #FAF9F6;
-}
-.light div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) {
-  background-color: #F4F3F0;
-  padding-left: 4px;
-}
-.light div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > button:nth-of-type(1) {
-  background-color: #EAE9E5;
-  border-color: #C0BDB8;
-  color: #1A1A18;
-}
-.light div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) {
-  background-color: #EAE9E5;
-  border-color: #C0BDB8;
-  color: #1A1A18;
-}
-.light div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > svg:nth-of-type(1) {
-  color: #1A1A18;
-}
-.light div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > span:nth-of-type(1) {
-  color: #1A1A18;
+.sp-vortex-loader:before {
+  border-top: 0.375rem #fff solid;
+  top: -0.1875rem;
+  left: calc( -50% - 0.1875rem );
+  transform-origin: right center;
 }
 
-/* Hardcoded Dark Value Overrides for Light Mode */
-.light .bg-\[\#08080a\] { background-color: var(--color-bg-canvas-main) !important; }
-.light .bg-\[\#121212\] { background-color: var(--color-bg-canvas-main) !important; }
-.light .bg-\[\#141414\] { background-color: var(--color-bg-canvas-main) !important; }
-.light .bg-\[\#1c1c1c\] { background-color: var(--color-bg-surface-panel) !important; }
-.light .bg-\[\#202020\] { background-color: var(--color-bg-surface-panel) !important; }
-.light .bg-\[\#151515\] { background-color: var(--color-bg-surface-panel) !important; }
-.light .bg-\[\#181818\] { background-color: var(--color-bg-surface-panel) !important; }
-.light .bg-\[\#1a1a1a\] { background-color: var(--color-bg-surface-panel) !important; }
-.light .bg-\[\#242424\] { background-color: var(--color-bg-surface-panel) !important; }
-.light .bg-white\/8 { background-color: var(--color-bg-action-hover) !important; }
-.light .bg-white\/10 { background-color: var(--color-bg-action-hover) !important; }
-
-/* Text Overrides */
-.light .text-white { color: var(--color-text-content-primary) !important; }
-.light .text-white\/45 { color: var(--color-text-content-secondary) !important; opacity: 0.75; }
-.light .text-white\/70 { color: var(--color-text-content-primary) !important; opacity: 0.85; }
-.light .text-white\/80 { color: var(--color-text-content-primary) !important; opacity: 0.9; }
-.light .text-white\/65 { color: var(--color-text-content-secondary) !important; opacity: 0.8; }
-.light .text-white\/30 { color: var(--color-text-content-secondary) !important; opacity: 0.5; }
-.light .text-white\/10 { color: var(--color-border-divider-subtle) !important; }
-
-/* Border Overrides */
-.light .border-white\/8 { border-color: var(--color-border-divider-subtle) !important; }
-.light .border-white\/7 { border-color: var(--color-border-divider-subtle) !important; }
-.light .border-white\/5 { border-color: var(--color-border-divider-subtle) !important; }
-.light .border-white\/10 { border-color: var(--color-border-divider-subtle) !important; }
-.light .border-white\/15 { border-color: var(--color-border-divider-subtle) !important; }
-.light .border-\[\#333333\] { border-color: var(--color-border-divider-subtle) !important; }
-
-/* Focus Mode Style Additions */
-div#root:nth-of-type(1) > div:nth-of-type(1) > aside:nth-of-type(1) > div:nth-of-type(2) {
-  background-color: #222222 !important;
-}
-div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) {
-  background-color: #1a1a1a !important;
-}
-div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) {
-  background-color: #1a1a1a !important;
-}
-div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) {
-  background-color: #1a1a1a !important;
-}
-div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(2) {
-  background-color: #1a1a1a !important;
-  border-radius: 5px !important;
-  border-color: #292929 !important;
-}
-div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) {
-  background-color: #1a1a1a !important;
-}
-div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > button:nth-of-type(1) {
-  background-color: #242424 !important;
-}
-div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > button:nth-of-type(2) {
-  background-color: #1a1a1a !important;
-  border-color: #323232 !important;
-}
-div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > button:nth-of-type(2) > span:nth-of-type(1) {
-  color: #d5d5d5 !important;
-}
-div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > button:nth-of-type(1) > svg:nth-of-type(1) {
-  color: #969696 !important;
-}
-div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > button:nth-of-type(2) > svg:nth-of-type(1) {
-  color: #8c8c8c !important;
+.sp-vortex-loader:after {
+  border-bottom: 0.375rem #fff solid;
+  top: 0.1875rem;
+  right: calc( -50% - 0.1875rem );
+  transform-origin: left center;
 }
 
-div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) {
-  background-color: #1a1a1a !important;
-}
-div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) {
-  background-color: #1a1a1a !important;
-}
-div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) {
-  background-color: #1a1a1a !important;
-}
-div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > svg:nth-of-type(1) {
-  background-color: #202020 !important;
-  color: #e0e0e0 !important;
-}
-div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) {
-  background-color: #202020 !important;
-  border-color: #323232 !important;
-}
-div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > button:nth-of-type(1) > svg:nth-of-type(1) {
-  color: #bababa !important;
-}
-div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > button:nth-of-type(2) > svg:nth-of-type(1) {
-  color: #d8d8d8 !important;
-}
-div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > button:nth-of-type(3) > svg:nth-of-type(1) {
-  color: #c5c5c5 !important;
-}
-div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > button:nth-of-type(4) > svg:nth-of-type(1) {
-  color: #d3d3d3 !important;
-}
-div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > button:nth-of-type(3) > svg:nth-of-type(1) {
-  background-color: #1a1a1a !important;
-  color: #747474 !important;
-}
-div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) {
-  border-width: 0px !important;
-}
-div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) {
-  background-color: #1a1a1a !important;
-  border-radius: 5px !important;
-}
-
-div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(3) {
-  background-color: #1a1a1a !important;
-}
-div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(3) > div:nth-of-type(1) > div:nth-of-type(1) > img:nth-of-type(1) {
-  background-color: #1a1a1a !important;
-}
-
-div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(2) > span:nth-of-type(1) {
-  color: #797979 !important;
-}
-div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(1) {
-  background-color: #1a1a1a !important;
-}
-div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(3) {
-  background-color: #1a1a1a !important;
-}
-
-div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) {
-  background-color: #1f1f1f !important;
-  color: #909090 !important;
-  border-color: #272727 !important;
-}
-div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > button:nth-of-type(2) {
-  background-color: #272727 !important;
-}
-div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > textarea:nth-of-type(1) {
-  color: #F5f5f5 !important;
+@keyframes spVortex {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(359deg);
+  }
 }
 
 

@@ -123,6 +123,51 @@ function createSafeFunction(scope: Record<string, any>, body: string) {
   };
 }
 
+// Safe hook factory that prevents fatal crashes when hooks are evaluated outside of component rendering
+const safeHook = <T extends (...args: any[]) => any>(hookName: string, fallback: T): T => {
+  return ((...args: any[]) => {
+    try {
+      const realHook = (React as any)[hookName];
+      if (typeof realHook === 'function') {
+        return realHook(...args);
+      }
+    } catch {
+      // Hook was invoked outside of a React component render pass
+      return fallback(...args);
+    }
+    return fallback(...args);
+  }) as T;
+};
+
+const safeUseState = safeHook('useState', (init: any) => {
+  const val = typeof init === 'function' ? init() : init;
+  return [val, () => {}];
+});
+
+const safeUseEffect = safeHook('useEffect', () => {});
+const safeUseLayoutEffect = safeHook('useLayoutEffect', () => {});
+const safeUseMemo = safeHook('useMemo', (fn: any) => (typeof fn === 'function' ? fn() : fn));
+const safeUseCallback = safeHook('useCallback', (fn: any) => fn);
+const safeUseRef = safeHook('useRef', (init: any) => ({ current: init }));
+const safeUseContext = safeHook('useContext', () => ({}));
+const safeUseReducer = safeHook('useReducer', (_reducer: any, init: any) => [init, () => {}]);
+const safeUseId = safeHook('useId', () => 'dynamic-id-' + Math.random().toString(36).slice(2, 7));
+
+const SafeReact = new Proxy(React, {
+  get(target: any, prop: string) {
+    if (prop === 'useState') return safeUseState;
+    if (prop === 'useEffect') return safeUseEffect;
+    if (prop === 'useLayoutEffect') return safeUseLayoutEffect;
+    if (prop === 'useMemo') return safeUseMemo;
+    if (prop === 'useCallback') return safeUseCallback;
+    if (prop === 'useRef') return safeUseRef;
+    if (prop === 'useContext') return safeUseContext;
+    if (prop === 'useReducer') return safeUseReducer;
+    if (prop === 'useId') return safeUseId;
+    return target[prop];
+  }
+});
+
 // Helper to sanitize code before passing to Babel
 function sanitizeSourceCode(rawCode: string): { code: string; mainComponentName: string } {
   if (!rawCode) return { code: '', mainComponentName: 'App' };
@@ -263,16 +308,16 @@ export function DynamicRuntimeRunner({ code, customFiles = {} }: DynamicRuntimeR
 
           if (subCompiled) {
             const subScope: Record<string, any> = {
-              React,
-              useState: React.useState,
-              useEffect: React.useEffect,
-              useContext: React.useContext,
-              useReducer: React.useReducer,
-              useCallback: React.useCallback,
-              useMemo: React.useMemo,
-              useRef: React.useRef,
-              useId: React.useId,
-              useLayoutEffect: React.useLayoutEffect,
+              React: SafeReact,
+              useState: safeUseState,
+              useEffect: safeUseEffect,
+              useContext: safeUseContext,
+              useReducer: safeUseReducer,
+              useCallback: safeUseCallback,
+              useMemo: safeUseMemo,
+              useRef: safeUseRef,
+              useId: safeUseId,
+              useLayoutEffect: safeUseLayoutEffect,
               Fragment: React.Fragment,
               createElement: React.createElement,
               cloneElement: React.cloneElement,
@@ -347,30 +392,30 @@ export function DynamicRuntimeRunner({ code, customFiles = {} }: DynamicRuntimeR
 
       // Ensure hooks are available on window/globalThis for any loose execution
       if (typeof window !== 'undefined') {
-        (window as any).React = React;
-        (window as any).useEffect = React.useEffect;
-        (window as any).useState = React.useState;
-        (window as any).useRef = React.useRef;
-        (window as any).useMemo = React.useMemo;
-        (window as any).useCallback = React.useCallback;
-        (window as any).useContext = React.useContext;
-        (window as any).useReducer = React.useReducer;
-        (window as any).useId = React.useId;
-        (window as any).useLayoutEffect = React.useLayoutEffect;
+        (window as any).React = SafeReact;
+        (window as any).useEffect = safeUseEffect;
+        (window as any).useState = safeUseState;
+        (window as any).useRef = safeUseRef;
+        (window as any).useMemo = safeUseMemo;
+        (window as any).useCallback = safeUseCallback;
+        (window as any).useContext = safeUseContext;
+        (window as any).useReducer = safeUseReducer;
+        (window as any).useId = safeUseId;
+        (window as any).useLayoutEffect = safeUseLayoutEffect;
       }
 
       // 4. Assemble execution scope with all subcomponents and helpers
       const scope: Record<string, any> = {
-        React,
-        useState: React.useState,
-        useEffect: React.useEffect,
-        useContext: React.useContext,
-        useReducer: React.useReducer,
-        useCallback: React.useCallback,
-        useMemo: React.useMemo,
-        useRef: React.useRef,
-        useId: React.useId,
-        useLayoutEffect: React.useLayoutEffect,
+        React: SafeReact,
+        useState: safeUseState,
+        useEffect: safeUseEffect,
+        useContext: safeUseContext,
+        useReducer: safeUseReducer,
+        useCallback: safeUseCallback,
+        useMemo: safeUseMemo,
+        useRef: safeUseRef,
+        useId: safeUseId,
+        useLayoutEffect: safeUseLayoutEffect,
         Fragment: React.Fragment,
         createElement: React.createElement,
         cloneElement: React.cloneElement,
