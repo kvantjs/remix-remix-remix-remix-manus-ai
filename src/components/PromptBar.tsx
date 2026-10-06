@@ -5,15 +5,16 @@ import { createShader, playSweep, accentChain, ACCENTS } from "glimm";
 
 /* The built-in "prism" palette is only cyan→indigo→magenta, so a sweep
  * reads as blue/purple. Build a true full-spectrum rainbow instead. */
-const RAINBOW = accentChain([
-  ACCENTS.red,
-  ACCENTS.orange,
-  ACCENTS.yellow,
-  ACCENTS.green,
-  ACCENTS.cyan,
-  ACCENTS.blue,
-  ACCENTS.purple,
-]);
+const RAINBOW_COLORS = [
+  "#FF3D7F", // red
+  "#FF7A1A", // orange
+  "#FFD600", // yellow
+  "#C2FF3D", // green
+  "#1FC8FF", // cyan
+  "#2E70FF", // blue
+  "#D33CFF", // purple
+];
+const RAINBOW = accentChain(RAINBOW_COLORS);
 
 /* ─────────────────────────────────────────────────────────
  * PROMPT BAR
@@ -635,8 +636,8 @@ export default function PromptBar({
                 >
                   <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-ink">{m.name}</span>
                   <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded font-mono ${
-                    m.tag === 'Flagship' ? 'bg-purple-500/15 text-purple-400 border border-purple-500/20' :
-                    m.tag === 'Ultra-fast' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20' :
+                    m.tag === 'Flagship' ? 'bg-zinc-500/20 text-zinc-300 border border-zinc-500/30' :
+                    m.tag === 'Ultra-fast' ? 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/20' :
                     'bg-white/5 text-ink-3'
                   }`}>{m.tag}</span>
                   <span className={`shrink-0 text-ink ${m.key === model.key ? "" : "invisible"}`}>

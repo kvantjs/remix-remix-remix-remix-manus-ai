@@ -7,11 +7,16 @@ import {
   Spinner, 
   Globe, 
   Hand, 
-  ShieldWarning
+  ShieldWarning,
+  HandPointing,
+  XCircle
 } from '@phosphor-icons/react';
 import { ToolCallTrace } from '../types/project';
 import { DynamicRuntimeRunner } from './DynamicRuntimeRunner';
 import { Favicon, extractCleanDomain } from '@/lib/favicon';
+import { OrbBloop } from '@/components/orb/bloop/index';
+import { BloopState } from '@/components/orb/bloop/types';
+import { BLOOP_PALETTES, BloopPaletteName } from '@/components/orb/bloop/palettes';
 
 interface KvantComputerProps {
   toolCalls?: ToolCallTrace[];
@@ -21,6 +26,8 @@ interface KvantComputerProps {
   contextText?: string;
   customFiles?: Record<string, string>;
   onRunTestTool?: (prompt: string) => void;
+  agentIntent?: any;
+  browserStatus?: 'loading' | 'interactive' | 'error' | 'blocked';
 }
 
 // Comprehensive Brand & Portal Registry for instant, accurate address navigation
@@ -103,13 +110,24 @@ const KNOWN_WEB_PORTALS: Record<string, string> = {
   anthropic: 'https://www.anthropic.com'
 };
 
+function sanitizeUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname.startsWith('api.')) {
+      // Hard block on api subdomains in the UI to match server policy
+      return 'https://news.ycombinator.com?blocked_api_access';
+    }
+  } catch {}
+  return url;
+}
+
 // Intelligent Web URL Parser - accurately extracts destination URLs requested by user
 export function resolveWebUrl(raw: string): string {
   let clean = (raw || '').trim();
-  if (!clean) return 'https://news.ycombinator.com';
+  if (!clean) return sanitizeUrl('https://news.ycombinator.com');
 
   // 1. Direct explicit URL match (http/https, www, or domain with known TLDs or localhost/IP)
-  const explicitUrlRegex = /(https?:\/\/[^\s"'<>]+|localhost(?::\d+)?(?:\/[^\s"'<>]*)?|127\.0\.0\.1(?::\d+)?(?:\/[^\s"'<>]*)?|www\.[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+(?::\d+)?(?:\/[^\s"'<>]*)?|[a-zA-Z0-9-]+\.(?:com|org|net|edu|gov|io|ai|tech|co|app|br|uk|de|fr|es|it|me|info|tv|xyz|dev|cloud|page|link|shop|store|online|site|space|top|club|pro|cc|to|is|gg|live|news|world|agency|studio|global|fm|social|blog|directory|guru|solutions|design|center|life)(?:\.[a-zA-Z]{2,3})*(?::\d+)?(?:\/[^\s"'<>]*)?)/i;
+  const explicitUrlRegex = /(https?:\/\/[^\s"'<>]+|localhost(?::\d+)?(?:\/[^\s"'<>]*)?|127\.0\.0\.1(?::\d+)?(?:\/[^\s"'<>]*)?|www\.[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+(?::\d+)?(?:\/[^\s"'<>]*)?|[a-zA-Z0-9-]+\.(?:com|org|net|edu|gov|io|ai|tech|co|app|br|uk|de|fr|es|it|me|info|tv|xyz|dev|cloud|page|link|shop|store|online|site|space|top|club|pro|cc|to|is|gg|live|news|world|agency|studio|global|fm|social|blog|directory|guru|solutions|design|center|life)(?:\.[a-zA-]{2,3})*(?::\d+)?(?:\/[^\s"'<>]*)?)/i;
   
   const urlMatch = clean.match(explicitUrlRegex);
   if (urlMatch) {
@@ -117,7 +135,7 @@ export function resolveWebUrl(raw: string): string {
     if (!u.startsWith('http://') && !u.startsWith('https://')) {
       u = 'https://' + u;
     }
-    return u;
+    return sanitizeUrl(u);
   }
 
   // 2. Explicit search requests (e.g. "pesquise por X", "procure na web por Y")
@@ -125,13 +143,13 @@ export function resolveWebUrl(raw: string): string {
   const lower = clean.toLowerCase();
   if (searchMatch && !lower.includes('endereço') && !lower.includes('endereco') && !lower.includes('acesse') && !lower.includes('abra o site')) {
     const query = searchMatch[1].trim().replace(/^(?:sobre|por)\s+/i, '').trim();
-    return 'https://news.ycombinator.com';
+    return sanitizeUrl('https://news.ycombinator.com');
   }
 
   // 3. Strip command prefixes and boilerplate
   clean = clean
     .replace(/^(?:por\s+favor\s*,?\s*|agente\s*,?\s*|por\s+gentileza\s*,?\s*|please\s*,?\s*|assistente\s*,?\s*)?/i, '')
-    .replace(/^(?:acesse|acessar|abra|abrir|navegue(?:\s+até|\s+para)?|navegar|visite|visitar|vá\s+(?:para|até|ao)|va\s+(?:para|ate|ao)|ir\s+para|entre\s+(?:no|na)|entrar\s+(?:no|na)|coloque|carregue|digite|open|navigate\s+to|visit|go\s+to|browse|load)\s+/i, '')
+    .replace(/^(?:acesse|acessar|abra|abrir|navegue(?:\s+até|\s+para)?|navegar|visite|visitar|vá\s+(?:para|até|ao)|va\s+(?:para|ate|ate|ao)|ir\s+para|entre\s+(?:no|na)|entrar\s+(?:no|na)|coloque|carregue|digite|open|navigate\s+to|visit|go\s+to|browse|load)\s+/i, '')
     .replace(/^(?:o\s+endereço(?:\s+na\s+web|\s+web)?|um\s+endereço(?:\s+na\s+web|\s+web)?|o\s+site|um\s+site|a\s+página|uma\s+página|o\s+portal|um\s+portal|a\s+url|uma\s+url|o\s+link|um\s+link|o\s+domínio|um\s+domínio|webpage|page|address)\s*/i, '')
     .replace(/^(?:de|do|da|dos|das|o|a|os|as|um|uma|no|na|em|para|pra|como|chamado|chamada|of|at|to|in|named|called|like)\s+/i, '')
     .replace(/\s+(?:pelo|no|no\s+computador(?:\s+na\s+nuvem)?|na\s+nuvem|pelo\s+computador|no\s+navegador|no\s+browser|no\s+pc|in\s+cloud|in\s+browser)$/i, '')
@@ -141,37 +159,37 @@ export function resolveWebUrl(raw: string): string {
   clean = clean.replace(/^[:\-–—\s"'`<([]+/, '').replace(/[>'"`\)\]]+$/, '').replace(/^(?:de|do|da|dos|das|o|a|os|as|um|uma)\s+/i, '').trim();
 
   if (!clean || /^(?:endereço|endereco|site|web|internet|computador|navegador|browser|página|pagina|portal|url|link)$/i.test(clean)) {
-    return 'https://news.ycombinator.com';
+    return sanitizeUrl('https://news.ycombinator.com');
   }
 
   // 4. Known brand check
   const cleanLower = clean.toLowerCase();
   for (const [brand, bUrl] of Object.entries(KNOWN_WEB_PORTALS)) {
     if (cleanLower === brand || cleanLower === `do ${brand}` || cleanLower === `da ${brand}` || cleanLower.startsWith(brand + ' ') || cleanLower.endsWith(' ' + brand)) {
-      return bUrl;
+      return sanitizeUrl(bUrl);
     }
   }
 
   // 5. Check if it's a domain with path or tld
   if (/^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:\/.*)?$/i.test(clean)) {
-    return `https://${clean}`;
+    return sanitizeUrl(`https://${clean}`);
   }
 
   // 6. Clean single word slug (e.g. "techcrunch", "airbnb")
   if (/^[a-zA-Z0-9-]+$/i.test(clean)) {
-    return `https://${clean}.com`;
+    return sanitizeUrl(`https://${clean}.com`);
   }
 
   // 7. Check if any word in the phrase matches a known brand
   const words = cleanLower.split(/\s+/);
   for (const w of words) {
     if (KNOWN_WEB_PORTALS[w]) {
-      return KNOWN_WEB_PORTALS[w];
+      return sanitizeUrl(KNOWN_WEB_PORTALS[w]);
     }
   }
 
   // 8. Default to news portal
-  return 'https://news.ycombinator.com';
+  return sanitizeUrl('https://news.ycombinator.com');
 }
 
 interface NavHistoryItem {
@@ -187,13 +205,31 @@ export function KvantComputer({
   workingTime,
   statusText = 'Computador do Agente Ativo',
   contextText,
-  customFiles
+  customFiles,
+  agentIntent,
+  browserStatus: externalBrowserStatus
 }: KvantComputerProps) {
   const [currentUrl, setCurrentUrl] = useState<string>('https://news.ycombinator.com');
+
+  // Trigger computer activation when research or computer intent is detected
+  useEffect(() => {
+    if (agentIntent && (agentIntent.mode === 'web_research' || agentIntent.mode === 'cloud_computer') && !isComputerActive) {
+      handleTurnOnComputer();
+    }
+  }, [agentIntent]);
+
   const [pageTitle, setPageTitle] = useState<string>('Hacker News');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isExternalWeb, setIsExternalWeb] = useState<boolean>(true);
   const [liveScreenshot, setLiveScreenshot] = useState<string | null>(null);
+  const [browserStatus, setBrowserStatus] = useState<'loading' | 'interactive' | 'error' | 'blocked'>('interactive');
+  
+  // Update browserStatus from props if provided
+  useEffect(() => {
+    if (externalBrowserStatus) {
+      setBrowserStatus(externalBrowserStatus);
+    }
+  }, [externalBrowserStatus]);
   const [iframeLoaded, setIframeLoaded] = useState<boolean>(false);
 
   // Computer active / inactive state (Inactive by default per user request)
@@ -243,7 +279,7 @@ export function KvantComputer({
   // Exclusive agent mode notification when user tries to click the remote desktop
   const [showObserverNotice, setShowObserverNotice] = useState<boolean>(false);
   const [userControlMode, setUserControlMode] = useState<boolean>(false);
-  const [forceLiveIframe, setForceLiveIframe] = useState<boolean>(true);
+  const [forceLiveIframe, setForceLiveIframe] = useState<boolean>(false);
   const noticeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Multi-source CAPTCHA and Security Challenge Scanner
@@ -327,6 +363,7 @@ export function KvantComputer({
     setIsLoading(true);
 
     if (actionType === 'navigate') {
+      setBrowserStatus('loading');
       setLiveScreenshot(null);
       setIframeLoaded(false);
       const cleanTarget = resolveWebUrl(targetVal);
@@ -392,6 +429,7 @@ export function KvantComputer({
           y: 260,
           status: `Agente ativo`
         }));
+        setBrowserStatus('interactive');
         setIsLoading(false);
       }, 2200);
       animationTimersRef.current.push(t4);
@@ -443,6 +481,7 @@ export function KvantComputer({
 
       const t1 = setTimeout(() => {
         setAgentCursor(prev => ({ ...prev, y: 330, isClicking: true }));
+        // Also send message to iframe if it's there
         iframeRef.current?.contentWindow?.postMessage({ type: 'AGENT_EXEC_SCROLL', deltaY: 450 }, '*');
       }, 350);
       animationTimersRef.current.push(t1);
@@ -524,6 +563,27 @@ export function KvantComputer({
 
       if (lastTool.screenData?.screenshot) {
         setLiveScreenshot(lastTool.screenData.screenshot);
+      }
+
+      if (lastTool.result) {
+        try {
+          const res = JSON.parse(lastTool.result);
+          if (res.browserStatus) {
+            setBrowserStatus(res.browserStatus);
+          } else if (lastTool.toolName.includes('navigate') || lastTool.toolName.includes('browser')) {
+            setBrowserStatus('interactive');
+          }
+        } catch {
+          if (lastTool.toolName.includes('navigate') || lastTool.toolName.includes('browser')) {
+            setBrowserStatus('interactive');
+          }
+        }
+      }
+
+      if (lastTool.status === 'success' && !lastTool.toolName.includes('write')) {
+        if (!lastTool.result || !lastTool.result.includes('browserStatus')) {
+          setBrowserStatus('interactive');
+        }
       }
 
       const toolKey = `${lastTool.id}_${lastTool.status}`;
@@ -639,7 +699,7 @@ export function KvantComputer({
       <div className="h-8 px-4 bg-bg-surface-panel border-b border-border-divider-subtle flex items-center justify-between text-xs shrink-0 select-none">
         <div className="flex items-center gap-2 overflow-hidden truncate">
           <span className="text-text-content-secondary font-normal text-[11.5px] tracking-tight">
-            {!isComputerActive ? 'Computador do Core Inativo' : 'Sparkle está usando o Navegador'}
+            {!isComputerActive ? 'Computador do Core Inativo' : (isLoading ? 'Sparkle está interagindo...' : 'Sparkle está usando o Navegador')}
           </span>
           <span className="text-border-divider-subtle text-xs">|</span>
           <span className="text-text-content-secondary/80 font-mono text-[11px] truncate tracking-tight">
@@ -647,7 +707,41 @@ export function KvantComputer({
           </span>
         </div>
 
+        {isComputerActive && (
+          <div className="flex items-center gap-3">
+            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border transition-colors ${
+                browserStatus === 'loading' || isLoading ? 'bg-amber-400/10 border-amber-400/30 text-amber-400' :
+                browserStatus === 'error' ? 'bg-red-500/10 border-red-500/30 text-red-500' :
+                browserStatus === 'blocked' ? 'bg-orange-500/10 border-orange-500/30 text-orange-500' :
+                'bg-emerald-500/10 border-emerald-500/30 text-emerald-500'
+            }`}>
+              <div className={`size-1.5 rounded-full ${
+                browserStatus === 'loading' || isLoading ? 'bg-amber-400 animate-pulse' :
+                browserStatus === 'error' ? 'bg-red-500' :
+                browserStatus === 'blocked' ? 'bg-orange-500' :
+                'bg-emerald-500'
+              }`} />
+              <span className="text-[9px] font-mono uppercase tracking-wider font-bold">
+                {browserStatus === 'loading' || isLoading ? 'Navegando' : 
+                 browserStatus === 'error' ? 'Erro' : 
+                 browserStatus === 'blocked' ? 'Bloqueado' : 
+                 'Interativo'}
+              </span>
+            </div>
 
+            <button
+              onClick={() => setForceLiveIframe(!forceLiveIframe)}
+              className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md border transition-all cursor-pointer ${
+                forceLiveIframe 
+                ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400' 
+                : 'bg-white/5 border-white/10 text-text-content-secondary hover:bg-white/10'
+              }`}
+            >
+              <Globe size={12} />
+              <span className="text-[10px] font-medium">{forceLiveIframe ? 'Live Browser' : 'Agent View'}</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 2. CHROMIUM BROWSER WINDOW (AUTHENTIC CLOUD COMPUTER INTERFACE) */}
@@ -709,16 +803,78 @@ export function KvantComputer({
             {isExternalWeb || !customCode ? (
               <div className="relative w-full h-full flex-1">
                 {!shouldShowLiveIframe && liveScreenshot ? (
-                  <div className="absolute inset-0 bg-[#f7f7f7] flex items-center justify-center overflow-hidden">
+                  <div className="absolute inset-0 bg-[#f7f7f7] flex items-center justify-center overflow-hidden group/screenshot">
                     <img
                       src={liveScreenshot}
                       alt={`Captura ao vivo de ${pageTitle || currentUrl}`}
-                      className="h-full w-full object-contain pointer-events-none"
+                      className={`h-full w-full object-contain pointer-events-none transition-all duration-700 group-hover/screenshot:scale-[1.01] ${isLoading && agentCursor.status?.includes('Rolando') ? '-translate-y-8 opacity-90 blur-[0.5px]' : ''}`}
                       onError={() => setLiveScreenshot(null)}
                     />
-                    <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full border border-black/10 bg-white/85 px-2 py-1 text-[9px] font-medium text-slate-700 shadow-sm backdrop-blur-sm">
-                      <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      Captura ao vivo do Chromium
+                    <div className="absolute left-3 top-3 flex items-center gap-2 rounded-full border border-black/10 bg-white/90 px-2.5 py-1.5 text-[10px] font-bold text-slate-800 shadow-xl backdrop-blur-md animate-in fade-in duration-300">
+                      <div className="relative flex size-2 items-center justify-center">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
+                      </div>
+                      Navegação Real do Agente
+                    </div>
+
+                    {isLoading && (
+                      <div className="absolute inset-0 z-10 bg-cyan-500/5 backdrop-blur-[1.5px] flex flex-col items-center justify-center animate-in fade-in duration-300">
+                        <div className="bg-slate-900/90 border border-cyan-500/30 rounded-2xl px-6 py-4 shadow-2xl flex items-center gap-4 scale-110">
+                          <div className="size-6 flex items-center justify-center">
+                            <OrbBloop
+                              size={24}
+                              audioMode="ambient"
+                              demoMode={true}
+                              state={BloopState.think}
+                              bloopColorMain={BLOOP_PALETTES[BloopPaletteName.blue].main}
+                              bloopColorLow={BLOOP_PALETTES[BloopPaletteName.blue].low}
+                              bloopColorMid={BLOOP_PALETTES[BloopPaletteName.blue].mid}
+                              bloopColorHigh={BLOOP_PALETTES[BloopPaletteName.blue].high}
+                            />
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-white tracking-wide uppercase">{agentCursor.status || 'Interagindo com a página...'}</span>
+                            <span className="text-[10px] text-cyan-300/80 font-mono">Agente Sparkle em controle remoto</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {browserStatus === 'loading' && !isLoading && (
+                      <div className="absolute inset-0 z-10 bg-black/5 backdrop-blur-[0.5px] flex flex-col items-center justify-center animate-in fade-in duration-300">
+                        <div className="bg-white/95 border border-slate-200 rounded-full px-5 py-2.5 shadow-xl flex items-center gap-3">
+                          <Spinner size={16} className="animate-spin text-blue-500" />
+                          <span className="text-[11px] font-bold text-slate-800 uppercase tracking-tight">Carregando Domínio Real...</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {browserStatus === 'error' && (
+                      <div className="absolute inset-0 z-10 bg-red-500/5 backdrop-blur-[2px] flex flex-col items-center justify-center animate-in fade-in duration-300">
+                        <div className="bg-white border border-red-200 rounded-2xl p-6 shadow-2xl flex flex-col items-center gap-4 max-w-sm text-center">
+                          <div className="size-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center">
+                            <XCircle size={28} weight="fill" />
+                          </div>
+                          <div className="space-y-1">
+                            <h4 className="text-sm font-bold text-slate-900">Erro de Conectividade</h4>
+                            <p className="text-[11px] text-slate-500 leading-relaxed">Não foi possível carregar a página solicitada. O site pode estar inacessível ou bloqueando o acesso automatizado.</p>
+                          </div>
+                          <button 
+                            onClick={() => {
+                              setBrowserStatus('loading');
+                              runAgentLiveActionAnimation('navigate', currentUrl);
+                            }}
+                            className="bg-slate-900 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-800 transition-colors"
+                          >
+                            Tentar Novamente
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="absolute right-3 top-3 flex items-center gap-1.5 rounded-lg border border-black/5 bg-black/5 px-2 py-1 text-[9px] font-medium text-slate-500">
+                      Modo Observador
                     </div>
                   </div>
                 ) : (
@@ -750,7 +906,7 @@ export function KvantComputer({
                 )}
               </div>
             ) : (
-                <div className={`w-full h-full flex-1 relative overflow-auto bg-[#090907] text-[#f8f8f6] ${userControlMode ? 'pointer-events-auto' : 'pointer-events-none'}`}>
+                <div className={`w-full h-full flex-1 relative overflow-auto bg-[#1a1a1a] text-[#f8f8f6] ${userControlMode ? 'pointer-events-auto' : 'pointer-events-none'}`}>
                 <DynamicRuntimeRunner code={customCode} />
               </div>
             )}
@@ -780,7 +936,7 @@ export function KvantComputer({
             )}
 
             {userControlMode && (
-              <div className="absolute left-3 bottom-3 z-40 flex items-center gap-2 rounded-full border border-amber-400/30 bg-[#17130c]/90 px-3 py-1.5 text-[10px] text-amber-200 shadow-xl backdrop-blur-md">
+              <div className="absolute left-3 bottom-3 z-40 flex items-center gap-2 rounded-full border border-zinc-500/30 bg-[#1a1a1a]/90 px-3 py-1.5 text-[10px] text-zinc-300 shadow-xl backdrop-blur-md">
                 <Hand size={12} />
                 <span>Você está no controle · clique e navegue normalmente</span>
               </div>
@@ -797,36 +953,24 @@ export function KvantComputer({
               top: `${agentCursor.y}px`
             }}
           >
-            <div className="relative">
-              <svg 
-                className={`w-5 h-5 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] text-white fill-white stroke-black stroke-[1.4] transition-transform duration-150 ${agentCursor.isClicking ? 'scale-90 translate-y-0.5' : 'scale-100'}`} 
-                viewBox="0 0 24 24"
-              >
-                <path d="M0,0 L0,18 L5,13.5 L9.5,22.5 L12,21.5 L7.5,12.5 L14,12.5 Z" />
-              </svg>
-
+            <div className="relative flex items-center">
               {agentCursor.isClicking && (
-                <span className="absolute -top-3 -left-3 size-10 rounded-full border-2 border-cyan-400 bg-cyan-400/25 animate-ping pointer-events-none" />
+                <div className="absolute inset-0 size-6 -left-0.5 -top-0.5 rounded-full bg-cyan-400/40 animate-ping" />
               )}
-
-              <div className="absolute left-4 top-2 flex flex-col gap-0.5 pointer-events-none">
-                <div className="bg-[#111113]/90 backdrop-blur-md text-white text-[9.5px] font-mono px-2 py-0.5 rounded-full shadow-lg border border-white/20 flex items-center gap-1.5 whitespace-nowrap animate-in fade-in">
-                  <span className="size-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                  <span className="font-semibold">{agentCursor.label}</span>
+              <HandPointing size={22} weight="fill" className={`text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] transition-transform ${agentCursor.isClicking ? 'scale-90' : 'scale-100'}`} />
+              
+              {agentCursor.status && (
+                <div className="absolute left-6 top-0 bg-slate-900/90 text-white text-[9px] px-2 py-0.5 rounded border border-white/10 whitespace-nowrap backdrop-blur-sm shadow-xl font-medium tracking-tight">
+                  {agentCursor.status}
                 </div>
-                {agentCursor.status && (
-                  <div className="bg-black/85 backdrop-blur-xs text-cyan-300 text-[8.5px] px-2 py-0.5 rounded shadow border border-cyan-500/30 whitespace-nowrap">
-                    {agentCursor.status}
-                  </div>
-                )}
-              </div>
+              )}
             </div>
           </div>
         )}
 
         {/* Agent Keystroke HUD */}
         {typedKeys.length > 0 && (
-          <div className="absolute top-14 left-1/2 -translate-x-1/2 bg-black/90 backdrop-blur-md border border-cyan-500/40 rounded-xl px-4 py-2 shadow-2xl flex items-center gap-2 z-50 animate-in fade-in zoom-in-95">
+          <div className="absolute top-14 left-1/2 -translate-x-1/2 bg-black/90 backdrop-blur-md border border-zinc-500/40 rounded-xl px-4 py-2 shadow-2xl flex items-center gap-2 z-50 animate-in fade-in zoom-in-95">
             <span className="text-zinc-400 text-[10px] font-mono uppercase tracking-wider">Teclas do Agente:</span>
             <div className="flex items-center gap-1">
               {typedKeys.map((key, i) => (
@@ -840,8 +984,8 @@ export function KvantComputer({
 
         {/* Agent Typing Banner */}
         {activeTypingBanner && (
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-[#09090b]/95 text-cyan-300 text-xs px-4 py-1.5 rounded-full border border-cyan-500/40 shadow-2xl flex items-center gap-2 z-50 animate-in fade-in">
-            <span className="size-2 rounded-full bg-cyan-400 animate-ping" />
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-[#09090b]/95 text-zinc-300 text-xs px-4 py-1.5 rounded-full border border-zinc-500/40 shadow-2xl flex items-center gap-2 z-50 animate-in fade-in">
+            <span className="size-2 rounded-full bg-zinc-400 animate-ping" />
             <span>Agente digitando: <strong>"{activeTypingBanner}"</strong></span>
           </div>
         )}
@@ -880,13 +1024,13 @@ export function KvantComputer({
             <div className="flex-1 relative flex items-center h-4 group">
               <div className="h-1 w-full bg-[#262626] rounded-full overflow-hidden">
                 <div 
-                  className="h-full bg-[#0070f3] rounded-full transition-all duration-150"
+                  className="h-full bg-white rounded-full transition-all duration-150"
                   style={{ width: `${scrubberValue}%` }}
                 />
               </div>
 
               <div 
-                className="absolute size-3 rounded-full bg-[#0070f3] ring-2 ring-white/20 shadow-md transition-all duration-150 pointer-events-none"
+                className="absolute size-3 rounded-full bg-white ring-2 ring-white/20 shadow-md transition-all duration-150 pointer-events-none"
                 style={{ left: `calc(${scrubberValue}% - 6px)` }}
               />
 
@@ -925,7 +1069,7 @@ export function KvantComputer({
               className="flex items-center gap-1.5 text-xs text-zinc-400 font-medium shrink-0 cursor-pointer"
               title="Voltar ao vivo"
             >
-              <span className={`size-1.5 rounded-full ${isLive ? 'bg-[#0070f3] animate-pulse' : 'bg-zinc-500'}`} />
+              <span className={`size-1.5 rounded-full ${isLive ? 'bg-white animate-pulse shadow-[0_0_8px_rgba(255,255,255,0.4)]' : 'bg-zinc-500'}`} />
               <span className={`text-[11px] ${isLive ? 'text-zinc-200 font-semibold' : 'text-zinc-500'}`}>Ao vivo</span>
             </div>
           </div>
@@ -940,12 +1084,23 @@ export function KvantComputer({
                 <span>O computador do Core está inativo</span>
               </div>
             ) : isWorking ? (
-              <div className="flex items-center gap-1.5 text-cyan-400">
-                <Spinner size={13} className="animate-spin" />
+              <div className="flex items-center gap-1.5 text-zinc-400">
+                <div className="size-4 flex items-center justify-center">
+                  <OrbBloop
+                    size={16}
+                    audioMode="ambient"
+                    demoMode={true}
+                    state={BloopState.listen}
+                    bloopColorMain={BLOOP_PALETTES[BloopPaletteName.blue].main}
+                    bloopColorLow={BLOOP_PALETTES[BloopPaletteName.blue].low}
+                    bloopColorMid={BLOOP_PALETTES[BloopPaletteName.blue].mid}
+                    bloopColorHigh={BLOOP_PALETTES[BloopPaletteName.blue].high}
+                  />
+                </div>
                 <span>Agente executando ação no computador...</span>
               </div>
             ) : (
-              <div className="flex items-center gap-1.5 text-[#22c55e]">
+              <div className="flex items-center gap-1.5 text-zinc-300">
                 <Check size={13} strokeWidth={2.5} />
                 <span>Computador Ativo · Tarefa concluída{workingTime && workingTime !== '0s' ? ` · Trabalhou por ${workingTime}` : ''}</span>
               </div>

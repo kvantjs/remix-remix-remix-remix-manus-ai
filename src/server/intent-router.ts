@@ -77,7 +77,7 @@ const TOOL_ALIASES: Record<string, string> = {
 
 const ALL_TOOLS = Object.values(TOOL_ALIASES).filter((name, index, list) => list.indexOf(name) === index);
 const WEB_TOOLS = ['web_search', 'web_fetch', 'browser_navigate', 'browser_inspect', 'browser_click', 'browser_scroll', 'browser_open_result'];
-const COMPUTER_TOOLS = [...WEB_TOOLS, 'browser_click', 'browser_type', 'bash_exec', 'python_exec', 'file_list', 'file_read', 'file_write', 'file_create_directory', 'file_delete', 'job_create', 'job_status', 'job_cancel', 'webdev_secret_set', 'webdev_secret_get', 'webdev_snapshot', 'webdev_rollback'];
+const COMPUTER_TOOLS = [...WEB_TOOLS, 'browser_type', 'bash_exec', 'python_exec', 'job_create', 'job_status', 'job_cancel'];
 const APP_TOOLS = ['file_list', 'file_read', 'file_write', 'file_create_directory', 'webdev_secret_set', 'webdev_secret_get', 'webdev_snapshot', 'webdev_rollback', 'bash_exec', 'python_exec', 'job_create', 'job_status', 'job_cancel'];
 const PROJECT_TOOLS = ['file_list', 'file_read', 'file_write', 'file_create_directory', 'file_delete', 'webdev_secret_set', 'webdev_secret_get', 'webdev_snapshot', 'webdev_rollback', 'bash_exec', 'job_create', 'job_status', 'job_cancel'];
 
@@ -116,7 +116,31 @@ export function classifyAgentIntent(message: string): AgentIntent {
   ];
 
   const hasAppCreation = hasAny(lower, appCreationTerms);
-  const isExplicitWebResearchOnly = (lower.includes('pesquise na web') || lower.includes('pesquisar na web') || lower.includes('busque na internet')) && !hasAppCreation;
+  const isExplicitWebResearchOnly = (lower.includes('pesquise na web') || lower.includes('pesquisar na web') || lower.includes('busque na internet') || lower.includes('procure na web')) && !hasAppCreation;
+
+  const research = hasAny(lower, [
+    'pesquise', 'pesquisar', 'busque', 'buscar', 'procure', 'pesquisa na web', 'informação atual',
+    'notícias', 'noticias', 'preço atual', 'cotação', 'fonte', 'fontes', 'o que aconteceu hoje',
+    'consulte a internet', 'verifique na web', 'compare dados atuais', 'site oficial', 'documentação'
+  ]);
+
+  const cloudComputer = hasAny(lower, [
+    'computador na nuvem', 'computador do agente', 'máquina virtual', 'terminal bash', 'execute no terminal',
+    'rode no terminal', 'comando shell', 'shell linux', 'navegador do agente', 'browser do agente',
+    'clique em', 'preencha o formulário', 'digite no site', 'abra no navegador', 'acesse o site',
+    'leia o arquivo', 'liste os arquivos', 'grave o arquivo', 'escreva no arquivo', 'sistema de arquivos',
+    'npx', 'playwright install', 'playwright', 'bash', 'terminal', 'computador'
+  ]);
+
+  // STRICTOR RULE: If user explicitly mentions "computador" or "pesquisa/busca", PRIORITIZE these over app_creation
+  // This prevents "Faça uma pesquisa" from being classified as app_creation just because of "Faça".
+  // RIGOROUS REDIRECT: When mentions search or computer, DO NOT allow webdev creation.
+  if (research || cloudComputer) {
+    if (cloudComputer) {
+      return { mode: 'cloud_computer', confidence: 'high', reason: 'Pedido autoriza uma operação no computador ou navegador da nuvem (Prioridade Total - Proibido WebDev).', allowedTools: COMPUTER_TOOLS };
+    }
+    return { mode: 'web_research', confidence: 'high', reason: 'Pedido solicita informação externa, atual ou verificável na web (Prioridade Total - Proibido WebDev).', allowedTools: WEB_TOOLS };
+  }
 
   if (hasAppCreation && !isExplicitWebResearchOnly) {
     return { 
@@ -135,28 +159,8 @@ export function classifyAgentIntent(message: string): AgentIntent {
     return { mode: 'project_operation', confidence: 'high', reason: 'Pedido trata do ciclo de vida de projeto, arquivo ou versão.', allowedTools: PROJECT_TOOLS, requiresUserAction: hasAny(lower, ['restaure', 'apague', 'delete', 'push', 'sincronize']) };
   }
 
-  const cloudComputer = hasAny(lower, [
-    'computador na nuvem', 'computador do agente', 'máquina virtual', 'terminal bash', 'execute no terminal',
-    'rode no terminal', 'comando shell', 'shell linux', 'navegador do agente', 'browser do agente',
-    'clique em', 'preencha o formulário', 'digite no site', 'abra no navegador', 'acesse o site',
-    'leia o arquivo', 'liste os arquivos', 'grave o arquivo', 'escreva no arquivo', 'sistema de arquivos',
-    'npx', 'playwright install', 'playwright', 'bash', 'terminal'
-  ]);
-  if (cloudComputer && !hasAppCreation) {
-    return { mode: 'cloud_computer', confidence: 'high', reason: 'Pedido autoriza uma operação no computador ou navegador da nuvem.', allowedTools: COMPUTER_TOOLS };
-  }
-
   if (explicitTools.length > 0 && hasAny(lower, ['ferramenta', 'tool', 'mcp', 'chame', 'execute', 'rode', 'use'])) {
     return { mode: 'explicit_tool_call', confidence: 'high', reason: 'Usuário nomeou explicitamente uma ferramenta e solicitou sua chamada.', allowedTools: explicitTools };
-  }
-
-  const research = hasAny(lower, [
-    'pesquise', 'pesquisar', 'busque', 'buscar', 'procure', 'pesquisa na web', 'informação atual',
-    'notícias', 'noticias', 'preço atual', 'cotação', 'fonte', 'fontes', 'o que aconteceu hoje',
-    'consulte a internet', 'verifique na web', 'compare dados atuais'
-  ]);
-  if (research && !hasAppCreation) {
-    return { mode: 'web_research', confidence: 'high', reason: 'Pedido solicita informação externa, atual ou verificável na web.', allowedTools: WEB_TOOLS };
   }
 
   return {

@@ -43,6 +43,8 @@ export default function App() {
   const [contextText, setContextText] = useState(
     'Instância Linux x86_64 ativa. Agente autônomo com navegador headless, shell bash e tool calling em tempo real.'
   );
+  const [agentIntent, setAgentIntent] = useState<any>(null);
+  const [browserStatus, setBrowserStatus] = useState<'loading' | 'interactive' | 'error' | 'blocked'>('interactive');
 
   const handleFileUpdate = useCallback((files: Array<{ path: string; code: string; lang?: string }>) => {
     setCustomFiles(prev => {
@@ -64,8 +66,16 @@ export default function App() {
     contextText?: string;
     toolCalls?: ToolCallTrace[];
     workingTime?: string;
+    intent?: any;
+    browserStatus?: 'loading' | 'interactive' | 'error' | 'blocked';
   }) => {
     setIsWorking(prev => prev !== state.isWorking ? state.isWorking : prev);
+    if (state.intent !== undefined) {
+      setAgentIntent(state.intent);
+    }
+    if (state.browserStatus !== undefined) {
+      setBrowserStatus(state.browserStatus);
+    }
     if (state.workingTime) {
       setWorkingTime(prev => prev !== state.workingTime ? state.workingTime! : prev);
     }
@@ -128,6 +138,8 @@ export default function App() {
             workingTime={workingTime}
             statusText={statusText}
             contextText={contextText}
+            agentIntent={agentIntent}
+            browserStatus={browserStatus}
             initialTab={workspaceTab}
           />
         )}

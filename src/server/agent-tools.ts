@@ -6,7 +6,6 @@ import { resolveSafeSandboxPath, redactSecrets, isSafeUrl, SANDBOX_WORKSPACE_ROO
 import { jobsManager, AgentJob, JobApprovalRequest } from './jobs-manager.js';
 import { challengeMessage } from './browser-challenge.js';
 import { agentIsolatedRuntime } from './agent-isolated-runtime.js';
-import { daytonaManager } from './daytona-manager.js';
 
 const execAsync = util.promisify(exec);
 
@@ -381,7 +380,7 @@ export class AgentToolExecutor {
           const search = await this.browserManager.searchCustomEngine(queryText, limit);
           return {
             success: true,
-            result: { ...search, browserUsed: true, provider: 'OpenSearchEngine', sources: search.results },
+            result: { ...search, browserStatus: 'interactive', browserUsed: true, provider: 'OpenSearchEngine', sources: search.results },
             actionDescription: `Pesquisa no mecanismo autônomo concluída (${search.results.length} resultados indexados)`,
             requiresApproval: false
           };
@@ -396,10 +395,20 @@ export class AgentToolExecutor {
             throw new Error(`Acesso negado: ${urlSafety.reason}`);
           }
 
+          try {
+            const parsed = new URL(rawUrl);
+            if (parsed.hostname.startsWith('api.')) {
+              throw new Error('Acesso a subdomínios "api." é terminantemente proibido por política de segurança. Utilize o domínio principal ou de documentação.');
+            }
+          } catch (e: any) {
+            if (e.message.includes('api.')) throw e;
+          }
+
           let pageText = '';
           let title = '';
           let status = 200;
 
+          let browserState: string = 'interactive';
           // Attempt fast fetch first
           try {
             const res = await fetch(rawUrl, {
@@ -410,6 +419,7 @@ export class AgentToolExecutor {
               signal: AbortSignal.timeout(10000)
             });
             status = res.status;
+            browserState = status >= 400 ? 'error' : 'interactive';
             if (res.ok) {
               const html = await res.text();
               const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
@@ -439,6 +449,7 @@ export class AgentToolExecutor {
               title = nav.title || '';
               pageText = nav.textContent || '';
               status = nav.status || 200;
+              browserState = nav.browserStatus || 'interactive';
             }
           }
 
@@ -452,6 +463,7 @@ export class AgentToolExecutor {
               url: rawUrl,
               title,
               status,
+              browserStatus: browserState,
               focus,
               contentLength: pageText.length,
               text: pageText
@@ -476,44 +488,26 @@ export class AgentToolExecutor {
           let stderr = '';
           let exitCode = 0;
           let timedOut = false;
-          let isDaytona = false;
 
-          if (daytonaManager.isAvailable() && (process.env.DAYTONA_API_KEY || process.env.DAYTONA_SERVER_URL)) {
-            try {
-              const projectId = args.projectId || 'remix-manus-ai';
-              const daytonaRes = await daytonaManager.executeCommand(projectId, command);
-              if (daytonaManager.isAvailable()) {
-                stdout = daytonaRes.stdout;
-                stderr = daytonaRes.stderr;
-                exitCode = daytonaRes.exitCode;
-                isDaytona = true;
+          try {
+            const { stdout: out, stderr: err } = await execAsync(command, {
+              cwd: SANDBOX_WORKSPACE_ROOT,
+              timeout: timeoutMs,
+              maxBuffer: 1024 * 512, // 512 KB
+              env: {
+                ...process.env,
+                PATH: process.env.PATH,
+                HOME: SANDBOX_WORKSPACE_ROOT,
+                WORKSPACE: SANDBOX_WORKSPACE_ROOT
               }
-            } catch (err: any) {
-              console.warn('[Agent Tools] Falha na execução via Daytona, utilizando fallback local:', err?.message || err);
-            }
-          }
-
-          if (!isDaytona) {
-            try {
-              const { stdout: out, stderr: err } = await execAsync(command, {
-                cwd: SANDBOX_WORKSPACE_ROOT,
-                timeout: timeoutMs,
-                maxBuffer: 1024 * 512, // 512 KB
-                env: {
-                  ...process.env,
-                  PATH: process.env.PATH,
-                  HOME: SANDBOX_WORKSPACE_ROOT,
-                  WORKSPACE: SANDBOX_WORKSPACE_ROOT
-                }
-              });
-              stdout = out;
-              stderr = err;
-            } catch (err: any) {
-              stdout = err.stdout || '';
-              stderr = err.stderr || err.message;
-              exitCode = err.code || (err.killed ? 124 : 1);
-              timedOut = !!err.killed;
-            }
+            });
+            stdout = out;
+            stderr = err;
+          } catch (err: any) {
+            stdout = err.stdout || '';
+            stderr = err.stderr || err.message;
+            exitCode = err.code || (err.killed ? 124 : 1);
+            timedOut = !!err.killed;
           }
 
           const durationMs = Math.round(performance.now() - startTime);
@@ -525,12 +519,11 @@ export class AgentToolExecutor {
               exitCode,
               timedOut,
               durationMs,
-              runner: isDaytona ? 'Daytona Sandbox SDK' : 'Local Isolated Sandbox',
               stdout: redactSecrets(stdout.slice(0, 16000)),
               stderr: redactSecrets(stderr.slice(0, 8000)),
-              workingDir: isDaytona ? '/home/daytona/app' : 'workspace/'
+              workingDir: 'workspace/'
             },
-            actionDescription: `Execução no Sandbox ${isDaytona ? 'Daytona' : 'Local'}: \`${command.slice(0, 50)}\` (Exit: ${exitCode}, ${durationMs}ms)`
+            actionDescription: `Execução no Sandbox: \`${command.slice(0, 50)}\` (Exit: ${exitCode}, ${durationMs}ms)`
           };
         }
 
@@ -677,14 +670,6 @@ export class AgentToolExecutor {
           await fs.writeFile(safe.safePath, content, 'utf-8');
           const stat = await fs.stat(safe.safePath);
 
-          // Synchronize with Daytona sandbox if available and active
-          if (daytonaManager.isAvailable() && (process.env.DAYTONA_API_KEY || process.env.DAYTONA_SERVER_URL)) {
-            const projectId = args.projectId || 'remix-manus-ai';
-            daytonaManager.writeFile(projectId, filePath, content).catch(err => {
-              console.warn('[Agent Tools] Notificação Daytona:', err?.message || err);
-            });
-          }
-
           // Register as artifact in current job if applicable
           const artifact = jobsManager.addArtifact('default', path.basename(filePath), filePath, stat.size);
 
@@ -694,7 +679,7 @@ export class AgentToolExecutor {
               filePath,
               sizeBytes: stat.size,
               artifactUrl: artifact.downloadUrl,
-              message: `Arquivo gravado com sucesso no workspace e sincronizado com o sandbox: ${filePath}`
+              message: `Arquivo "${filePath}" (${stat.size} bytes) gravado e integrado ao projeto com sucesso.`
             },
             actionDescription: `Gravação do arquivo "${filePath}" (${stat.size} bytes)`
           };
@@ -744,9 +729,19 @@ export class AgentToolExecutor {
           const url = String(args.url || '').trim();
           if (!url) throw new Error('URL é obrigatória.');
 
-          const urlSafety = isSafeUrl(url.includes('://') ? url : `https://${url}`);
+          const urlToTest = url.includes('://') ? url : `https://${url}`;
+          const urlSafety = isSafeUrl(urlToTest);
           if (!urlSafety.isSafe) {
             throw new Error(`Acesso negado: ${urlSafety.reason}`);
+          }
+
+          try {
+            const parsed = new URL(urlToTest);
+            if (parsed.hostname.startsWith('api.')) {
+              throw new Error('Acesso a subdomínios "api." é terminantemente proibido por política de segurança. Utilize o domínio principal ou de documentação.');
+            }
+          } catch (e: any) {
+            if (e.message.includes('api.')) throw e;
           }
 
           const result = await this.browserManager.navigate(url);
@@ -756,6 +751,7 @@ export class AgentToolExecutor {
               url: result.url,
               title: result.title,
               status: result.status,
+              browserStatus: result.browserStatus,
               durationMs: result.durationMs,
               screenshot: result.screenshot,
               interactiveElementsCount: result.interactiveElements?.length || 0,
@@ -783,6 +779,7 @@ export class AgentToolExecutor {
             result: {
               url,
               title,
+              browserStatus: 'interactive',
               interactiveElements: domData.interactive,
               bodySnippet: domData.bodyText.slice(0, 1500)
             },
@@ -795,7 +792,7 @@ export class AgentToolExecutor {
           const result = await this.browserManager.scroll(deltaY);
           return {
             success: result.success !== false && !result.challenge,
-            result,
+            result: { ...result, browserStatus: 'interactive' },
             error: result.error,
             actionDescription: result.challenge ? `Rolagem interrompida: ${result.challenge.reason}` : `Agente rolou a página real ${deltaY}px e capturou o novo contexto`,
             requiresApproval: Boolean(result.challenge),
@@ -807,7 +804,7 @@ export class AgentToolExecutor {
           const result = await this.browserManager.openFirstSearchResult();
           return {
             success: result.success !== false && !result.challenge,
-            result,
+            result: { ...result, browserStatus: result.browserStatus || 'interactive' },
             error: result.error,
             actionDescription: result.challenge ? `Abertura interrompida: ${result.challenge.reason}` : `Agente abriu o primeiro resultado orgânico e obteve o contexto da página real`,
             requiresApproval: Boolean(result.challenge),
@@ -819,7 +816,7 @@ export class AgentToolExecutor {
           const target = String(args.selectorOrText || '').trim();
           if (!target) throw new Error('Seletor ou texto do elemento é obrigatório.');
           const existingChallenge = this.browserManager.getChallenge?.();
-          if (existingChallenge) return { success: false, result: { challenge: existingChallenge, requiresUserAction: true }, error: challengeMessage(existingChallenge), actionDescription: `Clique bloqueado: ${existingChallenge.reason}`, requiresApproval: true, approvalDetails: { actionName: 'browser_handoff', details: existingChallenge, riskLevel: 'medium', reason: 'Intervenção humana autorizada necessária.', requestedAt: new Date().toISOString() } };
+          if (existingChallenge) return { success: false, result: { challenge: existingChallenge, requiresUserAction: true, browserStatus: 'blocked' }, error: challengeMessage(existingChallenge), actionDescription: `Clique bloqueado: ${existingChallenge.reason}`, requiresApproval: true, approvalDetails: { actionName: 'browser_handoff', details: existingChallenge, riskLevel: 'medium', reason: 'Intervenção humana autorizada necessária.', requestedAt: new Date().toISOString() } };
 
           const page = await this.browserManager.ensurePage();
           let clicked = false;
@@ -839,12 +836,12 @@ export class AgentToolExecutor {
             });
           }
 
-          await page.waitForTimeout(600);
+          await page.waitForTimeout(800);
           const newTitle = await page.title();
           const newUrl = page.url();
           const screenshotBuf = await page.screenshot({ type: 'jpeg', quality: 75 }).catch(() => null);
           const challenge = await this.browserManager.checkCurrentChallenge?.();
-          if (challenge) return { success: false, result: { newUrl, newTitle, challenge, requiresUserAction: true }, error: challengeMessage(challenge), actionDescription: `Clique interrompido: ${challenge.reason}`, requiresApproval: true, approvalDetails: { actionName: 'browser_handoff', details: challenge, riskLevel: 'medium', reason: 'Intervenção humana autorizada necessária.', requestedAt: new Date().toISOString() } };
+          if (challenge) return { success: false, result: { newUrl, newTitle, challenge, requiresUserAction: true, browserStatus: 'blocked' }, error: challengeMessage(challenge), actionDescription: `Clique interrompido: ${challenge.reason}`, requiresApproval: true, approvalDetails: { actionName: 'browser_handoff', details: challenge, riskLevel: 'medium', reason: 'Intervenção humana autorizada necessária.', requestedAt: new Date().toISOString() } };
 
           return {
             success: true,
@@ -852,6 +849,7 @@ export class AgentToolExecutor {
               target,
               newUrl,
               newTitle,
+              browserStatus: 'interactive',
               screenshot: screenshotBuf ? 'data:image/jpeg;base64,' + screenshotBuf.toString('base64') : null
             },
             actionDescription: `Clique realizado em "${target}". Nova página: "${newTitle}"`
@@ -865,24 +863,28 @@ export class AgentToolExecutor {
 
           const page = await this.browserManager.ensurePage();
           const existingChallenge = this.browserManager.getChallenge?.();
-          if (existingChallenge) return { success: false, result: { challenge: existingChallenge, requiresUserAction: true }, error: challengeMessage(existingChallenge), actionDescription: `Digitação bloqueada: ${existingChallenge.reason}`, requiresApproval: true, approvalDetails: { actionName: 'browser_handoff', details: existingChallenge, riskLevel: 'medium', reason: 'Intervenção humana autorizada necessária.', requestedAt: new Date().toISOString() } };
+          if (existingChallenge) return { success: false, result: { challenge: existingChallenge, requiresUserAction: true, browserStatus: 'blocked' }, error: challengeMessage(existingChallenge), actionDescription: `Digitação bloqueada: ${existingChallenge.reason}`, requiresApproval: true, approvalDetails: { actionName: 'browser_handoff', details: existingChallenge, riskLevel: 'medium', reason: 'Intervenção humana autorizada necessária.', requestedAt: new Date().toISOString() } };
+          
           await page.fill(selector, text, { timeout: 5000 });
           if (pressEnter) {
             await page.press(selector, 'Enter');
-            await page.waitForTimeout(800);
+            await page.waitForTimeout(1000);
           }
 
           const currentTitle = await page.title();
           const currentUrl = page.url();
+          const screenshotBuf = await page.screenshot({ type: 'jpeg', quality: 75 }).catch(() => null);
           const challenge = await this.browserManager.checkCurrentChallenge?.();
-          if (challenge) return { success: false, result: { currentUrl, currentTitle, challenge, requiresUserAction: true }, error: challengeMessage(challenge), actionDescription: `Digitação interrompida: ${challenge.reason}`, requiresApproval: true, approvalDetails: { actionName: 'browser_handoff', details: challenge, riskLevel: 'medium', reason: 'Intervenção humana autorizada necessária.', requestedAt: new Date().toISOString() } };
+          if (challenge) return { success: false, result: { currentUrl, currentTitle, challenge, requiresUserAction: true, browserStatus: 'blocked' }, error: challengeMessage(challenge), actionDescription: `Digitação interrompida: ${challenge.reason}`, requiresApproval: true, approvalDetails: { actionName: 'browser_handoff', details: challenge, riskLevel: 'medium', reason: 'Intervenção humana autorizada necessária.', requestedAt: new Date().toISOString() } };
 
           return {
             success: true,
             result: {
               textTyped: text,
               currentUrl,
-              currentTitle
+              currentTitle,
+              browserStatus: 'interactive',
+              screenshot: screenshotBuf ? 'data:image/jpeg;base64,' + screenshotBuf.toString('base64') : null
             },
             actionDescription: `Digitação concluída: "${text.slice(0, 30)}"`
           };

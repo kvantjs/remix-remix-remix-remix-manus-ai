@@ -151,15 +151,17 @@ export default function ThinkingState({
         onClick={() => setManualExpanded((current) => !(current ?? true))}
         className="-mx-1.5 flex w-fit items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-white/5 cursor-pointer"
       >
-        {icon ? (
-          <span className={`flex shrink-0 transition-colors text-text-content-secondary ${working ? 'animate-pulse' : ''}`}>
-            {icon}
-          </span>
-        ) : (
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`text-text-content-secondary ${working ? 'animate-spin-slow text-text-content-primary' : ''}`}>
-            <path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z" />
-          </svg>
-        )}
+        <div className="size-5 rounded-[3px] bg-cover bg-center overflow-hidden flex items-center justify-center shadow-xs border border-white/10" style={{ backgroundImage: `url('https://imgdb.io/i/axsNhBY.png')` }}>
+          {icon ? (
+            <span className={`flex shrink-0 transition-colors text-text-content-secondary ${working ? 'animate-pulse' : ''}`}>
+              {icon}
+            </span>
+          ) : (
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`text-text-content-secondary ${working ? 'animate-spin-slow text-text-content-primary' : ''}`}>
+              <path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z" />
+            </svg>
+          )}
+        </div>
         <span role="status" className="text-xs font-medium text-text-content-primary flex items-center gap-1.5">
           {working ? (
             <span className="thinking-shimmer font-semibold">{v.active} · {elapsedSeconds}s</span>
@@ -258,7 +260,7 @@ export default function ThinkingState({
                 const isActive = working && i === v.rows.length - 1;
                 return (
                   <div key={`step_${row.primary}_${i}`} className="flex items-center gap-2.5 py-1 text-xs text-text-content-primary/80 transition-colors">
-                    <span className={`size-1.5 rounded-full ${isActive ? 'bg-amber-400 animate-pulse' : 'bg-text-content-secondary/60'} shrink-0`} />
+                    <span className={`size-1.5 rounded-full ${isActive ? 'bg-zinc-400 animate-pulse shadow-[0_0_8px_rgba(161,161,170,0.5)]' : 'bg-text-content-secondary/60'} shrink-0`} />
                     <span className={`font-medium text-[12px] truncate ${isActive ? 'text-text-content-primary' : ''}`}>{row.primary}</span>
                     {row.secondary && (
                       <span className="text-[11px] font-mono text-text-content-secondary/60 shrink-0 ml-auto">{row.secondary}</span>

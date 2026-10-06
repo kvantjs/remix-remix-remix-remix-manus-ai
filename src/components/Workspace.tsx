@@ -56,6 +56,8 @@ interface WorkspaceProps {
   statusText?: string;
   contextText?: string;
   initialTab?: string;
+  agentIntent?: any;
+  browserStatus?: 'loading' | 'interactive' | 'error' | 'blocked';
 }
 
 interface TabItem {
@@ -74,7 +76,9 @@ export function Workspace({
   workingTime,
   statusText,
   contextText,
-  initialTab
+  initialTab,
+  agentIntent,
+  browserStatus
 }: WorkspaceProps) {
   // Top Level Application Tabs
   const [openTabs, setOpenTabs] = useState<TabItem[]>([
@@ -290,6 +294,8 @@ export function Workspace({
             statusText={statusText}
             contextText={contextText}
             customFiles={customFiles}
+            agentIntent={agentIntent}
+            browserStatus={browserStatus}
             onRunTestTool={(prompt) => onSendPrompt && onSendPrompt(prompt)}
           />
         </div>
@@ -729,7 +735,7 @@ function InteractiveCodeEditor({ activeFile, onFileChange, customFiles, onFileUp
       </div>
 
       {/* Main Code Editor View */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[#0A0B0E] overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 bg-[#1a1a1a] overflow-hidden">
         {/* Editor Tab Bar & Actions */}
         <div className="h-10 bg-[#252525] border-b border-white/10 px-4 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 font-mono text-xs text-slate-300 truncate">
