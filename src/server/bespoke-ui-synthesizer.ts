@@ -685,10 +685,11 @@ export default function App() {
 }
 `;
 
+  const normalizedRawCode = rawCode.replace(/[ \t]+$/gm, '');
   const generatedFiles = [
     {
       path: "client/src/App.tsx",
-      code: rawCode,
+      code: normalizedRawCode,
       lang: "typescript"
     },
     {
@@ -913,7 +914,7 @@ export default defineConfig({ plugins: [react()], server: { port: 5173, strictPo
   return {
     title,
     theme: chosenTheme.name,
-    code: rawCode,
+    code: normalizedRawCode,
     files: generatedFiles
   };
 }

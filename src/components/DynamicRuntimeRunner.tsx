@@ -23,7 +23,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('[DynamicRuntimeRunner] Render error in DynamicApp:', error, errorInfo);
+    console.error('[DynamicRuntimeRunner] Render error in client/src/App.tsx:', error, errorInfo);
   }
 
   render() {
@@ -34,7 +34,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
       return (
         <div className="p-6 bg-red-950/30 border border-red-500/30 rounded-xl text-red-200 text-xs font-mono space-y-3 m-4">
           <div className="font-bold text-red-400 flex items-center gap-2">
-            <span>⚠️ Erro de Renderização no Runtime (DynamicApp.tsx):</span>
+            <span>⚠️ Erro de renderização em client/src/App.tsx:</span>
           </div>
           <p className="text-white/80 whitespace-pre-wrap">{this.state.error.message}</p>
         </div>
@@ -124,9 +124,22 @@ function createSafeFunction(scope: Record<string, any>, body: string) {
 }
 
 // Helper to sanitize code before passing to Babel
-function sanitizeSourceCode(rawCode: string): { code: string; mainComponentName: string } {
-  if (!rawCode) return { code: '', mainComponentName: 'App' };
+function sanitizeSourceCode(rawCode: string): { code: string; mainComponentName: string; importedIdentifiers: string[] } {
+  if (!rawCode) return { code: '', mainComponentName: 'App', importedIdentifiers: [] };
   let code = rawCode.trim();
+  const importedIdentifiers = new Set<string>();
+  const namedImportPattern = /import\s+(?:type\s+)?(?:[^'\n]+?\s+from\s+)?['"]([^'"]+)['"]/g;
+  let importMatch: RegExpExecArray | null;
+  while ((importMatch = namedImportPattern.exec(code))) {
+    const statement = importMatch[0];
+    const namedPart = statement.match(/\{([\s\S]*?)\}/)?.[1] || '';
+    namedPart.split(',').forEach(part => {
+      const identifier = part.trim().split(/\s+as\s+/).pop()?.trim().replace(/^type\s+/, '');
+      if (identifier && /^[A-Za-z_$][\w$]*$/.test(identifier)) importedIdentifiers.add(identifier);
+    });
+    const defaultPart = statement.match(/import\s+(?:type\s+)?([A-Za-z_$][\w$]*)/)?.[1];
+    if (defaultPart && defaultPart !== 'type') importedIdentifiers.add(defaultPart);
+  }
 
   // 1. Strip outer markdown fences if present
   if (code.startsWith('```')) {
@@ -176,7 +189,7 @@ function sanitizeSourceCode(rawCode: string): { code: string; mainComponentName:
     // remove export { ... };
     .replace(/export\s*\{[\s\S]*?\};?/g, '');
 
-  return { code, mainComponentName };
+  return { code, mainComponentName, importedIdentifiers: Array.from(importedIdentifiers) };
 }
 
 function scopeRuntimeCss(css: string) {
@@ -268,7 +281,7 @@ export function DynamicRuntimeRunner({ code, customFiles = {} }: DynamicRuntimeR
         if (filePath.includes('App.tsx') && (code.includes('export default') || code.length > 50)) continue;
 
         try {
-          const { code: subProcessed, mainComponentName: subName } = sanitizeSourceCode(fileContent);
+          const { code: subProcessed, mainComponentName: subName, importedIdentifiers: subImportedIdentifiers } = sanitizeSourceCode(fileContent);
           const subCompiled = Babel.transform(subProcessed, {
             presets: [
               ['react', { runtime: 'classic' }],
@@ -308,7 +321,8 @@ export function DynamicRuntimeRunner({ code, customFiles = {} }: DynamicRuntimeR
               motion: SafeMotion,
               AnimatePresence,
               clsx: (...args: any[]) => args.filter(Boolean).join(' '),
-              cn: (...args: any[]) => args.filter(Boolean).join(' ')
+              cn: (...args: any[]) => args.filter(Boolean).join(' '),
+              ...Object.fromEntries(subImportedIdentifiers.filter(identifier => !['React', 'Fragment', 'useState', 'useEffect', 'useContext', 'useReducer', 'useCallback', 'useMemo', 'useRef', 'useId', 'useLayoutEffect'].includes(identifier)).map(identifier => [identifier, (SafePhosphorIcons as any)[identifier] || FallbackIcon]))
             };
 
             const subResolver = `\nreturn (typeof ${subName} !== 'undefined' ? ${subName} : typeof __DefaultDynamicApp__ !== 'undefined' ? __DefaultDynamicApp__ : null);`;
@@ -328,7 +342,7 @@ export function DynamicRuntimeRunner({ code, customFiles = {} }: DynamicRuntimeR
       }
 
       // 2. Sanitize main code and detect component name
-      const { code: processed, mainComponentName } = sanitizeSourceCode(code);
+      const { code: processed, mainComponentName, importedIdentifiers } = sanitizeSourceCode(code);
 
       // 3. Compile main component with Babel TypeScript + JSX
       let compiled: string | null | undefined = null;
@@ -339,7 +353,7 @@ export function DynamicRuntimeRunner({ code, customFiles = {} }: DynamicRuntimeR
             ['react', { runtime: 'classic' }],
             ['typescript', { isTSX: true, allExtensions: true }]
           ],
-          filename: 'DynamicApp.tsx',
+          filename: 'client/src/App.tsx',
           parserOpts: { allowReturnOutsideFunction: true }
         }).code;
       } catch (babelErr: any) {
@@ -353,13 +367,13 @@ export function DynamicRuntimeRunner({ code, customFiles = {} }: DynamicRuntimeR
             ['react', { runtime: 'classic' }],
             ['typescript', { isTSX: true, allExtensions: true }]
           ],
-          filename: 'DynamicApp.tsx',
+          filename: 'client/src/App.tsx',
           parserOpts: { allowReturnOutsideFunction: true }
         }).code;
       }
 
       if (!compiled) {
-        throw new Error('Falha ao compilar o código do DynamicApp.tsx');
+        throw new Error('Falha ao compilar o código de client/src/App.tsx');
       }
 
       // Ensure hooks are available on window/globalThis for any loose execution
@@ -413,7 +427,8 @@ export function DynamicRuntimeRunner({ code, customFiles = {} }: DynamicRuntimeR
         cn: (...args: any[]) => args.filter(Boolean).join(' '),
         confetti: () => console.log('🎉 Confetti action executed'),
         // Multi-file subcomponents
-        ...subComponents
+        ...subComponents,
+        ...Object.fromEntries(importedIdentifiers.filter(identifier => identifier !== 'React' && !(identifier in subComponents)).map(identifier => [identifier, (SafePhosphorIcons as any)[identifier] || FallbackIcon]))
       };
 
       // 5. Construct execution wrapper with robust component resolver
@@ -444,7 +459,7 @@ export function DynamicRuntimeRunner({ code, customFiles = {} }: DynamicRuntimeR
       setComponentToRender(() => ComponentResult);
       setCompilationError(null);
     } catch (err: any) {
-      console.error('[DynamicRuntimeRunner] Compilation error in DynamicApp.tsx:', err);
+      console.error('[DynamicRuntimeRunner] Compilation error in client/src/App.tsx:', err);
       setCompilationError(err.message || String(err));
     } finally {
       setIsCompiling(false);
@@ -459,7 +474,7 @@ export function DynamicRuntimeRunner({ code, customFiles = {} }: DynamicRuntimeR
       <div className="p-6 bg-red-950/25 border border-red-500/30 rounded-xl text-red-200 text-xs font-mono space-y-3 m-4 shadow-xl">
         <div className="font-bold text-red-400 flex items-center gap-2">
           <PhosphorIcons.Warning size={16} className="text-red-400 shrink-0" />
-          <span>Erro no DynamicApp.tsx</span>
+          <span>Erro no preview Vite</span>
         </div>
         <p className="text-white/80 whitespace-pre-wrap bg-black/40 p-3 rounded-lg border border-white/5">{compilationError}</p>
         <p className="text-white/50 text-[11px] font-sans">
@@ -473,7 +488,7 @@ export function DynamicRuntimeRunner({ code, customFiles = {} }: DynamicRuntimeR
     return (
       <div className="h-full flex items-center justify-center p-8 text-white/40 text-xs gap-2.5">
         <div className="size-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-        <span>Compilando DynamicApp.tsx no Runtime...</span>
+        <span>Compilando client/src/App.tsx com o runtime React + Vite...</span>
       </div>
     );
   }
@@ -502,7 +517,7 @@ export function DynamicRuntimeRunner({ code, customFiles = {} }: DynamicRuntimeR
         <div className="p-6 bg-red-950/30 border border-red-500/30 rounded-xl text-red-200 text-xs font-mono space-y-2 m-4">
           <div className="font-bold text-red-400 flex items-center gap-2">
             <PhosphorIcons.Warning size={15} className="text-red-400 shrink-0" />
-            <span>Erro em tempo de execução no DynamicApp.tsx:</span>
+            <span>Erro em tempo de execução no preview React + Vite:</span>
           </div>
           <p className="text-white/80">{error.message}</p>
         </div>

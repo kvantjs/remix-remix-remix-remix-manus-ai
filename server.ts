@@ -4241,10 +4241,43 @@ app.post('/api/agent/chat/stream', async (req, res) => {
         }
       }
 
-      if (intent.mode === 'app_creation' && generatedFiles.length === 0) {
+      if (intent.mode === 'app_creation') {
+        const requiredManifest = [
+          'client/package.json', 'client/index.html', 'client/vite.config.ts',
+          'client/tsconfig.json', 'client/src/main.tsx', 'client/src/index.css', 'client/src/App.tsx'
+        ];
         const fallback = generateAutonomousRuleEnforcedFallback(message, history, currentFiles);
-        if (fallback.files && fallback.files.length > 0) {
-          generatedFiles.push(...fallback.files);
+        const existingPaths = new Set(generatedFiles.map(file => file.path));
+        const scaffoldFiles = (fallback.files || []).filter(file => !existingPaths.has(file.path) || (generatedFiles.length === 0 && file.path === 'client/src/App.tsx'));
+        const missingManifest = requiredManifest.some(filePath => !existingPaths.has(filePath));
+        if (scaffoldFiles.length > 0 && (generatedFiles.length === 0 || missingManifest)) {
+          sendEvent('stage_note', {
+            label: 'Manifesto e validação do projeto',
+            text: `O agente está completando o projeto React + Vite com ${scaffoldFiles.length} arquivo(s) necessários antes da entrega.`
+          });
+          for (const generatedFile of scaffoldFiles) {
+            await waitForExecutionPhase();
+            const filePath = generatedFile.path || 'client/src/App.tsx';
+            sendEvent('tool_start', {
+              toolName: 'fs.writeFile',
+              arguments: { filePath, content: generatedFile.code, lang: generatedFile.lang },
+              reason: `Gravando ${filePath} como parte do scaffold React + Vite`
+            });
+            const execResult = await agentToolExecutor.executeTool('fs.writeFile', { filePath, content: generatedFile.code });
+            const scaffoldTrace = {
+              id: `scaffold_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+              toolName: 'fs.writeFile',
+              server: 'workspace_fs',
+              arguments: { filePath, content: generatedFile.code, lang: generatedFile.lang },
+              result: execResult.success ? JSON.stringify(execResult.result) : `Erro: ${execResult.error}`,
+              timestamp: new Date().toLocaleTimeString(),
+              status: execResult.success ? 'success' : 'error',
+              screenData: { filePath, actionDescription: `${filePath} validado e gravado no workspace` }
+            };
+            executedToolCalls.push(scaffoldTrace);
+            generatedFiles.push(generatedFile);
+            sendEvent('tool_finish', { toolCall: scaffoldTrace });
+          }
         }
       }
 
@@ -4277,6 +4310,25 @@ app.post('/api/agent/chat/stream', async (req, res) => {
     // 2. Local Fallback Execution when API key is unconfigured or unavailable
     const plannedActions = intent.mode === 'conversation' ? [] : planRealAgentActions(message);
     for (const action of plannedActions) {
+      if (action.toolName === 'fs.writeFile') {
+        const fallback = generateAutonomousRuleEnforcedFallback(message, history, currentFiles);
+        const filesToWrite = fallback.files || [{ path: 'client/src/App.tsx', code: '// App code', lang: 'typescript' }];
+        sendEvent('stage_note', { label: 'Gravação incremental do projeto', text: `O agente vai gravar ${filesToWrite.length} arquivo(s), validando cada etapa antes da próxima.` });
+        for (const generatedFile of filesToWrite) {
+          await waitForExecutionPhase();
+          const filePath = generatedFile.path || 'client/src/App.tsx';
+          sendEvent('tool_start', {
+            toolName: 'fs.writeFile',
+            arguments: { filePath, content: generatedFile.code, lang: generatedFile.lang },
+            reason: `Gravando ${filePath} individualmente no workspace`
+          });
+          const fileToolResult = await runRealTool('fs.writeFile', { filePath, content: generatedFile.code });
+          executedToolCalls.push(fileToolResult);
+          sendEvent('tool_finish', { toolCall: fileToolResult });
+          await new Promise(r => setTimeout(r, 500));
+        }
+        continue;
+      }
       await waitForExecutionPhase();
       sendEvent('tool_start', {
         toolName: action.toolName,
@@ -4285,14 +4337,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
       });
 
       let toolResult;
-      if (action.toolName === 'fs.writeFile') {
-        const fallback = generateAutonomousRuleEnforcedFallback(message, history, currentFiles);
-        const codeToWrite = fallback.files?.[0]?.code || '// App code';
-        toolResult = await runRealTool('fs.writeFile', {
-          filePath: 'client/src/App.tsx',
-          content: codeToWrite
-        });
-      } else {
+      {
         // Map browser actions to agentToolExecutor
         if (action.toolName === 'browser.navigate') {
           const res = await agentToolExecutor.executeTool('browser_navigate', { url: action.args.url });

@@ -354,6 +354,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
   const executionStepsRef = useRef<ExecutionStep[]>([]);
   const [progressNotes, setProgressNotes] = useState<AgentProgressNote[]>([]);
   const progressNotesRef = useRef<AgentProgressNote[]>([]);
+  const deliveredFilePathsRef = useRef<Set<string>>(new Set());
   const [showExecutionAnimation, setShowExecutionAnimation] = useState(false);
   const [initialThoughtComplete, setInitialThoughtComplete] = useState(false);
   const [cycleThinking, setCycleThinking] = useState(false);
@@ -381,7 +382,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
       const note = { id: existingIndex >= 0 ? next[existingIndex].id : `note_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, label: normalizedLabel, text: normalizedText, status, timestamp };
       if (existingIndex >= 0) next[existingIndex] = note;
       else next.push(note);
-      const bounded = next.slice(-7);
+      const bounded = next.slice(-20);
       progressNotesRef.current = bounded;
       return bounded;
     });
@@ -593,6 +594,8 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
     setIsThinking(true);
     progressNotesRef.current = [];
     setProgressNotes([]);
+    progressNotesRef.current = [];
+    deliveredFilePathsRef.current = new Set();
     setFinalResponseReceived(false);
     if (executionCycleTimerRef.current) clearTimeout(executionCycleTimerRef.current);
     setShowExecutionAnimation(false);
@@ -693,6 +696,10 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                         browserStatus: 'interactive'
                       });
                     }
+                  } else if (currentEvent === 'stage_note') {
+                    const stageLabel = data.label || 'Nota da etapa';
+                    updateProgressNote(`${stageLabel} · ${Date.now().toString().slice(-5)}`, data.text || 'Etapa registrada pelo agente.', 'running');
+                    setCurrentStep(data.text || stageLabel);
                   } else if (currentEvent === 'execution_gate') {
                     updateProgressNote('Transição para execução', data.text || 'Pensamento concluído; preparando a próxima ação.', 'running');
                     setCurrentStep(data.text || 'Preparando a próxima ação...');
@@ -728,7 +735,6 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                       });
                     }
                   } else if (currentEvent === 'step') {
-                    activateExecutionAnimation();
                     updateProgressNote(data.toolName || 'Etapa de execução', data.text || 'Executando a próxima etapa do plano.', 'running');
                     setCurrentStep(data.text);
                     beginExecutionStep('Executando etapa do plano', data.text);
@@ -743,7 +749,9 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                   } else if (currentEvent === 'tool_start') {
                     activateExecutionAnimation();
                     const presentation = describeToolExecution(data.toolName, data.arguments || {}, data.reason || '');
-                    updateProgressNote(presentation.label, `Iniciei esta etapa: ${presentation.detail || presentation.chip}`, 'running');
+                    const startedFilePath = String(data.arguments?.filePath || data.arguments?.path || data.arguments?.filename || '').trim();
+                    const presentationLabel = startedFilePath ? `${presentation.label} · ${startedFilePath}` : `${presentation.label} · etapa ${Date.now().toString().slice(-5)}`;
+                    updateProgressNote(presentationLabel, `Iniciei esta etapa: ${presentation.detail || presentation.chip}`, 'running');
                     setCurrentStep(`${presentation.label}: ${presentation.chip}`);
                     beginExecutionStep(presentation.label, presentation.detail);
                     const activeTrace: ToolCallTrace = {
@@ -809,13 +817,16 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                     restartExecutionAnimation();
                     const toolCall = data.toolCall;
                     const finishedPresentation = describeToolExecution(toolCall.toolName, toolCall.arguments || {}, toolCall.screenData?.actionDescription || '');
-                    updateProgressNote(finishedPresentation.label, `Etapa concluída: ${finishedPresentation.detail || 'resultado incorporado ao contexto.'}`, toolCall.status === 'error' ? 'warning' : 'complete');
+                    const finishedFilePath = String(toolCall.arguments?.filePath || toolCall.arguments?.path || toolCall.arguments?.filename || '').trim();
+                    const finishedLabel = finishedFilePath ? `${finishedPresentation.label} · ${finishedFilePath}` : finishedPresentation.label;
+                    updateProgressNote(finishedLabel, `Etapa concluída: ${finishedPresentation.detail || 'resultado incorporado ao contexto.'}`, toolCall.status === 'error' ? 'warning' : 'complete');
                     liveToolCalls.push(toolCall);
                     
                     // Live build: If the tool updated a file, sync with workspace immediately
                     if (onFileUpdate && toolCall.arguments?.content && (toolCall.toolName.includes('write') || toolCall.toolName.includes('create') || toolCall.toolName.includes('edit'))) {
                       const filePath = toolCall.arguments.path || toolCall.arguments.filePath || toolCall.arguments.filename;
-                      if (filePath) {
+                      if (filePath && !deliveredFilePathsRef.current.has(filePath)) {
+                        deliveredFilePathsRef.current.add(filePath);
                         onFileUpdate([{
                           path: filePath,
                           code: toolCall.arguments.content,
@@ -1030,7 +1041,11 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
 
       // Trigger reactive sync with Workspace
       if (generatedFilesList.length > 0 && onFileUpdate) {
-        onFileUpdate(generatedFilesList);
+        const remainingFiles = generatedFilesList.filter(file => !deliveredFilePathsRef.current.has(file.path));
+        if (remainingFiles.length > 0) {
+          remainingFiles.forEach(file => deliveredFilePathsRef.current.add(file.path));
+          onFileUpdate(remainingFiles);
+        }
       }
     } catch (err: any) {
       if (err.name !== 'AbortError') {
