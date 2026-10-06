@@ -10,10 +10,10 @@ export default defineConfig(() => {
       alias: {
         '@': path.resolve(import.meta.dirname, './src'),
       },
-      dedupe: ['react', 'react-dom'],
+      dedupe: ['react', 'react-dom', '@base-ui/react', 'react/jsx-runtime'],
     },
     optimizeDeps: {
-      include: ['react', 'react-dom'],
+      include: ['react', 'react-dom', '@base-ui/react'],
     },
     server: {
       // AI Studio and the local Preview proxy use a generated host name.

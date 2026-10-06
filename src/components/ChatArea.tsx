@@ -901,7 +901,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
         ref={scrollAreaRef}
         className="chat-messages-scroll flex-1 min-h-0 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] flex flex-col items-center bg-[#1a1a1a]"
       >
-        <div className="messages-container w-full max-w-3xl px-6 py-8 space-y-10 bg-[#1a1a1a]">
+        <div className="messages-container w-full px-6 py-8 space-y-10 bg-[#1a1a1a]">
           {messages.map((msg) => (
             <MessageItem
               key={msg.id}
@@ -962,7 +962,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
 
 
       {/* Floating Input Section */}
-      <div className="chat-input-dock w-full max-w-2xl px-6 z-20">
+      <div className="chat-input-dock w-full px-6 z-20">
         <PromptBar
           onSend={(text) => handleSendMessage(text)}
           onStop={handleStop}

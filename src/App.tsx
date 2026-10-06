@@ -119,14 +119,16 @@ export default function App() {
     <div className={`${theme} app-shell flex h-screen w-full bg-bg-canvas-main text-text-content-primary overflow-hidden font-sans selection:bg-blue-500/20`}>
       <Sidebar theme={theme} toggleTheme={toggleTheme} />
       <main className="app-main flex-1 flex min-w-0 min-h-0 overflow-hidden relative">
-        <ChatArea
-          onFileUpdate={handleFileUpdate}
-          externalPrompt={pendingPrompt}
-          onClearExternalPrompt={handleClearExternalPrompt}
-          currentFiles={customFiles}
-          onAgentStateChange={handleAgentStateChange}
-          onInspectInComputer={handleInspectInComputer}
-        />
+        <div className={isWorkspaceOpen ? "w-full md:w-[480px] lg:w-[540px] shrink-0 flex flex-col min-h-0 border-r border-white/5" : "flex-1 flex flex-col min-h-0"}>
+          <ChatArea
+            onFileUpdate={handleFileUpdate}
+            externalPrompt={pendingPrompt}
+            onClearExternalPrompt={handleClearExternalPrompt}
+            currentFiles={customFiles}
+            onAgentStateChange={handleAgentStateChange}
+            onInspectInComputer={handleInspectInComputer}
+          />
+        </div>
         {isWorkspaceOpen && (
           <Workspace
             onClose={handleCloseWorkspace}
