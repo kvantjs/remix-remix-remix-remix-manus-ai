@@ -1,12 +1,12 @@
-import {
-  MagnifyingGlass,
-  Plus,
-  Desktop,
-  Users,
-  FolderSimple,
-  Sparkle,
-  Lightning,
-  PuzzlePiece,
+import { 
+  MagnifyingGlass, 
+  Plus, 
+  Desktop, 
+  Users, 
+  FolderSimple, 
+  Sparkle, 
+  Lightning, 
+  PuzzlePiece, 
   DotsThree,
   CaretRight,
   ChatCircleText,
@@ -19,14 +19,14 @@ import {
 
 export function Sidebar({ theme, toggleTheme }: { theme: 'light' | 'dark'; toggleTheme: () => void }) {
   return (
-    <aside className="app-sidebar w-[292px] bg-bg-surface-panel border-r border-border-divider-subtle flex flex-col h-full min-h-0 shrink-0">
+    <aside className="w-[292px] bg-bg-surface-panel border-r border-border-divider-subtle flex flex-col h-full shrink-0">
       {/* Header */}
       <div className="p-4 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <img
-            src="https://imgdb.io/i/civJWXo.png"
-            alt="Logotipo da Aplicação"
-            className="size-6 object-contain rounded-md"
+          <img 
+            src="https://imgdb.io/i/civJWXo.png" 
+            alt="Logotipo da Aplicação" 
+            className="size-6 object-contain rounded-md" 
           />
           <span className="font-semibold text-sm tracking-tight text-text-content-primary">kvant</span>
         </div>
@@ -110,7 +110,7 @@ export function Sidebar({ theme, toggleTheme }: { theme: 'light' | 'dark'; toggl
             <span className="text-xs font-medium text-text-content-primary">levergucci XPTO</span>
           </div>
           <div className="flex items-center gap-1.5 text-text-content-secondary">
-            <button
+            <button 
               onClick={(e) => {
                 e.stopPropagation();
                 toggleTheme();
@@ -131,7 +131,7 @@ export function Sidebar({ theme, toggleTheme }: { theme: 'light' | 'dark'; toggl
 
 function NavItem({ icon, label, badge, color }: { icon: React.ReactNode; label: string; badge?: string; color?: string }) {
   return (
-    <button
+    <button 
       className="w-full flex items-center justify-between px-3 py-2 text-sm text-text-content-secondary hover:bg-bg-action-hover hover:text-text-content-primary rounded-lg transition-all group"
       style={color ? { color } : undefined}
     >

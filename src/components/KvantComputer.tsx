@@ -208,16 +208,43 @@ export function KvantComputer({
   agentIntent,
   browserStatus: externalBrowserStatus
 }: KvantComputerProps) {
-  // --- 1. React State & Reference Hooks (Declared first to follow React guidelines and avoid TDZ errors) ---
   const [currentUrl, setCurrentUrl] = useState<string>('https://news.ycombinator.com');
+
+  // Trigger computer activation when research or computer intent is detected
+  useEffect(() => {
+    if (agentIntent && (agentIntent.mode === 'web_research' || agentIntent.mode === 'cloud_computer') && !isComputerActive) {
+      handleTurnOnComputer();
+    }
+  }, [agentIntent]);
+
   const [pageTitle, setPageTitle] = useState<string>('Hacker News');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isExternalWeb, setIsExternalWeb] = useState<boolean>(true);
   const [liveScreenshot, setLiveScreenshot] = useState<string | null>(null);
   const [browserStatus, setBrowserStatus] = useState<'loading' | 'interactive' | 'error' | 'blocked'>('interactive');
+  
+  // Update browserStatus from props if provided
+  useEffect(() => {
+    if (externalBrowserStatus) {
+      setBrowserStatus(externalBrowserStatus);
+    }
+  }, [externalBrowserStatus]);
   const [iframeLoaded, setIframeLoaded] = useState<boolean>(false);
+
+  // Computer active / inactive state (Inactive by default per user request)
   const [isComputerActive, setIsComputerActive] = useState<boolean>(false);
-  const [forceIdle, setForceIdle] = useState<boolean>(false);
+
+  const handleTurnOnComputer = (targetUrlAfterBoot?: string) => {
+    setIsComputerActive(true);
+    if (targetUrlAfterBoot) {
+      setCurrentUrl(targetUrlAfterBoot);
+      setPageTitle(new URL(targetUrlAfterBoot).hostname || targetUrlAfterBoot);
+    }
+  };
+
+  const handleTurnOffComputer = () => {
+    setIsComputerActive(false);
+  };
 
   // History stack for navigation & scrubber
   const [navHistory, setNavHistory] = useState<NavHistoryItem[]>([
@@ -252,7 +279,7 @@ export function KvantComputer({
   const [forceLiveIframe, setForceLiveIframe] = useState<boolean>(false);
   const prevIsWorkingRef = useRef(isWorking);
 
-  // --- 2. Derived Computations (Safe from Temporal Dead Zone errors as all hooks are declared) ---
+  // Check if customFiles has an active React code file
   const customCode = 
     customFiles?.['client/src/App.tsx'] || 
     customFiles?.['App.tsx'] ||
@@ -261,10 +288,10 @@ export function KvantComputer({
   // Multi-source CAPTCHA and Security Challenge Scanner
   const isCaptchaOrChallenge = (() => {
     const textToScan = [
-      currentUrl ?? '',
-      pageTitle ?? '',
-      statusText ?? '',
-      contextText ?? '',
+      currentUrl,
+      pageTitle,
+      statusText,
+      contextText,
       toolCalls?.[toolCalls.length - 1]?.screenData?.title || '',
       toolCalls?.[toolCalls.length - 1]?.screenData?.actionDescription || '',
       toolCalls?.[toolCalls.length - 1]?.arguments?.url || ''
@@ -273,72 +300,24 @@ export function KvantComputer({
     return /captcha|recaptcha|hcaptcha|turnstile|cloudflare|challenge|just a moment|human|robot|bot|security check|verificaç|verifique|desafio|ddos|nowsecure|perimeterx|datadome|arkose|puzzle|shield|atencao|atenção/i.test(textToScan);
   })();
 
-  // Centralized Idle state flag
-  const isIdle = forceIdle || (!isWorking && !isLoading && !userControlMode && !liveScreenshot && !customCode);
-
-  // Trigger computer activation when research or computer intent is detected
-  useEffect(() => {
-    if (agentIntent && (agentIntent.mode === 'web_research' || agentIntent.mode === 'cloud_computer') && !isComputerActive) {
-      handleTurnOnComputer();
-    }
-  }, [agentIntent]);
-
-  // Update browserStatus from props if provided
-  useEffect(() => {
-    if (externalBrowserStatus) {
-      setBrowserStatus(externalBrowserStatus);
-    }
-  }, [externalBrowserStatus]);
-
-  const handleTurnOnComputer = (targetUrlAfterBoot?: string) => {
-    setIsComputerActive(true);
-    setForceIdle(false);
-    if (targetUrlAfterBoot) {
-      setCurrentUrl(targetUrlAfterBoot);
-      setPageTitle(new URL(targetUrlAfterBoot).hostname || targetUrlAfterBoot);
-    }
-  };
-
-  const handleTurnOffComputer = () => {
-    setIsComputerActive(false);
-    setForceIdle(true);
-  };
-
-  // Reset forceIdle to false on any active agent/user interaction or prompt change
-  useEffect(() => {
-    if (isWorking || isLoading || userControlMode) {
-      setForceIdle(false);
-    }
-  }, [isWorking, isLoading, userControlMode]);
-
-  useEffect(() => {
-    if (toolCalls && toolCalls.length > 0) {
-      setForceIdle(false);
-    }
-  }, [toolCalls?.length]);
-
-  useEffect(() => {
-    if (contextText) {
-      setForceIdle(false);
-    }
-  }, [contextText]);
-
   // Automatically "close" the browser and clear content when the agent finishes its work
   useEffect(() => {
     if (prevIsWorkingRef.current && !isWorking) {
-      // Immediately set the computer to Idle/Processamento Concluído as requested
-      setLiveScreenshot(null);
-      setIframeLoaded(false);
-      setForceIdle(true);
+      // Small delay to let the user see the final result before closing
+      const timer = setTimeout(() => {
+        setLiveScreenshot(null);
+        setIframeLoaded(false);
+      }, 3000);
+      return () => clearTimeout(timer);
     }
     prevIsWorkingRef.current = isWorking;
   }, [isWorking]);
 
   // Inactivity fallback: If no interaction or state change happens for 30s, 
-  // automatically close the browser and show the Processamento Concluído screen.
+  // automatically close the browser and show the Idle screen.
   useEffect(() => {
-    // Only track inactivity if the computer is active and we are NOT already idle
-    if (!isComputerActive || isIdle) return;
+    // Only track inactivity if the computer is active and showing content
+    if (!isComputerActive || (!liveScreenshot && !customCode && iframeLoaded)) return;
 
     // Reset timer on any significant state change (monitored via dependencies)
     const inactivityTimer = setTimeout(() => {
@@ -348,7 +327,6 @@ export function KvantComputer({
       setLiveScreenshot(null);
       setIframeLoaded(false);
       setForceLiveIframe(false);
-      setForceIdle(true);
     }, 30000); // 30 seconds
 
     return () => clearTimeout(inactivityTimer);
@@ -364,8 +342,7 @@ export function KvantComputer({
     liveScreenshot, 
     customCode, 
     isComputerActive,
-    currentUrl,
-    isIdle
+    currentUrl
   ]);
 
   const shouldShowLiveIframe = forceLiveIframe || userControlMode || isCaptchaOrChallenge || !liveScreenshot;
@@ -812,7 +789,7 @@ export function KvantComputer({
                 Envie uma instrução ao agente no chat para ligar o computador e iniciar as automações.
               </p>
           </div>
-        ) : isIdle ? (
+        ) : (!isWorking && !isLoading && !userControlMode && !liveScreenshot && !customCode) ? (
           /* ACTIVE BUT IDLE COMPUTER SCREEN (NOTHING TO SHOW) */
           <div className="flex-1 bg-bg-canvas-main flex flex-col items-center justify-center p-6 text-center select-none overflow-y-auto space-y-4 animate-in fade-in duration-500">
               <img 
@@ -831,7 +808,7 @@ export function KvantComputer({
           </div>
         ) : (
           <div 
-            className={`relative flex-1 bg-white overflow-hidden flex flex-col min-h-0 ${userControlMode || isCaptchaOrChallenge || forceLiveIframe ? 'cursor-default select-auto pointer-events-auto' : 'pointer-events-none select-none'}`}
+            className={`relative flex-1 bg-white overflow-hidden flex flex-col min-h-0 ${userControlMode || isCaptchaOrChallenge || forceLiveIframe ? 'cursor-default select-auto' : 'cursor-not-allowed select-none'}`}
           >
             {isLoading && (
               <div className="absolute top-0 left-0 right-0 h-0.5 bg-blue-500 z-30 animate-pulse" />
@@ -981,7 +958,7 @@ export function KvantComputer({
         )}
 
         {/* AGENT MOUSE CURSOR: Positioned over the remote desktop */}
-        {agentCursor.visible && isComputerActive && !isIdle && (isWorking || isLoading || userControlMode || liveScreenshot || customCode) && (
+        {agentCursor.visible && isComputerActive && (isWorking || isLoading || userControlMode || liveScreenshot || customCode) && (
           <span 
             className="absolute pointer-events-none transition-all duration-300 ease-out z-50 bg-transparent !bg-transparent border-none !border-none shadow-none !shadow-none"
             style={{
@@ -1048,8 +1025,8 @@ export function KvantComputer({
               </div>
 
               <div 
-                className="absolute size-1.5 rounded-full bg-blue-500 ring-1 ring-blue-400/30 shadow-md shadow-blue-500/30 transition-all duration-150 pointer-events-none group-hover:scale-110"
-                style={{ left: `calc(${scrubberValue}% - 3px)` }}
+                className="absolute size-3 rounded-full bg-blue-500 ring-2 ring-blue-400/40 shadow-md shadow-blue-500/30 transition-all duration-150 pointer-events-none group-hover:scale-110"
+                style={{ left: `calc(${scrubberValue}% - 6px)` }}
               />
 
               <input 
@@ -1084,11 +1061,11 @@ export function KvantComputer({
                   setPageTitle(latest.title);
                 }
               }}
-              className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white font-medium shrink-0 cursor-pointer transition-colors"
+              className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 font-medium shrink-0 cursor-pointer transition-colors"
               title="Voltar ao vivo"
             >
-              <span className={`size-1.5 rounded-full ${isLive ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-zinc-500/40'}`} />
-              <span className={`text-[11px] ${isLive ? 'text-white font-semibold drop-shadow-[0_0_6px_rgba(255,255,255,0.3)]' : 'text-zinc-500'}`}>Ao vivo</span>
+              <span className={`size-1.5 rounded-full ${isLive ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]' : 'bg-blue-500/40'}`} />
+              <span className={`text-[11px] ${isLive ? 'text-blue-400 font-semibold drop-shadow-[0_0_6px_rgba(59,130,246,0.3)]' : 'text-blue-400/60'}`}>Ao vivo</span>
             </div>
           </div>
         )}

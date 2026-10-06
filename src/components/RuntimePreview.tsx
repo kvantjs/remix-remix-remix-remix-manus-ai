@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import {
-  Monitor,
-  DeviceMobile,
-  Globe,
-  ArrowsCounterClockwise,
-  Terminal,
+import { 
+  Monitor, 
+  DeviceMobile, 
+  Globe, 
+  ArrowsCounterClockwise, 
+  Terminal, 
   Cube,
   Sparkle,
   ArrowSquareOut
@@ -19,7 +19,7 @@ interface RuntimePreviewProps {
   projectId?: string;
 }
 
-export function RuntimePreview({ activeCode, customFiles, onSendPrompt, projectId = 'kopilot-ai' }: RuntimePreviewProps) {
+export function RuntimePreview({ activeCode, customFiles, onSendPrompt, projectId = 'remix-manus-ai' }: RuntimePreviewProps) {
   const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop');
   const [useDaytona, setUseDaytona] = useState(true);
   const [daytonaUrl, setDaytonaUrl] = useState<string | null>(null);

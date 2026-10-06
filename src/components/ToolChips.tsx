@@ -337,7 +337,7 @@ export default function ToolChips({
     });
 
   return (
-    <div className={`w-full min-w-0 max-w-full overflow-hidden pb-1${className ? ` ${className}` : ""}`}>
+    <div className={`w-full max-w-[780px] pb-1${className ? ` ${className}` : ""}`}>
       {/* collapsed run header */}
       <button
         type="button"
@@ -348,7 +348,7 @@ export default function ToolChips({
             return !current;
           })
         }
-        className="-mx-1.5 flex min-w-0 max-w-full items-center gap-1.5 rounded-lg px-2 py-1 text-[12.5px] font-medium text-text-content-secondary transition-colors duration-150 hover:bg-white/5 hover:text-text-content-primary cursor-pointer"
+        className="-mx-1.5 flex w-fit items-center gap-1.5 rounded-lg px-2 py-1 text-[12.5px] font-medium text-text-content-secondary transition-colors duration-150 hover:bg-white/5 hover:text-text-content-primary cursor-pointer"
       >
         <CaretDown
           size={12}
@@ -374,7 +374,7 @@ export default function ToolChips({
                     type="button"
                     aria-expanded={rowOpen}
                     onClick={() => toggleRow(row.label)}
-                    className="group/row -mx-[3px] flex h-7 w-[calc(100%+6px)] min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-lg px-2 text-left transition-all duration-150 hover:bg-white/5 cursor-pointer"
+                    className="group/row -mx-[3px] flex h-7 w-[calc(100%+6px)] min-w-0 items-center gap-2 rounded-lg px-2 text-left transition-all duration-150 hover:bg-white/5 cursor-pointer"
                   >
                     <span className="relative flex size-5 shrink-0 items-center justify-center">
                       <span className={`transition-opacity duration-100 flex size-5 items-center justify-center rounded-[3px] bg-cover bg-center border border-white/10 shadow-xs ${rowOpen ? "opacity-0" : "group-hover/row:opacity-0"}`} style={{ backgroundImage: `url('https://imgdb.io/i/axsNhBY.png')` }}>
@@ -386,7 +386,7 @@ export default function ToolChips({
                         className={`absolute text-text-content-secondary transition-all duration-150 ${rowOpen ? "opacity-100 rotate-90" : "opacity-0 group-hover/row:opacity-100"}`}
                       />
                     </span>
-                    <span className="min-w-0 max-w-[42%] truncate text-[12.5px] font-medium text-text-content-primary">{row.label}</span>
+                    <span className="shrink-0 text-[12.5px] font-medium text-text-content-primary">{row.label}</span>
                     <span
                       className={`inline-flex h-5.5 min-w-0 flex-1 items-center truncate rounded-md bg-white/[0.04] border border-white/[0.06] px-2
                         text-[11px] text-text-content-secondary transition-colors duration-100 group-hover/row:bg-white/[0.08] group-hover/row:text-text-content-primary
@@ -410,7 +410,7 @@ export default function ToolChips({
                         {row.detail.map((line, lineIdx) => (
                           <span
                             key={`${line.text}_${lineIdx}`}
-                            className={`min-w-0 max-w-full truncate text-[11px] leading-[1.6] ${row.detailMono ? "font-mono" : ""} ${line.tone === "add" ? "text-emerald-400" : "text-text-content-secondary/80"}`}
+                            className={`truncate text-[11px] leading-[1.6] ${row.detailMono ? "font-mono" : ""} ${line.tone === "add" ? "text-emerald-400" : "text-text-content-secondary/80"}`}
                           >
                             {line.text}
                           </span>

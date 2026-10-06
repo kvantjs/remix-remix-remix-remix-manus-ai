@@ -12,7 +12,7 @@ import { ToolCallTrace } from './types/project';
 export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('kopilot-theme') as 'light' | 'dark') || 'dark';
+      return (localStorage.getItem('sparkle-theme') as 'light' | 'dark') || 'dark';
     }
     return 'dark';
   });
@@ -24,7 +24,7 @@ export default function App() {
   const toggleTheme = useCallback(() => {
     setTheme(prev => {
       const next = prev === 'dark' ? 'light' : 'dark';
-      localStorage.setItem('kopilot-theme', next);
+      localStorage.setItem('sparkle-theme', next);
       return next;
     });
   }, []);
@@ -116,22 +116,20 @@ export default function App() {
   }, []);
 
   return (
-    <div className={`${theme} app-shell flex h-screen w-full bg-bg-canvas-main text-text-content-primary overflow-hidden font-sans selection:bg-blue-500/20`}>
+    <div className={`${theme} flex h-screen w-full bg-bg-canvas-main text-text-content-primary overflow-hidden font-sans selection:bg-blue-500/20`}>
       <Sidebar theme={theme} toggleTheme={toggleTheme} />
-      <main className="app-main flex-1 flex min-w-0 min-h-0 overflow-hidden relative">
-        <div className={isWorkspaceOpen ? "w-full md:w-[480px] lg:w-[540px] shrink-0 flex flex-col min-h-0 border-r border-white/5" : "flex-1 flex flex-col min-h-0"}>
-          <ChatArea
-            onFileUpdate={handleFileUpdate}
-            externalPrompt={pendingPrompt}
-            onClearExternalPrompt={handleClearExternalPrompt}
-            currentFiles={customFiles}
-            onAgentStateChange={handleAgentStateChange}
-            onInspectInComputer={handleInspectInComputer}
-          />
-        </div>
+      <main className="flex-1 flex overflow-hidden relative">
+        <ChatArea 
+          onFileUpdate={handleFileUpdate} 
+          externalPrompt={pendingPrompt}
+          onClearExternalPrompt={handleClearExternalPrompt}
+          currentFiles={customFiles}
+          onAgentStateChange={handleAgentStateChange}
+          onInspectInComputer={handleInspectInComputer}
+        />
         {isWorkspaceOpen && (
-          <Workspace
-            onClose={handleCloseWorkspace}
+          <Workspace 
+            onClose={handleCloseWorkspace} 
             customFiles={customFiles}
             onFileUpdate={handleFileUpdate}
             onSendPrompt={handleSendPrompt}

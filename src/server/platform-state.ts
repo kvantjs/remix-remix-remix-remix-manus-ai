@@ -35,7 +35,7 @@ const defaultConfig: PlatformConfig = {
   version: 1,
   revision: 1,
   project: {
-    name: 'Kopilot AI',
+    name: 'Remix Sparkle AI',
     description: 'Aplicação full-stack criada no Google AI Studio e integrada ao Webdev.'
   },
   features: {
@@ -51,7 +51,7 @@ const defaultConfig: PlatformConfig = {
     port: Number(process.env.PORT) || 3000,
     healthPath: '/health'
   },
-  routes: [{ path: '/', title: 'Kopilot AI' }],
+  routes: [{ path: '/', title: 'Remix Sparkle AI' }],
   updatedAt: new Date().toISOString()
 };
 

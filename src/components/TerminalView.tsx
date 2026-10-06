@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import {
-  Terminal as TerminalIcon,
-  Trash,
-  ArrowsCounterClockwise,
-  Lightning,
-  Play,
-  CheckCircle
+import { 
+  Terminal as TerminalIcon, 
+  Trash, 
+  ArrowsCounterClockwise, 
+  Lightning, 
+  Play, 
+  CheckCircle 
 } from '@phosphor-icons/react';
 import { SyntaxCodeView, detectLanguage } from './SyntaxCodeView';
 
@@ -26,12 +26,12 @@ function TerminalOutput({ content }: { content: string }) {
     }
     return (
       <div className="my-1.5 pl-2 border-l-2 border-blue-500/40">
-        <SyntaxCodeView
-          code={formattedCode}
-          language={lang}
-          compact
-          showLineNumbers={formattedCode.split('\n').length > 3}
-          maxHeight="320px"
+        <SyntaxCodeView 
+          code={formattedCode} 
+          language={lang} 
+          compact 
+          showLineNumbers={formattedCode.split('\n').length > 3} 
+          maxHeight="320px" 
         />
       </div>
     );
@@ -162,7 +162,7 @@ export function TerminalView({ activeCode }: { activeCode?: string }) {
   };
 
   return (
-    <div
+    <div 
       className="h-full flex flex-col bg-[#111111] text-[#ededed] font-mono text-[12px] select-text"
       onClick={() => inputRef.current?.focus()}
     >
@@ -170,13 +170,13 @@ export function TerminalView({ activeCode }: { activeCode?: string }) {
       <div className="h-9 border-b border-white/5 bg-[#181818] px-3 flex items-center justify-between shrink-0 select-none">
         <div className="flex items-center gap-2 text-white/50 text-[11px] font-sans">
           <TerminalIcon size={13} className="text-green-400" />
-          <span className="font-semibold text-white/80">bash (Kopilot@sandbox)</span>
+          <span className="font-semibold text-white/80">bash (Sparkle@sandbox)</span>
           <span className="text-[10px] bg-green-500/10 text-green-400 border border-green-500/20 px-1.5 py-0.5 rounded">
             Interativo Real
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <button
+          <button 
             onClick={(e) => {
               e.stopPropagation();
               executeCommand('curl https://api.github.com/zen');
@@ -186,7 +186,7 @@ export function TerminalView({ activeCode }: { activeCode?: string }) {
           >
             Testar curl API
           </button>
-          <button
+          <button 
             onClick={(e) => {
               e.stopPropagation();
               executeCommand('npm test');
@@ -195,7 +195,7 @@ export function TerminalView({ activeCode }: { activeCode?: string }) {
           >
             Executar testes
           </button>
-          <button
+          <button 
             onClick={(e) => {
               e.stopPropagation();
               setHistory([]);
@@ -214,7 +214,7 @@ export function TerminalView({ activeCode }: { activeCode?: string }) {
           <div key={line.id} className="leading-relaxed">
             {line.type === 'input' && (
               <div className="flex items-start gap-2 text-white">
-                <span className="text-green-400 font-semibold select-none">Kopilot@sandbox:~/project$</span>
+                <span className="text-green-400 font-semibold select-none">Sparkle@sandbox:~/project$</span>
                 <span className="font-medium text-white/90">{line.content}</span>
               </div>
             )}
@@ -236,7 +236,7 @@ export function TerminalView({ activeCode }: { activeCode?: string }) {
 
         {/* Live Input Prompt Row */}
         <div className="flex items-center gap-2 pt-1">
-          <span className="text-green-400 font-semibold select-none shrink-0">Kopilot@sandbox:~/project$</span>
+          <span className="text-green-400 font-semibold select-none shrink-0">Sparkle@sandbox:~/project$</span>
           <input
             ref={inputRef}
             type="text"

@@ -143,13 +143,13 @@ export default function ThinkingState({
   }, [working, onSettled]);
 
   return (
-    <div className="flex w-full min-w-0 max-w-full overflow-hidden flex-col select-none">
+    <div className="flex w-full max-w-[780px] flex-col select-none">
       {/* header — shared across variants */}
       <button
         type="button"
         aria-expanded={expanded}
         onClick={() => setManualExpanded((current) => !(current ?? true))}
-        className="-mx-1.5 flex min-w-0 max-w-full items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-white/5 cursor-pointer"
+        className="-mx-1.5 flex w-fit items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-white/5 cursor-pointer"
       >
         <div className="size-5 rounded-[3px] bg-cover bg-center overflow-hidden flex items-center justify-center shadow-xs border border-white/10" style={{ backgroundImage: `url('https://imgdb.io/i/axsNhBY.png')` }}>
           {icon ? (
@@ -162,7 +162,7 @@ export default function ThinkingState({
             </svg>
           )}
         </div>
-        <span role="status" className="min-w-0 max-w-full break-words whitespace-normal text-xs font-medium text-text-content-primary flex items-center gap-1.5">
+        <span role="status" className="text-xs font-medium text-text-content-primary flex items-center gap-1.5">
           {working ? (
             <span className="thinking-shimmer font-semibold">{v.active} · {elapsedSeconds}s</span>
           ) : (
@@ -198,29 +198,29 @@ export default function ThinkingState({
                 {v.rows.map((row, i) => (
                   <p key={`reasoning_${row.primary}_${i}`} className="flex items-start gap-2">
                     <span className="text-text-content-secondary/50 font-mono text-[11px] shrink-0">›</span>
-                    <span className="min-w-0 break-words">{row.primary}</span>
+                    <span>{row.primary}</span>
                   </p>
                 ))}
               </div>
             </div>
           ) : variant === "Search" ? (
             /* Frameless Transparent Web Search Trace */
-            <div className="min-w-0 max-w-full space-y-2 pl-3 border-l border-border-divider-subtle/40 ml-1 text-xs">
+            <div className="space-y-2 pl-3 border-l border-border-divider-subtle/40 ml-1 text-xs">
               <div className="flex items-center gap-2 font-mono text-[11px] text-text-content-secondary">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white/40 shrink-0">
                   <circle cx="11" cy="11" r="7" />
                   <path d="M21 21l-4.3-4.3" />
                 </svg>
-                <span className="min-w-0 truncate">{v.query || "Consultando informações na web..."}</span>
+                <span className="truncate">{v.query || "Consultando informações na web..."}</span>
               </div>
               <div className="space-y-1">
                 {v.rows.map((row, i) => {
                   const hasHref = Boolean(row.href && row.href !== "#");
                   const content = (
                     <>
-                      <div className="min-w-0 flex items-center gap-2 truncate">
+                      <div className="flex items-center gap-2 truncate">
                         <Favicon urlOrDomain={row.href || row.secondary || ""} size={14} />
-                      <span className={`min-w-0 truncate font-medium text-text-content-primary/90 text-[12px] ${hasHref ? 'group-hover:underline' : ''}`}>
+                        <span className={`font-medium text-text-content-primary/90 text-[12px] truncate ${hasHref ? 'group-hover:underline' : ''}`}>
                           {row.primary}
                         </span>
                       </div>
@@ -255,15 +255,15 @@ export default function ThinkingState({
             </div>
           ) : (
             /* Frameless Transparent Standard Step Trace */
-            <div className="min-w-0 max-w-full space-y-1 pl-3 border-l border-border-divider-subtle/40 ml-1">
+            <div className="space-y-1 pl-3 border-l border-border-divider-subtle/40 ml-1">
               {v.rows.map((row, i) => {
                 const isActive = working && i === v.rows.length - 1;
                 return (
-                  <div key={`step_${row.primary}_${i}`} className="flex min-w-0 max-w-full items-center gap-2.5 py-1 text-xs text-text-content-primary/80 transition-colors">
+                  <div key={`step_${row.primary}_${i}`} className="flex items-center gap-2.5 py-1 text-xs text-text-content-primary/80 transition-colors">
                     <span className={`size-1.5 rounded-full ${isActive ? 'bg-zinc-400 animate-pulse shadow-[0_0_8px_rgba(161,161,170,0.5)]' : 'bg-text-content-secondary/60'} shrink-0`} />
-                    <span className={`min-w-0 flex-1 font-medium text-[12px] truncate ${isActive ? 'text-text-content-primary' : ''}`}>{row.primary}</span>
+                    <span className={`font-medium text-[12px] truncate ${isActive ? 'text-text-content-primary' : ''}`}>{row.primary}</span>
                     {row.secondary && (
-                      <span className="max-w-[38%] truncate text-[11px] font-mono text-text-content-secondary/60 shrink-0 ml-auto">{row.secondary}</span>
+                      <span className="text-[11px] font-mono text-text-content-secondary/60 shrink-0 ml-auto">{row.secondary}</span>
                     )}
                   </div>
                 );
