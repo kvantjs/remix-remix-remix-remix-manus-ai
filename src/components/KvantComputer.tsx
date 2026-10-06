@@ -1033,8 +1033,8 @@ export function KvantComputer({
               </div>
 
               <div 
-                className="absolute size-3 rounded-full bg-blue-500 ring-2 ring-blue-400/40 shadow-md shadow-blue-500/30 transition-all duration-150 pointer-events-none group-hover:scale-110"
-                style={{ left: `calc(${scrubberValue}% - 6px)` }}
+                className="absolute size-2 rounded-full bg-blue-500 ring-2 ring-blue-400/40 shadow-md shadow-blue-500/30 transition-all duration-150 pointer-events-none group-hover:scale-125"
+                style={{ left: `calc(${scrubberValue}% - 4px)` }}
               />
 
               <input 
@@ -1069,11 +1069,11 @@ export function KvantComputer({
                   setPageTitle(latest.title);
                 }
               }}
-              className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 font-medium shrink-0 cursor-pointer transition-colors"
+              className="flex items-center gap-1.5 text-xs shrink-0 cursor-pointer transition-colors"
               title="Voltar ao vivo"
             >
-              <span className={`size-1.5 rounded-full ${isLive ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]' : 'bg-blue-500/40'}`} />
-              <span className={`text-[11px] ${isLive ? 'text-blue-400 font-semibold drop-shadow-[0_0_6px_rgba(59,130,246,0.3)]' : 'text-blue-400/60'}`}>Ao vivo</span>
+              <span className={`size-1.5 rounded-full ${isLive ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)]' : 'bg-emerald-500/40'}`} />
+              <span className={`text-[11px] ${isLive ? 'text-white font-semibold' : 'text-zinc-400'}`}>Ao vivo</span>
             </div>
           </div>
         )}
