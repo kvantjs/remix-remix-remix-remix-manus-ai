@@ -14,7 +14,7 @@ export interface AgentSkill {
   systemInstruction: string;
 }
 
-export const AGENT_SKILLS: AgentSkill[] = [
+const CORE_AGENT_SKILLS: AgentSkill[] = [
   {
     id: 'skill-design-to-code',
     name: 'Design-to-Code & Vibecoding de Alta Fidelidade',
@@ -205,11 +205,41 @@ Em todas as interações:
   }
 ];
 
+type AdvancedSkillTuple = [string, string, AgentSkill['category'], AgentSkill['mcpServers'], string, string[], string];
+type AdvancedSkillSpec = Omit<AgentSkill, 'id' | 'version'> & { slug: string };
+const ADVANCED_SKILL_SPECS: AdvancedSkillSpec[] = ([
+  ['product-requirements', 'Engenharia de Requisitos e Critérios de Aceite', 'architecture', ['WebDev'], 'Converte pedidos vagos em escopo verificável.', ['escopo', 'restrições', 'aceite'], 'Transforme o pedido em critérios de aceite antes de criar.'],
+  ['ux-information-architecture', 'Arquitetura de Informação e Jornadas UX', 'frontend', ['WebDev'], 'Organiza navegação, hierarquia e estados de produto.', ['rotas', 'hierarquia', 'estados'], 'Modele jornada principal, vazio, carregamento, erro e confirmação.'],
+  ['responsive-layout', 'Layout Responsivo Multidispositivo', 'frontend', ['WebDev'], 'Garante composição em desktop, tablet e mobile.', ['breakpoints', 'grids fluidos', 'touch targets'], 'Valide 375px, 768px e desktop sem larguras frágeis.'],
+  ['accessibility-wcag', 'Acessibilidade WCAG e Teclado', 'frontend', ['WebDev'], 'Aplica semântica, foco, contraste e navegação acessível.', ['aria', 'foco', 'contraste'], 'Todo controle deve ter nome, foco visível e estado acessível.'],
+  ['design-tokens', 'Design Tokens e Sistema Visual', 'frontend', ['WebDev'], 'Cria tokens consistentes de cor, tipografia e espaçamento.', ['paleta', 'tipografia', 'tokens'], 'Defina identidade visual própria antes dos componentes.'],
+  ['visual-assets', 'Direção de Arte e Ativos Visuais', 'frontend', ['WebDev', 'Computer'], 'Seleciona ícones, imagens e ilustrações coerentes.', ['iconografia', 'imagens', 'fallback'], 'Use ativos relevantes e mantenha fallback acessível.'],
+  ['forms-validation', 'Formulários, Validação e Feedback', 'frontend', ['WebDev'], 'Implementa formulários com estados e feedback completos.', ['campos', 'submit', 'feedback'], 'Valide, preserve entradas e mostre sucesso ou erro no fluxo.'],
+  ['state-management', 'Modelagem de Estado React', 'frontend', ['WebDev'], 'Evita estado duplicado, loops e efeitos inseguros.', ['useState', 'reducer', 'memoização'], 'Mantenha uma fonte de verdade e derive filtros e totais.'],
+  ['data-visualization', 'Visualização de Dados e Métricas', 'frontend', ['WebDev'], 'Transforma dados em gráficos, tabelas e métricas compreensíveis.', ['escalas', 'vazio', 'tooltips'], 'Explique unidades e ausência de dados sem inventar precisão.'],
+  ['ecommerce-flows', 'Fluxos de Comércio e Checkout', 'frontend', ['WebDev'], 'Implementa catálogo, carrinho, cupons e checkout.', ['carrinho', 'totais', 'etapas'], 'Mantenha subtotal, desconto, frete e total consistentes.'],
+  ['auth-rbac', 'Autenticação, Sessão e RBAC', 'backend', ['WebDev', 'Terminal Bash'], 'Projeta sessão, papéis e permissões com segurança.', ['roles', 'sessão', 'rotas protegidas'], 'Separe autenticação de autorização e não exponha segredos.'],
+  ['database-schema', 'Modelagem de Dados e Migrações', 'backend', ['WebDev', 'Terminal Bash'], 'Define entidades, relações, índices e migrações.', ['relações', 'integridade', 'migração'], 'Documente invariantes, índices e compatibilidade.'],
+  ['api-contract-testing', 'Contratos de API e Integração Resiliente', 'backend', ['WebDev', 'Computer'], 'Integra APIs com schemas, timeouts e rate limits.', ['schemas', 'retry', 'paginação'], 'Valide status, payload e limites antes de consumir dados.'],
+  ['performance-budget', 'Performance, Bundle e Renderização', 'devops', ['WebDev', 'Terminal Bash'], 'Controla peso, carregamento e re-renderizações.', ['bundle', 'lazy loading', 'profiling'], 'Proteja o caminho crítico e evite trabalho caro por render.'],
+  ['seo-metadata', 'SEO Técnico e Compartilhamento Social', 'frontend', ['WebDev'], 'Adiciona semântica, metadados e previews sociais.', ['title', 'canonical', 'Open Graph'], 'Cada rota pública deve ser indexável e descritiva.'],
+  ['i18n-localization', 'Internacionalização e Localização', 'frontend', ['WebDev'], 'Prepara idioma, moeda, datas e pluralização.', ['Intl', 'locale', 'fallback'], 'Use Intl e preserve o idioma solicitado.'],
+  ['error-observability', 'Observabilidade, Logs e Diagnóstico', 'devops', ['WebDev', 'Terminal Bash'], 'Instrumenta erros e logs acionáveis sem vazar dados.', ['correlation id', 'logs', 'boundary'], 'Registre contexto útil sem segredos ou dados sensíveis.'],
+  ['testing-qa', 'QA, Testes de Fluxo e Regressão', 'devops', ['WebDev', 'Terminal Bash'], 'Valida compilação, interações e regressões.', ['smoke', 'bordas', 'visual'], 'Teste caminho principal, erro, vazio, mobile e repetição.'],
+  ['migration-refactor', 'Refatoração e Migração Segura', 'architecture', ['WebDev', 'Terminal Bash'], 'Evolui projetos sem apagar comportamento não solicitado.', ['diff', 'compatibilidade', 'rollback'], 'Leia dependências, preserve contratos e valide o diff.'],
+  ['documentation-release', 'Documentação, Changelog e Entrega', 'architecture', ['WebDev'], 'Documenta estrutura, instalação, comandos e limites.', ['README', 'manifesto', 'release'], 'Entregue documentação que permita executar e manter o projeto.'],
+  ['realtime-collaboration', 'Sincronização em Tempo Real e Concorrência', 'automation', ['WebDev', 'Computer'], 'Projeta eventos ao vivo, reconciliação e conflitos.', ['conexão', 'ordenação', 'conflito'], 'Mostre status e não sobrescreva mudanças silenciosamente.'],
+  ['runtime-security', 'Segurança do Runtime e Isolamento de Preview', 'devops', ['WebDev', 'Terminal Bash'], 'Reduz riscos de CSS global, XSS e vazamento de ambiente.', ['escopo', 'sanitização', 'segredos'], 'Isole preview, bloqueie segredos e trate código gerado como não confiável.']
+] as AdvancedSkillTuple[]).map(([slug, name, category, mcpServers, description, capabilities, instruction]) => ({ slug, name, category, mcpServers, description, capabilities, systemInstruction: `[SKILL: ${slug.toUpperCase().replace(/-/g, '_')}]
+${instruction}` }));
+const ADVANCED_AGENT_SKILLS: AgentSkill[] = ADVANCED_SKILL_SPECS.map(({ slug, ...skill }) => ({ ...skill, id: `skill-${slug}`, version: '1.0.0' }));
+export const AGENT_SKILLS: AgentSkill[] = [...CORE_AGENT_SKILLS, ...ADVANCED_AGENT_SKILLS];
+
 export function getSkillsSummary(): string {
   return AGENT_SKILLS.map((s, i) => `${i + 1}. **${s.name}** (v${s.version}) [MCP: ${s.mcpServers.join(', ')}]\n   ${s.description}`).join('\n\n');
 }
 
 export function buildSkillsSystemInstruction(): string {
-  return `\n\n--- HABILIDADES DE PONTA (10 SKILLS ATIVAS NO AGENTE) ---\n` +
+  return `\n\n--- HABILIDADES DE PONTA (32 SKILLS ATIVAS NO AGENTE) ---\n` +
     AGENT_SKILLS.map(s => s.systemInstruction).join('\n\n');
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Component, ErrorInfo, ReactNode } from 'react';
+import React, { useState, useEffect, useRef, Component, ErrorInfo, ReactNode } from 'react';
 import * as Babel from '@babel/standalone';
 import * as PhosphorIcons from '@phosphor-icons/react';
 
@@ -179,6 +179,20 @@ function sanitizeSourceCode(rawCode: string): { code: string; mainComponentName:
   return { code, mainComponentName };
 }
 
+function scopeRuntimeCss(css: string) {
+  if (!css.trim()) return '';
+  // Keep generated CSS inside the preview so a user site cannot recolor the Manus shell.
+  return css.replace(/(^|})\s*([^@}{][^{}]+)\{/g, (_match, boundary, selector) => {
+    const scoped = String(selector).split(',').map(part => {
+      const trimmed = part.trim();
+      if (!trimmed || trimmed.startsWith('#kvant-runtime-root')) return trimmed;
+      if (trimmed === ':root' || trimmed === 'html' || trimmed === 'body') return '#kvant-runtime-root';
+      return `#kvant-runtime-root ${trimmed}`;
+    }).join(', ');
+    return `${boundary}\n${scoped} {`;
+  });
+}
+
 interface DynamicRuntimeRunnerProps {
   code: string;
   customFiles?: Record<string, string>;
@@ -188,6 +202,8 @@ export function DynamicRuntimeRunner({ code, customFiles = {} }: DynamicRuntimeR
   const [ComponentToRender, setComponentToRender] = useState<React.ComponentType<any> | null>(null);
   const [compilationError, setCompilationError] = useState<string | null>(null);
   const [isCompiling, setIsCompiling] = useState(false);
+  const [runtimeNotice, setRuntimeNotice] = useState<string | null>(null);
+  const runtimeStyleId = useRef(`dynamic-runtime-css-${Math.random().toString(36).slice(2, 9)}`);
 
   useEffect(() => {
     if (!code || !code.trim()) {
@@ -203,7 +219,7 @@ export function DynamicRuntimeRunner({ code, customFiles = {} }: DynamicRuntimeR
       // 1. Compile subcomponents from customFiles if any
       const subComponents: Record<string, any> = {};
 
-      // 1a. Process and inject custom CSS files dynamically into document head
+      // 1a. Process and inject custom CSS files into a scoped preview stylesheet.
       let aggregatedCss = '';
       for (const [filePath, fileContent] of Object.entries(customFiles)) {
         if (filePath.endsWith('.css') && fileContent && typeof fileContent === 'string') {
@@ -212,13 +228,14 @@ export function DynamicRuntimeRunner({ code, customFiles = {} }: DynamicRuntimeR
       }
 
       if (typeof document !== 'undefined') {
-        let styleElement = document.getElementById('dynamic-runtime-css');
+        let styleElement = document.getElementById(runtimeStyleId.current);
         if (!styleElement) {
           styleElement = document.createElement('style');
-          styleElement.setAttribute('id', 'dynamic-runtime-css');
+          styleElement.setAttribute('id', runtimeStyleId.current);
           document.head.appendChild(styleElement);
         }
-        styleElement.textContent = aggregatedCss;
+        styleElement.textContent = scopeRuntimeCss(aggregatedCss);
+        setRuntimeNotice(aggregatedCss.trim() ? 'CSS dos arquivos carregado com escopo isolado' : null);
       }
 
       // 1b. Parse and expose JSON, MD, TXT files into the subcomponents dictionary for imports
@@ -432,6 +449,9 @@ export function DynamicRuntimeRunner({ code, customFiles = {} }: DynamicRuntimeR
     } finally {
       setIsCompiling(false);
     }
+    return () => {
+      if (typeof document !== 'undefined') document.getElementById(runtimeStyleId.current)?.remove();
+    };
   }, [code, customFiles]);
 
   if (compilationError) {
@@ -488,7 +508,8 @@ export function DynamicRuntimeRunner({ code, customFiles = {} }: DynamicRuntimeR
         </div>
       )}
     >
-      <div className="w-full h-full min-h-full flex flex-col bg-transparent overflow-auto">
+      <div id="kvant-runtime-root" className="w-full h-full min-h-full flex flex-col overflow-auto" style={{ isolation: 'isolate', background: 'transparent' }}>
+        {runtimeNotice && <div className="pointer-events-none absolute right-2 top-2 z-50 rounded-md border border-emerald-400/20 bg-black/60 px-2 py-1 text-[10px] font-mono text-emerald-200/80 backdrop-blur-sm">{runtimeNotice}</div>}
         <RenderedComponent />
       </div>
     </ErrorBoundary>

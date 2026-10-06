@@ -235,7 +235,7 @@ export function RuntimePreview({ activeCode, customFiles, onSendPrompt, projectI
           )}
 
           {/* RUNTIME VIEWPORT */}
-          <div key={`${activeCode}-${refreshKey}`} className="flex-1 overflow-auto w-full h-full relative bg-[#111]">
+          <div key={`${activeCode}-${refreshKey}`} className="flex-1 overflow-auto w-full h-full relative bg-transparent">
             {useDaytona ? (
               isDaytonaLoading ? (
                 <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-slate-400 font-mono text-xs">
@@ -247,7 +247,7 @@ export function RuntimePreview({ activeCode, customFiles, onSendPrompt, projectI
                   <iframe
                     src={daytonaUrl}
                     title="Preview Daytona Sandbox"
-                    className="w-full h-full border-none bg-white"
+                    className="w-full h-full border-none bg-transparent"
                     sandbox="allow-scripts allow-same-origin allow-forms allow-modals"
                   />
                   <div className="absolute top-3 right-3 opacity-80 group-hover:opacity-100 transition-opacity z-10">

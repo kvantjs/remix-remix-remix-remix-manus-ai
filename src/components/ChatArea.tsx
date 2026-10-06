@@ -1401,7 +1401,7 @@ function MessageItem({
         )}
 
         {/* Clean Executive Response Text with Streaming Text Animation */}
-        <div className="text-sm leading-relaxed text-text-content-primary/90 font-sans">
+        <div className="text-[15px] leading-relaxed text-text-content-primary/90 font-sans">
           <StreamingText 
             content={cleanText}
             isStreaming={Boolean(message.isStreaming && !isAlreadyStreamed)}

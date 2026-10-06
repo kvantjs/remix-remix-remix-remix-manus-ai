@@ -537,6 +537,8 @@ DIRETIVA DE FORMATO DE RESPOSTA EM PORTUGUÊS:
 - NUNCA retorne JSON no chat. Suas respostas devem ser texto legível por humanos.
 - Descreva mudanças no código em alto nível, sem colocar o código no chat.`;
 
+const APP_CREATION_EXECUTION_CONTRACT = `\n\nCONTRATO DE ENTREGA APP_CREATION (VALIDAÇÃO OBRIGATÓRIA):\n- Em taskMode=new_project, crie uma aplicação nova e única mesmo quando o prompt for repetido; não use currentFiles como template.\n- Em taskMode=edit_existing, leia o código relevante, preserve o restante e altere apenas o escopo solicitado.\n- Antes de concluir, faça um manifesto mental dos arquivos necessários: client/src/App.tsx, componentes/hooks/tipos/estilos quando exigidos, README.md e metadata.json; nenhum arquivo prometido pode ficar vazio ou parcial.\n- Audite o root visual: o site deve definir seu próprio background-color/background-image ou classes bg-* no elemento raiz, sem depender do canvas da aplicação hospedeira.\n- Valide imports de ícones, estados interativos, estados loading/empty/error, responsividade e compilação do preview.\n- No chat entregue apenas síntese executiva; código pertence aos arquivos ou às ferramentas.\n`;
+
 // Autonomous cognitive engine fallback when cloud model has 503 high demand or quota
 function generateAutonomousRuleEnforcedFallback(
   message: string, 
@@ -1601,12 +1603,12 @@ export default function CloudControlDashboard() {
   const isModificationRequest = currentCode && currentCode.length > 50 && (
     lower.includes('adicionar') || lower.includes('adicione') || lower.includes('mudar') ||
     lower.includes('alterar') || lower.includes('remover') || lower.includes('excluir') ||
-    lower.includes('trocar') || lower.includes('ajustar') || lower.includes('colocar') ||
+    lower.includes('trocar') || lower.includes('ajustar') || lower.includes('editar') || lower.includes('modificar') || lower.includes('melhorar') || lower.includes('no site atual') || lower.includes('na aplicação atual') || lower.includes('colocar') ||
     lower.includes('botão') || lower.includes('botao') || lower.includes('campo')
   );
 
   if (isModificationRequest) {
-    const bespokeUpdate = synthesizeBespokeInterface(message + " " + (currentCode ? currentCode.slice(0, 200) : ""));
+    const bespokeUpdate = synthesizeBespokeInterface(message, currentCode);
     let updatedCode = bespokeUpdate.code;
     let actionDescription = 'Modificação aplicada ao componente';
 
@@ -3902,10 +3904,16 @@ async function runDeepDeliberation(
     const plan = await call('Planejamento estruturado', 'plan', `Defina objetivo, escopo, dependências, premissas e uma sequência curta de ações. Não escreva código e não chame ferramentas.`);
     const critique = await call('Crítica independente', 'critique', `Avalie o plano abaixo contra o pedido. Procure ambiguidades, riscos técnicos, segurança, regressões e critérios ausentes. Sugira correções objetivas.\nPLANO:\n${JSON.stringify(plan).slice(0, 5000)}`);
     const verification = await call('Verificação e critérios de aceite', 'verify', `Consolide um plano aprovado e uma checklist testável. Só marque decision como aprovado se os riscos críticos estiverem tratados.\nPLANO:\n${JSON.stringify(plan).slice(0, 3500)}\nCRÍTICA:\n${JSON.stringify(critique).slice(0, 4500)}`);
+    const fileManifest = intent.mode === 'app_creation'
+      ? await call('Manifesto de arquivos e dependências', 'manifest', `Defina o manifesto mínimo e completo de arquivos para esta aplicação. Para cada arquivo, informe responsabilidade, dependências e se é obrigatório. Diferencie criação nova de edição existente. Audite que client/src/App.tsx tenha ponto de entrada, que nenhum arquivo prometido seja parcial e que README/metadata existam quando aplicáveis.`)
+      : null;
+    const runtimeAudit = intent.mode === 'app_creation'
+      ? await call('QA visual e funcional do preview', 'runtime', `Crie uma checklist de validação do preview: fundo próprio no root sem herdar o shell, imports válidos, componentes resolvíveis, CSS isolado, estados loading/empty/error, responsividade e interações principais. Aponte correções preventivas objetivas; não escreva código.`)
+      : null;
     const browserAudit = intent.mode === 'cloud_computer'
       ? await call('Análise visual de navegação', 'browser', `Para este pedido de Computer MCP, defina uma sequência verificável de navegação: como posicionar o cursor, qual elemento ou região inspecionar, quando rolar em incrementos, como confirmar que a página mudou e quais sinais indicam bloqueio ou CAPTCHA. Não invente resultados e não chame ferramentas nesta etapa.`)
       : null;
-    const context = `DELIBERAÇÃO INTERNA CONCLUÍDA (não exponha raciocínio privado):\nPlano: ${JSON.stringify(plan)}\nCrítica: ${JSON.stringify(critique)}\nVerificação: ${JSON.stringify(verification)}${browserAudit ? `\nAnálise visual: ${JSON.stringify(browserAudit)}` : ''}\nUse estes resultados para executar o pedido. Faça somente ações autorizadas pelo modo ${intent.mode}.`;
+    const context = `DELIBERAÇÃO INTERNA CONCLUÍDA (não exponha raciocínio privado):\nPlano: ${JSON.stringify(plan)}\nCrítica: ${JSON.stringify(critique)}\nVerificação: ${JSON.stringify(verification)}${fileManifest ? `\nManifesto: ${JSON.stringify(fileManifest)}` : ''}${runtimeAudit ? `\nQA Runtime: ${JSON.stringify(runtimeAudit)}` : ''}${browserAudit ? `\nAnálise visual: ${JSON.stringify(browserAudit)}` : ''}\nUse estes resultados para executar o pedido. Faça somente ações autorizadas pelo modo ${intent.mode}.`;
     emit?.('status', { text: `Deliberação concluída em ${Date.now() - startedAt}ms; iniciando execução validada.` });
     return { context, stages };
   } catch (error: any) {
@@ -3921,7 +3929,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
   if (!message) {
     return res.status(400).json({ error: 'Message is required' });
   }
-  const intent = classifyAgentIntent(message);
+  const intent = classifyAgentIntent(message, Array.isArray(history) ? history : []);
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -4004,7 +4012,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
               model: modelCandidate,
               contents: chatContents,
               config: {
-                systemInstruction: CORE_SPARK_SYSTEM_INSTRUCTION + buildIntentInstruction(intent) + buildSkillsSystemInstruction() + '\n\nDIRETIVA DE RESPOSTA SEM CÓDIGO NO CHAT: NUNCA responda com blocos de código grandes ou listagens de código-fonte no chat. Só produza códigos se a intenção APP_CREATION estiver ativa.',
+                systemInstruction: CORE_SPARK_SYSTEM_INSTRUCTION + APP_CREATION_EXECUTION_CONTRACT + buildIntentInstruction(intent) + buildSkillsSystemInstruction() + '\n\nDIRETIVA DE RESPOSTA SEM CÓDIGO NO CHAT: NUNCA responda com blocos de código grandes ou listagens de código-fonte no chat. Só produza códigos se a intenção APP_CREATION estiver ativa.',
                 tools: intent.allowedTools.length ? [{ functionDeclarations: filterToolDeclarations(intent, AGENT_TOOL_DECLARATIONS) as any }] : undefined
               }
             });
@@ -4352,7 +4360,7 @@ app.post('/api/agent/chat', async (req, res) => {
   if (!message) {
     return res.status(400).json({ error: 'Message is required' });
   }
-  const intent = classifyAgentIntent(message);
+  const intent = classifyAgentIntent(message, Array.isArray(history) ? history : []);
 
   if (checkNeedsContextQuestionnaire(message)) {
     const fallback = generateAutonomousRuleEnforcedFallback(message, history, currentFiles);
@@ -4391,9 +4399,12 @@ app.post('/api/agent/chat', async (req, res) => {
     }
 
     const isCodeAction = intent.mode === 'app_creation';
+    const preserveExistingProject = intent.taskMode === 'edit_existing';
     let userPromptWithContext = message;
-    if (isCodeAction && currentAppCode && typeof currentAppCode === 'string' && currentAppCode.length > 50) {
-      userPromptWithContext = `INSTRUÇÃO:\n${message}\n\nCÓDIGO ATUAL DE client/src/App.tsx:\n\`\`\`tsx\n${currentAppCode}\n\`\`\``;
+    if (isCodeAction && preserveExistingProject && currentAppCode && typeof currentAppCode === 'string' && currentAppCode.length > 50) {
+      userPromptWithContext = `INSTRUÇÃO DE EDIÇÃO:\n${message}\n\nCÓDIGO ATUAL DE client/src/App.tsx:\n\`\`\`tsx\n${currentAppCode}\n\`\`\``;
+    } else if (isCodeAction) {
+      userPromptWithContext = `INSTRUÇÃO DE NOVO PROJETO:\n${message}\n\nNão reutilize o layout, o branding ou os arquivos visuais atuais apenas porque já existem; crie uma composição própria e completa para este novo pedido.`;
     }
     chatContents.push({
       role: 'user',
@@ -4417,7 +4428,7 @@ app.post('/api/agent/chat', async (req, res) => {
             model: modelCandidate,
             contents: chatContents,
             config: {
-              systemInstruction: CORE_SPARK_SYSTEM_INSTRUCTION + buildIntentInstruction(intent) + buildSkillsSystemInstruction() + '\n\nDIRETIVA DE RESPOSTA SEM CÓDIGO NO CHAT: NUNCA responda com blocos de código grandes ou listagens de código-fonte no chat. Só produza códigos se a intenção APP_CREATION estiver ativa.',
+              systemInstruction: CORE_SPARK_SYSTEM_INSTRUCTION + APP_CREATION_EXECUTION_CONTRACT + buildIntentInstruction(intent) + buildSkillsSystemInstruction() + '\n\nDIRETIVA DE RESPOSTA SEM CÓDIGO NO CHAT: NUNCA responda com blocos de código grandes ou listagens de código-fonte no chat. Só produza códigos se a intenção APP_CREATION estiver ativa.',
               tools: intent.allowedTools.length ? [{ functionDeclarations: filterToolDeclarations(intent, AGENT_TOOL_DECLARATIONS) as any }] : undefined
             }
           });

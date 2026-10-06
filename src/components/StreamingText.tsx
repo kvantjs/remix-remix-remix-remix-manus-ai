@@ -154,7 +154,7 @@ export default function StreamingText({
       {children ? (
         <div className="relative">{children}</div>
       ) : (
-        <div className="text-sm leading-relaxed text-[#f4f4f5]">
+        <div className="text-[15px] leading-relaxed text-[#f4f4f5]">
           <MarkdownRenderer content={currentDisplayedText} />
         </div>
       )}

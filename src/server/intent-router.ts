@@ -12,6 +12,7 @@ export type AgentIntent = {
   reason: string;
   allowedTools: string[];
   requiresUserAction?: boolean;
+  taskMode?: 'new_project' | 'edit_existing' | 'computer_action' | 'research' | 'conversation';
 };
 
 const TOOL_ALIASES: Record<string, string> = {
@@ -94,13 +95,13 @@ function extractExplicitTools(text: string) {
   return [...found];
 }
 
-export function classifyAgentIntent(message: string): AgentIntent {
+export function classifyAgentIntent(message: string, history: Array<{ role?: string; content?: string }> = []): AgentIntent {
   const text = String(message || '').trim();
   const lower = text.toLocaleLowerCase('pt-BR');
   const explicitTools = extractExplicitTools(lower);
 
   if (!text) {
-    return { mode: 'conversation', confidence: 'high', reason: 'Mensagem vazia não autoriza execução.', allowedTools: [] };
+    return { mode: 'conversation', confidence: 'high', reason: 'Mensagem vazia não autoriza execução.', allowedTools: [], taskMode: 'conversation' };
   }
 
   // 1. High Priority: Software, WebDev, UI and Website Creation/Modification
@@ -116,6 +117,9 @@ export function classifyAgentIntent(message: string): AgentIntent {
   ];
 
   const hasAppCreation = hasAny(lower, appCreationTerms);
+  const editTerms = ['edite', 'editar', 'edit', 'modifique', 'modificar', 'altere', 'alterar', 'corrija', 'corrigir', 'melhore', 'melhorar', 'ajuste', 'ajustar', 'remova', 'remover', 'adicione', 'adicionar', 'no site atual', 'na aplicação atual', 'no projeto atual', 'já existente'];
+  const isExistingProjectEdit = hasAny(lower, editTerms) && (hasAppCreation || history.some(item => /site|aplicação|aplicacao|app|projeto|código|codigo/i.test(String(item.content || ''))));
+  const hasSequentialCreationThenComputer = hasAppCreation && /(?:depois|após|apos|quando terminar|em seguida).*(?:computador|navegador|terminal)/i.test(lower);
   const isExplicitWebResearchOnly = (lower.includes('pesquise na web') || lower.includes('pesquisar na web') || lower.includes('busque na internet') || lower.includes('procure na web')) && !hasAppCreation;
 
   const research = hasAny(lower, [
@@ -136,18 +140,21 @@ export function classifyAgentIntent(message: string): AgentIntent {
   // This prevents "Faça uma pesquisa" from being classified as app_creation just because of "Faça".
   // RIGOROUS REDIRECT: When mentions search or computer, DO NOT allow webdev creation.
   if (research || cloudComputer) {
-    if (cloudComputer) {
-      return { mode: 'cloud_computer', confidence: 'high', reason: 'Pedido autoriza uma operação no computador ou navegador da nuvem (Prioridade Total - Proibido WebDev).', allowedTools: COMPUTER_TOOLS };
+    if (cloudComputer && !hasSequentialCreationThenComputer) {
+      return { mode: 'cloud_computer', confidence: 'high', reason: 'Pedido autoriza uma operação no computador ou navegador da nuvem; criação e edição permanecem separadas deste turno.', allowedTools: COMPUTER_TOOLS, taskMode: 'computer_action' };
     }
-    return { mode: 'web_research', confidence: 'high', reason: 'Pedido solicita informação externa, atual ou verificável na web (Prioridade Total - Proibido WebDev).', allowedTools: WEB_TOOLS };
+    if (research && !hasAppCreation) {
+      return { mode: 'web_research', confidence: 'high', reason: 'Pedido solicita informação externa, atual ou verificável na web (Prioridade Total - Proibido WebDev).', allowedTools: WEB_TOOLS, taskMode: 'research' };
+    }
   }
 
   if (hasAppCreation && !isExplicitWebResearchOnly) {
     return { 
       mode: 'app_creation', 
       confidence: 'high', 
-      reason: 'Pedido contém intenção de criação, desenvolvimento ou modificação de website/software (WebDev MCP).', 
-      allowedTools: APP_TOOLS 
+      reason: isExistingProjectEdit ? 'Edição explícita de projeto existente; preservar arquivos e alterar somente o escopo solicitado.' : hasSequentialCreationThenComputer ? 'Duas fases detectadas: criar primeiro; Computer MCP somente em uma mensagem operacional posterior.' : 'Criação de um projeto novo com identidade visual e arquivos próprios.',
+      allowedTools: APP_TOOLS,
+      taskMode: isExistingProjectEdit ? 'edit_existing' : 'new_project'
     };
   }
 
@@ -167,7 +174,8 @@ export function classifyAgentIntent(message: string): AgentIntent {
     mode: 'conversation',
     confidence: 'medium',
     reason: 'Nenhum verbo de ação operacional foi detectado; responder sem executar ferramentas.',
-    allowedTools: []
+    allowedTools: [],
+    taskMode: 'conversation'
   };
 }
 
@@ -183,7 +191,7 @@ export function filterToolDeclarations(intent: AgentIntent, declarations: any[])
 
 export function buildIntentInstruction(intent: AgentIntent) {
   const tools = intent.allowedTools.length ? intent.allowedTools.join(', ') : 'nenhuma';
-  return `\n\nROTEADOR RIGOROSO DE INTENÇÃO — MODO ATIVO: ${intent.mode.toUpperCase()}\nMotivo: ${intent.reason}\nFerramentas autorizadas neste turno: ${tools}.\nREGRAS INVIOLÁVEIS:\n1. Não confunda conversa com autorização operacional. Em CONVERSATION, responda em linguagem natural e não chame ferramentas, navegador, terminal ou filesystem.\n2. Em WEB_RESEARCH, utilize web_search ou browser_search para obter resultados, LEIA o conteúdo da página acessada, PENSE e ANALISE criticamente as informações coletadas e elabore uma resposta rica, completa e sintetizada. Se necessário, acesse links adicionais com web_fetch ou browser_navigate para aprofundar seu conhecimento antes de concluir.\n3. Em CLOUD_COMPUTER, execute somente ações no computador/navegador descritas pelo usuário; não transforme uma pergunta em criação de software.\n4. Em APP_CREATION, crie aplicações e sites React+Vite ULTRA COMPLETOS DO ZERO para cada solicitação, sem repetir interfaces. O site DEVE ter fundo próprio e visível (nunca o padrão da aplicação). Escreva o código completo, rico em recursos e de verdade (sem simulações vazias ou parciais). Crie múltiplos arquivos e pastas estruturados se necessário (README.md completo e detalhado, .md de documentação, tipos .ts, metadata.json, etc.), defina e importe no topo todos os ícones utilizados no JSX (incluindo TrendUp as TrendingUp). Não navegue na web por iniciativa própria.\n5. Em EXPLICIT_TOOL_CALL, chame somente a ferramenta nomeada; se o pedido estiver incompleto, peça esclarecimento em vez de escolher outra ferramenta.\n6. Em PROJECT_OPERATION, trate arquivos, snapshots, diffs e versões como operações de projeto; não publique, restaure ou faça push sem confirmação explícita do usuário.\n7. Nunca alegue que uma ferramenta foi executada se ela não aparecer em toolCalls com resultado real.\n8. Se a intenção mudar no meio da tarefa, pare e peça confirmação antes de trocar de modo.\n`;
+  return `\n\nROTEADOR RIGOROSO DE INTENÇÃO — MODO ATIVO: ${intent.mode.toUpperCase()}\nMotivo: ${intent.reason}\nFerramentas autorizadas neste turno: ${tools}.\nREGRAS INVIOLÁVEIS:\n1. Não confunda conversa com autorização operacional. Em CONVERSATION, responda em linguagem natural e não chame ferramentas, navegador, terminal ou filesystem.\n2. Em WEB_RESEARCH, utilize web_search ou browser_search para obter resultados, LEIA o conteúdo da página acessada, PENSE e ANALISE criticamente as informações coletadas e elabore uma resposta rica, completa e sintetizada. Se necessário, acesse links adicionais com web_fetch ou browser_navigate para aprofundar seu conhecimento antes de concluir.\n3. Em CLOUD_COMPUTER, execute somente ações no computador/navegador descritas pelo usuário; não transforme uma pergunta em criação de software.\n4. Em APP_CREATION, crie aplicações e sites React+Vite ULTRA COMPLETOS DO ZERO para cada solicitação, sem repetir interfaces. O site DEVE ter fundo próprio e visível (nunca o padrão da aplicação). Escreva o código completo, rico em recursos e de verdade (sem simulações vazias ou parciais). Crie múltiplos arquivos e pastas estruturados se necessário (README.md completo e detalhado, .md de documentação, tipos .ts, metadata.json, etc.), defina e importe no topo todos os ícones utilizados no JSX (incluindo TrendUp as TrendingUp). Não navegue na web por iniciativa própria.\n5. Em EXPLICIT_TOOL_CALL, chame somente a ferramenta nomeada; se o pedido estiver incompleto, peça esclarecimento em vez de escolher outra ferramenta.\n6. Em PROJECT_OPERATION, trate arquivos, snapshots, diffs e versões como operações de projeto; não publique, restaure ou faça push sem confirmação explícita do usuário.\n7. Nunca alegue que uma ferramenta foi executada se ela não aparecer em toolCalls com resultado real.\n8. Se a intenção mudar no meio da tarefa, pare e peça confirmação antes de trocar de modo.\n9. taskMode=new_project significa composição nova mesmo quando o prompt se repete; não copie o projeto atual.\n10. taskMode=edit_existing exige leitura, diff mínimo e preservação do que não foi pedido.\n11. Em criação seguida de computador, conclua WebDev primeiro e aguarde nova mensagem para Computer MCP.\n12. Antes de finalizar, valide manifesto, fundo próprio, imports, interações e compilação do preview.\n`;
 }
 
 export function conversationFallback(message = '', history: Array<{ role?: string; content?: string }> = []) {
