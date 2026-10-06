@@ -550,7 +550,21 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
               } else if (line.startsWith('data: ')) {
                 try {
                   const data = JSON.parse(line.replace('data: ', '').trim());
-                  if (currentEvent === 'status') {
+                  if (currentEvent === 'deliberation') {
+                    setCurrentStep(data.text || data.label || 'Deliberação profunda em andamento');
+                    beginExecutionStep(data.label || 'Deliberação profunda', data.text || 'Avaliando critérios verificáveis.');
+                    if (data.complete) {
+                      completeExecutionStep(data.label || 'Deliberação profunda', data.text || 'Etapa validada.');
+                    }
+                    if (onAgentStateChange) {
+                      onAgentStateChange({
+                        isWorking: true,
+                        statusText: data.text || data.label || 'Deliberação profunda em andamento',
+                        contextText: data.text || 'Planejamento, crítica e verificação independentes.',
+                        toolCalls: [...liveToolCalls]
+                      });
+                    }
+                  } else if (currentEvent === 'status') {
                     setCurrentStep(data.text);
                     beginExecutionStep('Raciocinando sobre a próxima ação', data.text);
                     if (onAgentStateChange) {

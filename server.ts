@@ -409,14 +409,14 @@ O Agente Kvant DEVE executar uma análise cognitiva pesada, profunda e estrutura
 DIRETRIZES RIGOROSAS DE PENSAMENTO E RACIOCÍNIO PESADO:
 
 1. CADEIA DE RACIOCÍNIO EXAUSTIVA (CHAIN-OF-THOUGHT):
-- Antes de formular a resposta ou acionar qualquer ferramenta MCP, você DEVE construir um plano mental rigoroso dividido em 4 etapas obrigatórias:
+- Antes de formular a resposta ou acionar qualquer ferramenta MCP, use os resultados da deliberação externa quando fornecidos; não revele cadeia de raciocínio privada:
   * ETAPA 1 (ANÁLISE DE INTENÇÃO E OBJETIVOS): Decompor a mensagem do usuário, identificando requisitos implícitos e explícitos, regras de negócio e restrições técnicas.
   * ETAPA 2 (ARQUITETURA DE DESIGN E INTERFACE): Mapear a estrutura de componentes React, a paleta de cores exclusiva (Regra 60-30-10 com fundo próprio obrigatório), e a reatividade de estado (useState, useEffect, useMemo).
   * ETAPA 3 (AVALIAÇÃO DE SEGURANÇA E ERROS): Verificar potenciais problemas de compilação TypeScript, pacotes ausentes, nomes de ícones indefinidos e regras do ambiente.
   * ETAPA 4 (PLANO DE EXECUÇÃO SEQUENCIAL MCP): Definir a ordem exata das chamadas de ferramentas no WebDev MCP (código) e Computer MCP (navegador/terminal).
 
 2. SÍNTESE DE PENSAMENTO NO CAMPO THOUGHT:
-- Sempre preencha o campo de raciocínio ('thought') da resposta com um resumo técnico detalhado e articulado dessa análise cognitiva profunda, permitindo que o usuário acompanhe o raciocínio crítico do agente.
+- O campo 'thought' deve conter apenas um resumo verificável das decisões, premissas, riscos e validações; nunca exponha a cadeia de raciocínio privada passo a passo.
 
 ================================================================================
 CONSTITUIÇÃO RIGOROSA DE DESIGN DE PRODUÇÃO E ENGENHARIA DE SOFTWARE
@@ -3773,6 +3773,88 @@ function checkNeedsContextQuestionnaire(message: string): boolean {
   return isStrictlyGeneric;
 }
 
+
+// Deliberação externa verificável: usa chamadas reais do modelo, mas nunca expõe chain-of-thought privado.
+type DeliberationResult = {
+  context: string;
+  stages: Array<{ stage: string; label: string; summary: string; durationMs: number }>;
+};
+
+function shouldDeliberate(message: string, intent: AgentIntent, currentFiles?: Record<string, string>) {
+  if (intent.mode === 'conversation' && !/racioc|profund|complex|analis|compare|avalie/i.test(message)) return false;
+  if (intent.mode === 'conversation' && !currentFiles) return false;
+  return true;
+}
+
+function parseDeliberationJson(text: string): Record<string, any> {
+  const cleaned = String(text || '').replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+  try { return JSON.parse(cleaned); } catch { return { summary: cleaned.slice(0, 800) }; }
+}
+
+async function runDeepDeliberation(
+  message: string,
+  history: any[] | undefined,
+  intent: AgentIntent,
+  currentFiles: Record<string, string> | undefined,
+  emit?: (event: string, data: any) => void,
+): Promise<DeliberationResult> {
+  const stages: DeliberationResult['stages'] = [];
+  const startedAt = Date.now();
+  const historySummary = (Array.isArray(history) ? history : [])
+    .slice(-6)
+    .map((item: any) => `${item.role}: ${String(item.content || '').slice(0, 900)}`)
+    .join('\n');
+  const filesSummary = currentFiles && Object.keys(currentFiles).length
+    ? `Arquivos disponíveis: ${Object.keys(currentFiles).slice(0, 20).join(', ')}\nConteúdo relevante: ${Object.values(currentFiles).join('\n').slice(0, 6000)}`
+    : 'Nenhum arquivo do workspace foi fornecido.';
+  const base = `PEDIDO DO USUÁRIO:\n${message}\n\nMODO: ${intent.mode}\nHISTÓRICO RECENTE:\n${historySummary || 'vazio'}\n\n${filesSummary}`;
+  const model = MODEL_CANDIDATES[0];
+
+  const call = async (label: string, stage: string, instruction: string) => {
+    const started = Date.now();
+    emit?.('deliberation', { stage, label, text: `${label}: avaliando critérios e dependências reais...` });
+    const response = await ai.models.generateContent({
+      model,
+      contents: [{ role: 'user', parts: [{ text: `${base}\n\n${instruction}` }] }],
+      config: {
+        systemInstruction: `Você é um revisor interno de engenharia. Não revele cadeia de pensamento privada, tokens ocultos ou raciocínio passo a passo. Produza somente um resumo curto, verificável e orientado a decisões. Responda exclusivamente em JSON válido.`,
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: 'OBJECT',
+          properties: {
+            summary: { type: 'STRING' },
+            assumptions: { type: 'ARRAY', items: { type: 'STRING' } },
+            risks: { type: 'ARRAY', items: { type: 'STRING' } },
+            checks: { type: 'ARRAY', items: { type: 'STRING' } },
+            corrections: { type: 'ARRAY', items: { type: 'STRING' } },
+            decision: { type: 'STRING' }
+          },
+          required: ['summary']
+        }
+      }
+    });
+    const raw = response.candidates?.[0]?.content?.parts?.map((part: any) => part.text || '').join('') || '';
+    const parsed = parseDeliberationJson(raw);
+    const summary = String(parsed.summary || 'Critérios avaliados e registrados para a próxima etapa.').slice(0, 900);
+    stages.push({ stage, label, summary, durationMs: Date.now() - started });
+    emit?.('deliberation', { stage, label, text: summary, complete: true, durationMs: Date.now() - started });
+    return parsed;
+  };
+
+  try {
+    const plan = await call('Planejamento estruturado', 'plan', `Defina objetivo, escopo, dependências, premissas e uma sequência curta de ações. Não escreva código e não chame ferramentas.`);
+    const critique = await call('Crítica independente', 'critique', `Avalie o plano abaixo contra o pedido. Procure ambiguidades, riscos técnicos, segurança, regressões e critérios ausentes. Sugira correções objetivas.\nPLANO:\n${JSON.stringify(plan).slice(0, 5000)}`);
+    const verification = await call('Verificação e critérios de aceite', 'verify', `Consolide um plano aprovado e uma checklist testável. Só marque decision como aprovado se os riscos críticos estiverem tratados.\nPLANO:\n${JSON.stringify(plan).slice(0, 3500)}\nCRÍTICA:\n${JSON.stringify(critique).slice(0, 4500)}`);
+    const context = `DELIBERAÇÃO INTERNA CONCLUÍDA (não exponha raciocínio privado):\nPlano: ${JSON.stringify(plan)}\nCrítica: ${JSON.stringify(critique)}\nVerificação: ${JSON.stringify(verification)}\nUse estes resultados para executar o pedido. Faça somente ações autorizadas pelo modo ${intent.mode}.`;
+    emit?.('status', { text: `Deliberação concluída em ${Date.now() - startedAt}ms; iniciando execução validada.` });
+    return { context, stages };
+  } catch (error: any) {
+    const summary = `Deliberação parcial: ${String(error?.message || error).slice(0, 240)}`;
+    emit?.('deliberation', { stage: 'error', label: 'Deliberação interrompida', text: summary, complete: true });
+    return { context: `A deliberação profunda falhou; prossiga com validações normais. Motivo resumido: ${summary}`, stages };
+  }
+}
+
 // 7. Streaming Agent Chat Endpoint (Server-Sent Events) with Real Function Calling
 app.post('/api/agent/chat/stream', async (req, res) => {
   const { message, history, currentFiles } = req.body;
@@ -3841,6 +3923,11 @@ app.post('/api/agent/chat/stream', async (req, res) => {
         parts: [{ text: message }]
       });
 
+      if (shouldDeliberate(message, intent, currentFiles)) {
+        const deliberation = await runDeepDeliberation(message, history, intent, currentFiles, sendEvent);
+        chatContents.push({ role: 'user', parts: [{ text: deliberation.context }] });
+      }
+
       let iterationCount = 0;
       let modelTextResponse = '';
 
@@ -3876,13 +3963,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
             console.warn('[CoreSpark Engine] Activating autonomous engine with realistic cognitive execution steps.');
             
             sendEvent('status', { text: 'Etapa 1: Análise de Intenção e Decomposição de Requisitos...' });
-            await new Promise(r => setTimeout(r, 2200));
-
-            sendEvent('step', { text: 'Etapa 2: Planejamento de Arquitetura, Regra 60-30-10 e Estados React...', toolName: 'agent.plan' });
-            await new Promise(r => setTimeout(r, 2600));
-
-            sendEvent('step', { text: 'Etapa 3: Raciocínio Pesado & Validação de Segurança e Tipos...', toolName: 'agent.reasoning' });
-            await new Promise(r => setTimeout(r, 2800));
+            sendEvent('step', { text: 'Modo local: aplicando plano determinístico e validações disponíveis...', toolName: 'agent.plan' });
 
             const fallbackResult = generateAutonomousRuleEnforcedFallback(message, history, currentFiles);
             modelTextResponse = (fallbackResult as any).explanation || fallbackResult.response || '';
@@ -3894,16 +3975,13 @@ app.post('/api/agent/chat/stream', async (req, res) => {
                   arguments: tc.arguments,
                   reason: (tc as any).screenData?.actionDescription || `Executando ${tc.toolName}`
                 });
-                await new Promise(r => setTimeout(r, 2000));
                 sendEvent('tool_finish', { toolCall: tc });
                 executedToolCalls.push(tc);
-                await new Promise(r => setTimeout(r, 1200));
               }
             }
 
             if (fallbackResult.files && fallbackResult.files.length > 0) {
               sendEvent('step', { text: 'Etapa 4: Gravando client/src/App.tsx e compilando no preview de runtime...', toolName: 'fs.writeFile' });
-              await new Promise(r => setTimeout(r, 2200));
               const codeToWrite = fallbackResult.files[0].code;
               const execResult = await agentToolExecutor.executeTool('fs.writeFile', {
                 filePath: 'client/src/App.tsx',
@@ -3924,7 +4002,6 @@ app.post('/api/agent/chat/stream', async (req, res) => {
               };
               executedToolCalls.push(fsTrace);
               sendEvent('tool_finish', { toolCall: fsTrace });
-              await new Promise(r => setTimeout(r, 1200));
             }
           }
           break;
@@ -4257,6 +4334,11 @@ app.post('/api/agent/chat', async (req, res) => {
       role: 'user',
       parts: [{ text: userPromptWithContext }]
     });
+
+    if (shouldDeliberate(message, intent, currentFiles)) {
+      const deliberation = await runDeepDeliberation(message, history, intent, currentFiles);
+      chatContents.push({ role: 'user', parts: [{ text: deliberation.context }] });
+    }
 
     for (const modelCandidate of MODEL_CANDIDATES) {
       try {
