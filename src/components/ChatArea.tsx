@@ -848,7 +848,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
   };
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-[#141414] relative">
+    <div className="flex-1 flex flex-col min-w-0 bg-[#1a1a1a] relative">
       {/* Header */}
       <header className="h-14 flex items-center justify-between px-6 border-b border-white/5 shrink-0 z-10 bg-[#1a1a1a]">
         <div className="flex items-center gap-2.5 cursor-pointer hover:bg-white/5 px-2.5 py-1.5 rounded-lg transition-colors group">
@@ -1530,30 +1530,6 @@ function MessageItem({
 }
 
 function LocalActiveThinkingState({ elapsedSeconds, step, steps }: { elapsedSeconds: number; step: string; steps: ExecutionStep[] }) {
-  const [phase, setPhase] = useState<0 | 1 | 2 | 3 | 4>(0);
-
-  useEffect(() => {
-    if (steps.length === 0) {
-      setPhase(0);
-    }
-  }, [steps.length]);
-
-  useEffect(() => {
-    if (phase === 0) {
-      const t = setTimeout(() => setPhase(1), 2200); // 2.2s for Pensando/Processando
-      return () => clearTimeout(t);
-    } else if (phase === 1) {
-      const t = setTimeout(() => setPhase(2), 3200); // 3.2s for Planejando
-      return () => clearTimeout(t);
-    } else if (phase === 2) {
-      const t = setTimeout(() => setPhase(3), 4200); // 4.2s for Raciocinando
-      return () => clearTimeout(t);
-    } else if (phase === 3) {
-      const t = setTimeout(() => setPhase(4), 5200); // 5.2s for Verificando
-      return () => clearTimeout(t);
-    }
-  }, [phase]);
-
   // A step is a real web search only if it explicitly involves search engines or browsing and is NOT a command, terminal, check, or sandbox task.
   const isWebSearchStep = (text: string) => {
     const isCommandOrCheck = /verify|check|exec|run|npm|test|install|sandbox|terminal|fs_|c[oó]digo|write|read/i.test(text);
@@ -1572,12 +1548,6 @@ function LocalActiveThinkingState({ elapsedSeconds, step, steps }: { elapsedSeco
 
   const isReasoningActive = step.toLowerCase().includes('racioc') || step.toLowerCase().includes('analis') || step.toLowerCase().includes('planej');
 
-  // Determine active variant based on sequential cognitive phase:
-  // Phase 0: "Steps" (Thinking)
-  // Phase 1: "Planning" (Planejando)
-  // Phase 2: "Reasoning" (Raciocínio)
-  // Phase 3: "Verification" (Verificando)
-  // Phase 4+: Context-aware variant ("Search", "Coding", or "Steps")
   let contextVariant = "Steps";
   if (isCurrentlyCoding || hasCodingInHistory || isQueryRelatedToCoding) {
     contextVariant = "Coding";
@@ -1587,21 +1557,20 @@ function LocalActiveThinkingState({ elapsedSeconds, step, steps }: { elapsedSeco
     contextVariant = "Reasoning";
   }
 
-  // Enforce natural cognitive stage progression so every animation is clearly visible:
+  // Paced cognitive stage progression matching elapsedSeconds so animations stay active for the exact duration of agent thinking
   let currentVariant = "Steps";
-  if (phase === 0) {
+  if (elapsedSeconds < 4) {
     currentVariant = "Steps";
-  } else if (phase === 1) {
+  } else if (elapsedSeconds < 9) {
     currentVariant = "Planning";
-  } else if (phase === 2) {
+  } else if (elapsedSeconds < 16) {
     currentVariant = "Reasoning";
-  } else if (phase === 3) {
+  } else if (elapsedSeconds < 24) {
     currentVariant = "Verification";
   } else {
     currentVariant = contextVariant;
   }
 
-  // In Phase < 3, if no real steps exist yet, we show the initial trace. As soon as steps arrive, we map ALL of them dynamically!
   const mappedRows = steps.length > 0 ? steps.map(s => ({
     primary: s.label,
     secondary: s.detail,
@@ -1659,25 +1628,27 @@ function LocalActiveThinkingState({ elapsedSeconds, step, steps }: { elapsedSeco
         <div className="flex items-center gap-2 text-xs font-medium">
           <span className="text-text-content-primary">Manus</span>
           <span className="text-[9px] text-text-content-secondary font-mono px-1.5 py-0.5 border border-solid" style={{ borderRadius: '4px', backgroundColor: '#1a1a1a', borderColor: '#303030', borderWidth: '2.1507px' }}>
-            Executando · {elapsedSeconds || 1}s
+            Raciocinando · {elapsedSeconds || 1}s
           </span>
         </div>
       </div>
       
-      {/* Transitions smoothly between variants with a stable variant key */}
+      {/* Active trace rendering with explicit working=true */}
       <div key={`thinking_trace_${currentVariant}`} className="pl-8 bg-transparent transition-all duration-300 ease-out">
         {currentVariant === "Coding" ? (
           <ToolChips 
             steps={mappedToolSteps} 
             diffs={diffs}
             diffLines={diffLines}
-            labels={{ header: `${mappedToolSteps.length} chamada(s) de ferramenta (${elapsedSeconds || 1}s)` }}
+            initialOpen={true}
+            labels={{ header: `${mappedToolSteps.length} chamada(s) de ferramenta em execução (${elapsedSeconds || 1}s)` }}
           />
         ) : (
           <ThinkingState 
             variant={currentVariant} 
             rows={mappedRows} 
             elapsedSeconds={elapsedSeconds}
+            working={true}
             active={currentVariant === "Search" ? `Pesquisando: ${step || "fontes relevantes na web"}` : undefined}
           />
         )}

@@ -9,7 +9,7 @@ import { MarkdownRenderer } from "./MarkdownRenderer";
  * context, then actions and follow-up prompts become usable.
  * ───────────────────────────────────────────────────────── */
 
-const WORD_MS = 20;
+const WORD_MS = 60;
 
 export type StreamingToken = { text: string; cite?: boolean; sourceIndex?: number };
 

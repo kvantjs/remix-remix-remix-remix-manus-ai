@@ -91,9 +91,9 @@ export function RuntimePreview({ activeCode, customFiles, onSendPrompt, projectI
   const displayUrl = useDaytona && daytonaUrl ? daytonaUrl : (daytonaUrl || 'Aguardando criação do site no Daytona...');
 
   return (
-    <div className="h-full flex flex-col bg-[#141414] select-none">
+    <div className="h-full flex flex-col bg-[#1a1a1a] select-none">
       {/* Top Browser Address & Controls Toolbar */}
-      <div className="h-11 bg-[#1c1c1c] border-b border-white/5 flex items-center justify-between px-3 gap-3 shrink-0">
+      <div className="h-11 bg-[#1a1a1a] border-b border-white/5 flex items-center justify-between px-3 gap-3 shrink-0">
         {/* Left: Window Controls + Viewport switcher */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">

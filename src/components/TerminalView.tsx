@@ -163,11 +163,11 @@ export function TerminalView({ activeCode }: { activeCode?: string }) {
 
   return (
     <div 
-      className="h-full flex flex-col bg-[#111111] text-[#ededed] font-mono text-[12px] select-text"
+      className="h-full flex flex-col bg-[#1a1a1a] text-[#ededed] font-mono text-[12px] select-text"
       onClick={() => inputRef.current?.focus()}
     >
       {/* Terminal Top Bar */}
-      <div className="h-9 border-b border-white/5 bg-[#181818] px-3 flex items-center justify-between shrink-0 select-none">
+      <div className="h-9 border-b border-white/5 bg-[#1a1a1a] px-3 flex items-center justify-between shrink-0 select-none">
         <div className="flex items-center gap-2 text-white/50 text-[11px] font-sans">
           <TerminalIcon size={13} className="text-green-400" />
           <span className="font-semibold text-white/80">bash (Manus@sandbox)</span>

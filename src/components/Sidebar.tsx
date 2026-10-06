@@ -19,7 +19,7 @@ import {
 
 export function Sidebar({ theme, toggleTheme }: { theme: 'light' | 'dark'; toggleTheme: () => void }) {
   return (
-    <aside className="w-[292px] bg-bg-surface-panel border-r border-border-divider-subtle flex flex-col h-full shrink-0">
+    <aside className="w-[292px] bg-[#1f1f1f] border-r border-border-divider-subtle flex flex-col h-full shrink-0">
       {/* Header */}
       <div className="p-4 flex items-center justify-between">
         <div className="flex items-center gap-2.5">

@@ -401,6 +401,24 @@ const MODEL_CANDIDATES = [
 const CORE_SPARK_SYSTEM_INSTRUCTION = `Você é o CoreSpark (Versão de Produção), o Agente Autônomo de Engenharia de Software e Design Director do Kvant.
 
 ================================================================================
+CONSTITUIÇÃO DE DEEP THINKING E RACIOCÍNIO PESADO (HEAVY COGNITIVE ENGINE)
+================================================================================
+
+O Agente Kvant DEVE executar uma análise cognitiva pesada, profunda e estruturada antes de qualquer tomada de decisão, execução de código ou resposta no chat.
+
+DIRETRIZES RIGOROSAS DE PENSAMENTO E RACIOCÍNIO PESADO:
+
+1. CADEIA DE RACIOCÍNIO EXAUSTIVA (CHAIN-OF-THOUGHT):
+- Antes de formular a resposta ou acionar qualquer ferramenta MCP, você DEVE construir um plano mental rigoroso dividido em 4 etapas obrigatórias:
+  * ETAPA 1 (ANÁLISE DE INTENÇÃO E OBJETIVOS): Decompor a mensagem do usuário, identificando requisitos implícitos e explícitos, regras de negócio e restrições técnicas.
+  * ETAPA 2 (ARQUITETURA DE DESIGN E INTERFACE): Mapear a estrutura de componentes React, a paleta de cores exclusiva (Regra 60-30-10 com fundo próprio obrigatório), e a reatividade de estado (useState, useEffect, useMemo).
+  * ETAPA 3 (AVALIAÇÃO DE SEGURANÇA E ERROS): Verificar potenciais problemas de compilação TypeScript, pacotes ausentes, nomes de ícones indefinidos e regras do ambiente.
+  * ETAPA 4 (PLANO DE EXECUÇÃO SEQUENCIAL MCP): Definir a ordem exata das chamadas de ferramentas no WebDev MCP (código) e Computer MCP (navegador/terminal).
+
+2. SÍNTESE DE PENSAMENTO NO CAMPO THOUGHT:
+- Sempre preencha o campo de raciocínio ('thought') da resposta com um resumo técnico detalhado e articulado dessa análise cognitiva profunda, permitindo que o usuário acompanhe o raciocínio crítico do agente.
+
+================================================================================
 CONSTITUIÇÃO RIGOROSA DE DESIGN DE PRODUÇÃO E ENGENHARIA DE SOFTWARE
 (Inspirada nos padrões de produção de Linear, Stripe, Airbnb, Raycast, Vercel, Apple e Supabase)
 ================================================================================
@@ -3855,13 +3873,16 @@ app.post('/api/agent/chat/stream', async (req, res) => {
 
         if (!modelResponse) {
           if (!modelTextResponse && executedToolCalls.length === 0) {
-            console.warn('[CoreSpark Engine] Activating autonomous engine with realistic execution steps.');
+            console.warn('[CoreSpark Engine] Activating autonomous engine with realistic cognitive execution steps.');
             
-            sendEvent('status', { text: 'Analisando a solicitação e planejando a arquitetura...' });
-            await new Promise(r => setTimeout(r, 1200));
+            sendEvent('status', { text: 'Etapa 1: Análise de Intenção e Decomposição de Requisitos...' });
+            await new Promise(r => setTimeout(r, 2200));
 
-            sendEvent('step', { text: 'Mapeando modelo de dados, estados e componentes reativos...', toolName: 'agent.plan' });
-            await new Promise(r => setTimeout(r, 1400));
+            sendEvent('step', { text: 'Etapa 2: Planejamento de Arquitetura, Regra 60-30-10 e Estados React...', toolName: 'agent.plan' });
+            await new Promise(r => setTimeout(r, 2600));
+
+            sendEvent('step', { text: 'Etapa 3: Raciocínio Pesado & Validação de Segurança e Tipos...', toolName: 'agent.reasoning' });
+            await new Promise(r => setTimeout(r, 2800));
 
             const fallbackResult = generateAutonomousRuleEnforcedFallback(message, history, currentFiles);
             modelTextResponse = (fallbackResult as any).explanation || fallbackResult.response || '';
@@ -3873,16 +3894,16 @@ app.post('/api/agent/chat/stream', async (req, res) => {
                   arguments: tc.arguments,
                   reason: (tc as any).screenData?.actionDescription || `Executando ${tc.toolName}`
                 });
-                await new Promise(r => setTimeout(r, 1200));
+                await new Promise(r => setTimeout(r, 2000));
                 sendEvent('tool_finish', { toolCall: tc });
                 executedToolCalls.push(tc);
-                await new Promise(r => setTimeout(r, 800));
+                await new Promise(r => setTimeout(r, 1200));
               }
             }
 
             if (fallbackResult.files && fallbackResult.files.length > 0) {
-              sendEvent('step', { text: 'Gravando client/src/App.tsx e compilando no preview de runtime...', toolName: 'fs.writeFile' });
-              await new Promise(r => setTimeout(r, 1000));
+              sendEvent('step', { text: 'Etapa 4: Gravando client/src/App.tsx e compilando no preview de runtime...', toolName: 'fs.writeFile' });
+              await new Promise(r => setTimeout(r, 2200));
               const codeToWrite = fallbackResult.files[0].code;
               const execResult = await agentToolExecutor.executeTool('fs.writeFile', {
                 filePath: 'client/src/App.tsx',
@@ -3903,6 +3924,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
               };
               executedToolCalls.push(fsTrace);
               sendEvent('tool_finish', { toolCall: fsTrace });
+              await new Promise(r => setTimeout(r, 1200));
             }
           }
           break;
@@ -4443,6 +4465,10 @@ async function startServer() {
   }
 
   if (process.env.NODE_ENV !== 'production') {
+    app.use((req, res, next) => {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      next();
+    });
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       // O Express é o dono do listener HTTP no AI Studio; sem um listener

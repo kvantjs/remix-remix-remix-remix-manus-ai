@@ -14,7 +14,7 @@ import { Favicon, extractCleanDomain } from "@/lib/favicon";
  * The trace runs once, settles, and remains expandable.
  * ───────────────────────────────────────────────────────── */
 
-const STAGES = [800, 600, 1800, 2600, 1600];
+const STAGES = [1600, 2000, 2400, 2800, 2000];
 
 function useSequence(steps: number[]) {
   const [stage, setStage] = useState(0);
