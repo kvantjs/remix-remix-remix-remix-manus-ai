@@ -354,6 +354,10 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
   const executionStepsRef = useRef<ExecutionStep[]>([]);
   const [progressNotes, setProgressNotes] = useState<AgentProgressNote[]>([]);
   const progressNotesRef = useRef<AgentProgressNote[]>([]);
+  const [showExecutionAnimation, setShowExecutionAnimation] = useState(false);
+  const [initialThoughtComplete, setInitialThoughtComplete] = useState(false);
+  const [cycleThinking, setCycleThinking] = useState(false);
+  const executionCycleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -380,6 +384,21 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
       progressNotesRef.current = bounded;
       return bounded;
     });
+  };
+
+  const activateExecutionAnimation = () => {
+    if (executionCycleTimerRef.current) clearTimeout(executionCycleTimerRef.current);
+    setShowExecutionAnimation(true);
+  };
+
+  const restartExecutionAnimation = () => {
+    if (executionCycleTimerRef.current) clearTimeout(executionCycleTimerRef.current);
+    setShowExecutionAnimation(false);
+    setCycleThinking(true);
+    executionCycleTimerRef.current = setTimeout(() => {
+      setCycleThinking(false);
+      setShowExecutionAnimation(true);
+    }, 550);
   };
 
   const addOpeningProgressNote = (prompt: string) => {
@@ -573,7 +592,15 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
     setIsThinking(true);
     progressNotesRef.current = [];
     setProgressNotes([]);
-    addOpeningProgressNote(userPrompt);
+    if (executionCycleTimerRef.current) clearTimeout(executionCycleTimerRef.current);
+    setShowExecutionAnimation(false);
+    setInitialThoughtComplete(false);
+    executionCycleTimerRef.current = setTimeout(() => {
+      setInitialThoughtComplete(true);
+      setCycleThinking(false);
+      addOpeningProgressNote(userPrompt);
+      setShowExecutionAnimation(true);
+    }, 850);
     const initialSteps: ExecutionStep[] = [
       {
         id: `intent_${Date.now()}`,
@@ -639,9 +666,11 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                 try {
                   const data = JSON.parse(line.replace('data: ', '').trim());
                   if (currentEvent === 'deliberation') {
+                    activateExecutionAnimation();
                     const deliberationLabel = data.label || 'Deliberação profunda';
                     const deliberationText = data.text || 'Avaliando critérios verificáveis.';
                     updateProgressNote(deliberationLabel, data.complete ? `Etapa concluída: ${deliberationText}` : deliberationText, data.complete ? 'complete' : 'running');
+                    if (data.complete) restartExecutionAnimation();
                     setCurrentStep(data.text || data.label || 'Deliberação profunda em andamento');
                     beginExecutionStep(data.label || 'Deliberação profunda', data.text || 'Avaliando critérios verificáveis.');
                     if (data.complete) {
@@ -656,6 +685,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                       });
                     }
                   } else if (currentEvent === 'status') {
+                    activateExecutionAnimation();
                     updateProgressNote('Raciocínio e coordenação', data.text || 'Coordenando a próxima ação do agente.', 'running');
                     setCurrentStep(data.text);
                     beginExecutionStep('Raciocinando sobre a próxima ação', data.text);
@@ -669,6 +699,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                       });
                     }
                   } else if (currentEvent === 'step') {
+                    activateExecutionAnimation();
                     updateProgressNote(data.toolName || 'Etapa de execução', data.text || 'Executando a próxima etapa do plano.', 'running');
                     setCurrentStep(data.text);
                     beginExecutionStep('Executando etapa do plano', data.text);
@@ -681,6 +712,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                       });
                     }
                   } else if (currentEvent === 'tool_start') {
+                    activateExecutionAnimation();
                     const presentation = describeToolExecution(data.toolName, data.arguments || {}, data.reason || '');
                     updateProgressNote(presentation.label, `Iniciei esta etapa: ${presentation.detail || presentation.chip}`, 'running');
                     setCurrentStep(`${presentation.label}: ${presentation.chip}`);
@@ -713,6 +745,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                       });
                     }
                   } else if (currentEvent === 'browser_progress') {
+                    activateExecutionAnimation();
                     updateProgressNote('Navegador ao vivo', data.actionDescription || data.status || 'Acompanhando mouse, rolagem e conteúdo da página.', 'running');
                     const progressTrace: ToolCallTrace = {
                       id: `active_browser_${data.toolName || 'action'}`,
@@ -744,6 +777,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                       });
                     }
                   } else if (currentEvent === 'tool_finish') {
+                    restartExecutionAnimation();
                     const toolCall = data.toolCall;
                     const finishedPresentation = describeToolExecution(toolCall.toolName, toolCall.arguments || {}, toolCall.screenData?.actionDescription || '');
                     updateProgressNote(finishedPresentation.label, `Etapa concluída: ${finishedPresentation.detail || 'resultado incorporado ao contexto.'}`, toolCall.status === 'error' ? 'warning' : 'complete');
@@ -787,6 +821,10 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                     beginExecutionStep('Aguardando sua autorização', data.approval?.reason || 'O agente pausou antes de uma ação sensível.');
                     completeExecutionStep('Aguardando sua autorização', data.approval?.reason || 'Ação pausada até sua decisão.', 'warning');
                   } else if (currentEvent === 'complete') {
+                    if (executionCycleTimerRef.current) clearTimeout(executionCycleTimerRef.current);
+                    setShowExecutionAnimation(false);
+                    setInitialThoughtComplete(false);
+                    setCycleThinking(false);
                     payload = data;
                     setCurrentStep('Organizando resultados e preparando a resposta final...');
                   }
@@ -1050,15 +1088,19 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
           ))}
           
           {isThinking && !messages.some(m => m.isStreaming) && (
+            <InitialThinkingAnimation elapsedSeconds={elapsedSeconds} />
+          )}
+
+          {isThinking && initialThoughtComplete && !cycleThinking && !messages.some(m => m.isStreaming) && progressNotes.length > 0 && (
+            <AgentProgressNotes notes={progressNotes} />
+          )}
+
+          {isThinking && initialThoughtComplete && !cycleThinking && !messages.some(m => m.isStreaming) && showExecutionAnimation && (
             <LocalActiveThinkingState 
               elapsedSeconds={elapsedSeconds} 
               step={currentStep}
               steps={executionSteps}
             />
-          )}
-
-          {isThinking && !messages.some(m => m.isStreaming) && progressNotes.length > 0 && (
-            <AgentProgressNotes notes={progressNotes} />
           )}
 
           {isAgentInBackground && !isThinking && !messages.some(m => m.isStreaming) && (
@@ -1665,6 +1707,19 @@ function MessageItem({
           </div>
         )}
 
+      </div>
+    </div>
+  );
+}
+
+function InitialThinkingAnimation({ elapsedSeconds }: { elapsedSeconds: number }) {
+  return (
+    <div className="w-full max-w-[820px] pl-8 animate-in fade-in duration-300">
+      <div className="flex items-center gap-2.5 py-1">
+        <span className="flex size-5 shrink-0 items-center justify-center text-text-content-primary/70">
+          <Sparkle size={15} weight="fill" className="animate-pulse" />
+        </span>
+        <span className="thinking-shimmer text-[12px] font-medium">Pensando e preparando a próxima etapa · {elapsedSeconds || 1}s</span>
       </div>
     </div>
   );
