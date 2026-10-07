@@ -151,7 +151,7 @@ export default function ThinkingState({
         onClick={() => setManualExpanded((current) => !(current ?? true))}
         className="-mx-1.5 flex w-fit items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-white/5 cursor-pointer"
       >
-        <div className="size-5 rounded-[3px] bg-cover bg-center overflow-hidden flex items-center justify-center shadow-xs border border-white/10" style={{ backgroundImage: `url('https://imgdb.io/i/axsNhBY.png')` }}>
+        <div className="size-5 rounded-[7px] bg-cover bg-center overflow-hidden flex items-center justify-center shadow-xs border border-white/10" style={{ backgroundImage: `url('https://imgdb.io/i/z2ZOrTk.png')` }}>
           {icon ? (
             <span className={`flex shrink-0 transition-colors text-text-content-secondary ${working ? 'animate-pulse' : ''}`}>
               {icon}

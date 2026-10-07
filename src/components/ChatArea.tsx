@@ -38,7 +38,8 @@ import {
   ThumbsUp,
   ThumbsDown,
   ArrowClockwise,
-  CheckCircle
+  CheckCircle,
+  ChatCircleDots
 } from '@phosphor-icons/react';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { ToolCallTrace, AgentExecutionLog } from '../types/project';
@@ -666,12 +667,12 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                   if (currentEvent === 'computer_starting') {
                     updateProgressNote('Inicialização do computador', 'O Computer MCP está iniciando; nenhuma ação será executada durante o boot.', 'running');
                     setCurrentStep(data.text || 'Inicializando o computador do agente...');
-                    beginExecutionStep('Inicializando computador do agente', 'Boot de 5 segundos; nenhuma ação será executada durante a inicialização.');
+                    beginExecutionStep('Inicializando computador do agente', 'Boot de 7 segundos; nenhuma ação será executada durante a inicialização.');
                     if (onAgentStateChange) {
                       onAgentStateChange({
                         isWorking: true,
                         statusText: data.text || 'Inicializando o computador do agente...',
-                        contextText: 'O computador está iniciando. As ações serão liberadas somente após o boot de 5 segundos.',
+                        contextText: 'O computador está iniciando. As ações serão liberadas somente após o boot de 7 segundos.',
                         toolCalls: [...liveToolCalls],
                         browserStatus: 'loading'
                       });
@@ -760,7 +761,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                       timestamp: new Date().toLocaleTimeString(),
                       status: 'running',
                       screenData: {
-                        url: data.arguments?.url || 'https://news.ycombinator.com',
+                        url: data.arguments?.url || 'https://www.google.com',
                         title: 'Acessando ao vivo...',
                         actionDescription: data.reason
                       }
@@ -1066,7 +1067,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-[#1a1a1a] relative">
       {/* Header */}
-      <header className="h-14 flex items-center justify-between px-6 border-b border-white/5 shrink-0 z-10 bg-[#1a1a1a]">
+      <header className="h-11 flex items-center justify-between px-6 border-b border-white/5 shrink-0 z-10 bg-[#1a1a1a]">
         <div className="flex items-center gap-2.5 cursor-pointer hover:bg-white/5 px-2.5 py-1.5 rounded-lg transition-colors group">
           <span className="text-sm font-medium text-[#dcdcdc]">Manus 1.0 Lite</span>
           <CaretDown size={14} className="text-[#dcdcdc]/40 group-hover:text-[#dcdcdc]" />
@@ -1288,7 +1289,7 @@ function InlineChatQuestionnaire({
         {!showTextArea ? (
           <div key={`step-${currentStep}`} className="space-y-3 animate-in fade-in slide-in-from-right-2 duration-300" style={{ borderRadius: '4px' }}>
             <div className="min-h-[28px]">
-              <div className="text-[14px] font-medium text-[#e9e9e9] leading-tight" style={{ fontFamily: 'system-ui' }}>
+              <div className="text-[14px] font-medium text-[#e9e9e9] leading-tight">
                 <StreamingText 
                   content={currentQuestion.title} 
                   speedMs={8} 
@@ -1335,7 +1336,7 @@ function InlineChatQuestionnaire({
           </div>
         ) : (
           <div className="space-y-3 animate-in fade-in slide-in-from-right-2 duration-300" style={{ borderRadius: '4px' }}>
-             <div className="min-h-[28px] text-[14px] font-medium text-[#e9e9e9] leading-tight" style={{ fontFamily: 'system-ui' }}>
+             <div className="min-h-[28px] text-[14px] font-medium text-[#e9e9e9] leading-tight">
               <StreamingText 
                 content="Deseja adicionar mais algum detalhe ou pensamento adicional?" 
                 speedMs={8} 
@@ -1373,7 +1374,7 @@ function InlineChatQuestionnaire({
               className="px-4 py-1.5 rounded-lg bg-white text-black font-bold text-[11px] hover:bg-white/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95 flex items-center gap-1.5"
               style={{ borderRadius: '4px' }}
             >
-              <span style={{ fontFamily: 'Karla, sans-serif' }}>{isLastStep ? 'Próximo' : 'Continuar'}</span>
+              <span>{isLastStep ? 'Próximo' : 'Continuar'}</span>
               <CaretRight size={11} weight="bold" />
             </button>
           ) : (
@@ -1382,7 +1383,7 @@ function InlineChatQuestionnaire({
               className="px-5 py-1.5 rounded-lg bg-emerald-600 text-white font-bold text-[11px] hover:bg-emerald-500 transition-all active:scale-95 flex items-center gap-1.5 shadow-lg shadow-emerald-900/20"
               style={{ borderRadius: '4px' }}
             >
-              <span style={{ fontFamily: 'Karla, sans-serif' }}>Concluir</span>
+              <span>Concluir</span>
               <Check size={11} weight="bold" />
             </button>
           )}
@@ -1413,6 +1414,8 @@ function MessageItem({
   const isWaiting = message.status === 'in_background' || Boolean(message.questionnaire && message.status !== 'completed');
   const [showCodeSnippet, setShowCodeSnippet] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [rating, setRating] = useState<number>(0);
+  const [hoverRating, setHoverRating] = useState<number>(0);
 
   // Keep message content intact so code blocks are fully syntax-highlighted
   const cleanText = message.content || '';
@@ -1644,22 +1647,90 @@ function MessageItem({
           </div>
         )}
 
-        {/* Task Completion Bar */}
-        {!isWaiting && (isAlreadyStreamed || !message.isStreaming) && message.suggestions && message.suggestions.length > 0 && (
-          <div className="pt-2 animate-in fade-in slide-in-from-bottom-2 duration-500 delay-100">
-             <div className="flex flex-wrap gap-2">
+        {/* Task Completion Bar and Message Suggestions Follow-ups */}
+        {!isWaiting && (isAlreadyStreamed || !message.isStreaming) && message.status === 'completed' && (
+          <div className="pt-3 mt-1 border-t border-white/5 animate-in fade-in slide-in-from-bottom-1 duration-500 fill-mode-both space-y-2">
+            {/* Top Bar: Tarefa concluída | Copy | Replay | Time ----- Como foi este resultado? ★★★★★ */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3 text-xs text-text-content-secondary/60">
+                <div className="flex items-center gap-1.5 text-[11.5px] font-medium" style={{ color: '#68ca3c' }}>
+                  <Check size={14} weight="bold" style={{ color: '#68ca3c' }} />
+                  <span style={{ color: '#68ca3c' }}>Tarefa concluída</span>
+                </div>
+
+                <span className="text-white/20 select-none">|</span>
+
+                <div className="flex items-center gap-1 text-text-content-secondary/40">
+                  <button 
+                    onClick={() => {
+                      navigator.clipboard?.writeText(message.content);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    }}
+                    className="hover:text-text-content-primary transition-colors flex items-center justify-center size-6 rounded hover:bg-white/5 cursor-pointer" 
+                    title="Copiar resposta"
+                  >
+                    {copied ? <Check size={13} style={{ color: '#68ca3c' }} /> : <Copy size={13} />}
+                  </button>
+                  <button 
+                    onClick={() => onSelectSuggestion("Refazer resposta")}
+                    className="hover:text-text-content-primary transition-colors flex items-center justify-center size-6 rounded hover:bg-white/5 cursor-pointer" 
+                    title="Gerar nova resposta"
+                  >
+                    <ArrowClockwise size={13} />
+                  </button>
+                </div>
+
+                <span className="text-[11px] text-white/40 font-normal">
+                  {message.time || 'Hoje, 20:26'}
+                </span>
+              </div>
+
+              {/* Right: Como foi este resultado? + 5 Stars */}
+              <div className="flex items-center gap-2 text-text-content-secondary/70">
+                <span className="text-[11px] text-white/50 hidden sm:inline">Como foi este resultado?</span>
+                <div className="flex items-center gap-0.5">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setRating(star === rating ? 0 : star)}
+                      onMouseEnter={() => setHoverRating(star)}
+                      onMouseLeave={() => setHoverRating(0)}
+                      className="p-0.5 hover:scale-110 transition-transform cursor-pointer"
+                      title={`Avaliar com ${star} estrela${star > 1 ? 's' : ''}`}
+                    >
+                      <Star 
+                        size={13} 
+                        weight={(hoverRating || rating) >= star ? "fill" : "regular"} 
+                        className={(hoverRating || rating) >= star ? "text-amber-400" : "text-white/20 hover:text-white/40"}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Suggestions Follow-up List (stacked vertically with subtle divider lines) */}
+            {message.suggestions && message.suggestions.length > 0 && (
+              <div className="flex flex-col divide-y divide-white/5 animate-in fade-in slide-in-from-bottom-2 duration-500 delay-100">
                 {message.suggestions.map((suggestion, sIdx) => (
                   <button
                     key={sIdx}
                     onClick={() => onSelectSuggestion(suggestion)}
-                    className="px-3 py-1.5 rounded-full bg-white/[0.03] border border-border-divider-subtle/50 text-[11.5px] text-text-content-secondary hover:text-text-content-primary hover:bg-white/[0.08] hover:border-border-divider-subtle transition-all cursor-pointer flex items-center gap-2 group"
+                    className="group w-full flex items-start sm:items-center justify-between gap-3 py-3 px-1 text-left hover:bg-white/[0.03] rounded-lg transition-colors cursor-pointer"
                   >
-                    <ArrowBendDownRight size={12} className="text-text-content-secondary/60 group-hover:text-amber-400 transition-colors" weight="bold" />
-                    <span>{suggestion}</span>
-                    <ArrowRight size={10} className="opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+                    <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
+                      <ChatCircleDots size={16} className="text-white/40 group-hover:text-white/80 shrink-0 mt-0.5 sm:mt-0 transition-colors" />
+                      <span className="text-[12.5px] text-white/80 group-hover:text-white leading-relaxed font-normal">
+                        {suggestion}
+                      </span>
+                    </div>
+                    <ArrowRight size={14} className="text-white/30 group-hover:text-white/80 shrink-0 transition-all group-hover:translate-x-0.5 mt-0.5 sm:mt-0" />
                   </button>
                 ))}
-             </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1682,7 +1753,7 @@ function MessageItem({
                     className="hover:text-text-content-primary transition-colors flex items-center justify-center size-7 rounded-lg hover:bg-white/5 cursor-pointer" 
                     title="Copiar resposta"
                   >
-                    {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
+                    {copied ? <Check size={14} style={{ color: '#68ca3c' }} /> : <Copy size={14} />}
                   </button>
                   <button 
                     onClick={() => onSelectSuggestion("Refazer resposta")}
@@ -1695,57 +1766,6 @@ function MessageItem({
              </div>
 
              <div className="flex items-center gap-3 text-text-content-secondary/40">
-                <span className="text-[10px] font-mono opacity-60">{message.time}</span>
-             </div>
-          </div>
-        )}
-
-        {!isWaiting && (isAlreadyStreamed || !message.isStreaming) && message.status === 'completed' && (
-          <div className="flex items-center justify-between pt-3 mt-1 border-t border-white/5 animate-in fade-in slide-in-from-bottom-1 duration-500 delay-200 fill-mode-both">
-             <div className="flex items-center gap-4">
-                <div className="flex items-center gap-1.5 text-green-400/90 text-[11px] font-medium">
-                  <div className="size-3.5 bg-green-500/20 rounded-full flex items-center justify-center">
-                    <Check size={9} weight="bold" />
-                  </div>
-                  <span>Tarefa concluída</span>
-                </div>
-                <div className="flex items-center gap-1 text-text-content-secondary/40">
-                  <button 
-                    onClick={() => {
-                      navigator.clipboard?.writeText(message.content);
-                      setCopied(true);
-                      setTimeout(() => setCopied(false), 2000);
-                    }}
-                    className="hover:text-text-content-primary transition-colors flex items-center justify-center size-7 rounded-lg hover:bg-white/5 cursor-pointer" 
-                    title="Copiar resposta"
-                  >
-                    {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
-                  </button>
-                  <button 
-                    className="hover:text-text-content-primary transition-colors flex items-center justify-center size-7 rounded-lg hover:bg-white/5 cursor-pointer" 
-                    title="Compartilhar resultado"
-                  >
-                    <ShareNetwork size={14} />
-                  </button>
-                  <button 
-                    onClick={() => onSelectSuggestion("Refazer resposta")}
-                    className="hover:text-text-content-primary transition-colors flex items-center justify-center size-7 rounded-lg hover:bg-white/5 cursor-pointer" 
-                    title="Gerar nova resposta"
-                  >
-                    <ArrowClockwise size={14} />
-                  </button>
-                </div>
-             </div>
-
-             <div className="flex items-center gap-3 text-text-content-secondary/40">
-                <div className="flex items-center gap-1 mr-1">
-                  <button className="hover:text-emerald-400 transition-colors cursor-pointer p-0.5">
-                    <ThumbsUp size={13} />
-                  </button>
-                  <button className="hover:text-rose-400 transition-colors cursor-pointer p-0.5">
-                    <ThumbsDown size={13} />
-                  </button>
-                </div>
                 <span className="text-[10px] font-mono opacity-60">{message.time}</span>
              </div>
           </div>
@@ -1760,8 +1780,8 @@ function InitialThinkingAnimation({ elapsedSeconds }: { elapsedSeconds: number }
   return (
     <div className="w-full max-w-[820px] pl-8 animate-in fade-in duration-300">
       <div className="flex items-center gap-2.5 py-1">
-        <span className="flex size-5 shrink-0 items-center justify-center text-text-content-primary/70">
-          <Sparkle size={15} weight="fill" className="animate-pulse" />
+        <span className="flex size-5 shrink-0 items-center justify-center rounded-[7px] bg-cover bg-center border border-white/10 shadow-xs" style={{ backgroundImage: `url('https://imgdb.io/i/z2ZOrTk.png')` }}>
+          <Sparkle size={13} weight="fill" className="animate-pulse text-white" />
         </span>
         <span className="thinking-shimmer text-[12px] font-medium">Pensando e preparando a próxima etapa · {elapsedSeconds || 1}s</span>
       </div>
@@ -1909,7 +1929,9 @@ function ExecutionTimeline({
         ) : isRunning ? (
           <Spinner size={13} className="animate-spin text-text-content-secondary shrink-0" />
         ) : (
-          getContextualToolIcon(step.label, step.label, step.detail)
+          <span className="flex size-5 shrink-0 items-center justify-center rounded-[7px] bg-cover bg-center border border-white/10 shadow-xs" style={{ backgroundImage: `url('https://imgdb.io/i/z2ZOrTk.png')` }}>
+            {getContextualToolIcon(step.label, step.label, step.detail)}
+          </span>
         )}
         <div className="min-w-0 flex-1 flex flex-col items-stretch gap-0.5">
           <span className={`min-w-0 break-words [overflow-wrap:anywhere] text-[11px] ${searchVariant ? 'text-text-content-primary/80' : 'text-text-content-primary/70'} ${codingVariant ? 'font-mono' : 'font-medium'}`}>{step.label}</span>
@@ -1923,8 +1945,10 @@ function ExecutionTimeline({
   return (
     <div className={`execution-timeline flex w-full max-w-[780px] flex-col bg-transparent p-0 ${completed ? 'mt-1' : ''}`} style={{ minHeight: working || expanded ? 148 : undefined, transition: 'min-height 400ms cubic-bezier(0.23,1,0.32,1)' }}>
       <div className="flex items-center gap-2">
-        <button type="button" aria-expanded={expanded} onClick={() => setManualExpanded((current) => !(current ?? autoExpanded))} className="-mx-1.5 flex w-fit items-center gap-2 rounded-lg px-1.5 py-1 text-left transition-colors hover:bg-bg-action-hover">
-          <span className={`flex size-4 shrink-0 items-center justify-center transition-colors ${working ? 'text-text-content-primary/60' : 'text-text-content-secondary/40'}`}><Sparkle size={14} weight="fill" /></span>
+        <button type="button" aria-expanded={expanded} onClick={() => setManualExpanded((current) => !(current ?? autoExpanded))} className="-mx-1.5 flex w-fit items-center gap-2 rounded-lg px-1.5 py-1 text-left transition-colors hover:bg-bg-action-hover cursor-pointer">
+          <span className="flex size-5 shrink-0 items-center justify-center rounded-[7px] bg-cover bg-center border border-white/10 shadow-xs" style={{ backgroundImage: `url('https://imgdb.io/i/z2ZOrTk.png')` }}>
+            <Sparkle size={13} weight="fill" className={working ? 'text-white animate-pulse' : 'text-text-content-secondary'} />
+          </span>
           <span role="status" className="text-[13px] font-medium">
             {working ? <span className="thinking-shimmer">{activeLabel}</span> : <span className="text-text-content-primary/60">{doneLabel}</span>}
           </span>

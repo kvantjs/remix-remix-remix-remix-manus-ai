@@ -377,7 +377,7 @@ export default function ToolChips({
                     className="group/row -mx-[3px] flex min-h-7 w-[calc(100%+6px)] min-w-0 items-start gap-2 rounded-lg px-2 py-1 text-left transition-all duration-150 hover:bg-white/5 cursor-pointer"
                   >
                     <span className="relative flex size-5 shrink-0 items-center justify-center">
-                      <span className={`transition-opacity duration-100 flex size-5 items-center justify-center rounded-[3px] bg-cover bg-center border border-white/10 shadow-xs ${rowOpen ? "opacity-0" : "group-hover/row:opacity-0"}`} style={{ backgroundImage: `url('https://imgdb.io/i/axsNhBY.png')` }}>
+                      <span className={`transition-opacity duration-100 flex size-5 items-center justify-center rounded-[7px] bg-cover bg-center border border-white/10 shadow-xs ${rowOpen ? "opacity-0" : "group-hover/row:opacity-0"}`} style={{ backgroundImage: `url('https://imgdb.io/i/z2ZOrTk.png')` }}>
                         {getContextualToolIcon(row.icon, row.label, row.chip)}
                       </span>
                       <CaretRight
@@ -445,7 +445,7 @@ export default function ToolChips({
                       transition-all duration-150 hover:bg-white/[0.08] hover:border-white/15 cursor-pointer"
                     style={{ animation: `pop-in 250ms cubic-bezier(0.23,1,0.32,1) ${i * 80}ms both` }}
                   >
-                    <span className="inline-flex size-4 items-center justify-center rounded-[3px] bg-cover bg-center border border-white/10 overflow-hidden" style={{ backgroundImage: `url('https://imgdb.io/i/axsNhBY.png')` }}>
+                    <span className="inline-flex size-4 items-center justify-center rounded-[7px] bg-cover bg-center border border-white/10 overflow-hidden" style={{ backgroundImage: `url('https://imgdb.io/i/z2ZOrTk.png')` }}>
                       {getContextualFileIcon(d.file)}
                     </span>
                     <span className="min-w-0 truncate">{d.file}</span>

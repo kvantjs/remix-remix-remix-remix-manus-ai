@@ -518,7 +518,7 @@ export function DynamicRuntimeRunner({ code, customFiles = {} }: DynamicRuntimeR
     return (
       <div className="h-full flex items-center justify-center p-8 text-white/40 text-xs gap-2.5">
         <div className="size-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-        <span>Compilando client/src/App.tsx com o runtime React + Vite...</span>
+        <span>Compilando client/src/App.tsx...</span>
       </div>
     );
   }
@@ -547,13 +547,13 @@ export function DynamicRuntimeRunner({ code, customFiles = {} }: DynamicRuntimeR
         <div className="p-6 bg-red-950/30 border border-red-500/30 rounded-xl text-red-200 text-xs font-mono space-y-2 m-4">
           <div className="font-bold text-red-400 flex items-center gap-2">
             <PhosphorIcons.Warning size={15} className="text-red-400 shrink-0" />
-            <span>Erro em tempo de execução no preview React + Vite:</span>
+            <span>Erro em tempo de execução no preview:</span>
           </div>
           <p className="text-white/80">{error.message}</p>
         </div>
       )}
     >
-      <div id="kvant-runtime-root" className="w-full h-full min-h-full flex flex-col overflow-auto" style={{ isolation: 'isolate', background: 'transparent' }}>
+      <div id="kvant-runtime-root" className="w-full h-full min-h-full flex flex-col overflow-auto" style={{ isolation: 'isolate', background: 'transparent', borderColor: '#1a1a1a' }}>
         {runtimeNotice && <div className="pointer-events-none absolute right-2 top-2 z-50 rounded-md border border-emerald-400/20 bg-black/60 px-2 py-1 text-[10px] font-mono text-emerald-200/80 backdrop-blur-sm">{runtimeNotice}</div>}
         <RenderedComponent />
       </div>

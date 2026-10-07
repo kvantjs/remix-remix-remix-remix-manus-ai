@@ -30,7 +30,8 @@ import {
   FloppyDisk,
   FilePlus,
   FolderPlus,
-  Sparkle
+  Sparkle,
+  LinuxLogo
 } from '@phosphor-icons/react';
 import React, { useState, useEffect, useMemo } from 'react';
 import { RuntimePreview } from './RuntimePreview';
@@ -41,6 +42,9 @@ import { javascript } from '@codemirror/lang-javascript';
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { KvantComputer } from './KvantComputer';
 import { ToolCallTrace } from '../types/project';
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { cn } from "cn";
+import { motion, AnimatePresence } from "motion/react";
 
 export type TopLevelTab = 'computer' | 'workspace' | 'code_tab' | 'preview_tab' | 'terminal_tab';
 export type WorkspaceSubTab = 'preview' | 'code' | 'terminal' | 'projects' | 'automations' | 'settings';
@@ -140,7 +144,7 @@ export function Workspace({
     <div className={`${isMaximized ? 'w-full absolute inset-0 z-30' : 'w-[56%] min-w-[460px]'} border-l border-border-divider-subtle bg-bg-surface-panel flex flex-col h-full animate-in duration-200 select-none`}>
       
       {/* Top Application Tab Bar */}
-      <div className="h-10 flex items-center px-3 bg-bg-canvas-main/60 border-b border-border-divider-subtle shrink-0 relative select-none">
+      <div className="h-11 flex items-center px-3 bg-bg-canvas-main/60 border-b border-border-divider-subtle shrink-0 relative select-none">
         
         {/* Tabs list of the application */}
         <div className="flex items-center gap-1 overflow-x-auto custom-scrollbar">
@@ -157,22 +161,22 @@ export function Workspace({
                 }`}
               >
                 {tab.id === 'computer' && (
-                  <Desktop size={13} weight={isActive ? "fill" : "regular"} className={isActive ? "text-white" : "text-text-content-secondary"} />
+                  <Desktop size={13} weight={isActive ? "fill" : "regular"} style={{ color: isActive ? '#ffffff' : undefined }} className={!isActive ? "text-text-content-secondary" : ""} />
                 )}
                 {tab.id === 'workspace' && (
-                  <Code size={13} weight={isActive ? "bold" : "regular"} className={isActive ? "text-slate-200" : "text-text-content-secondary"} />
+                  <LinuxLogo size={13} weight={isActive ? "fill" : "regular"} style={{ color: isActive ? '#ffffff' : undefined }} className={!isActive ? "text-text-content-secondary" : ""} />
                 )}
                 {tab.id === 'code_tab' && (
-                  <FileCode size={13} weight={isActive ? "fill" : "regular"} className={isActive ? "text-slate-200" : "text-text-content-secondary"} />
+                  <FileCode size={13} weight={isActive ? "fill" : "regular"} style={{ color: isActive ? '#ffffff' : undefined }} className={!isActive ? "text-text-content-secondary" : ""} />
                 )}
                 {tab.id === 'preview_tab' && (
-                  <Browser size={13} className={isActive ? "text-slate-200" : "text-text-content-secondary"} />
+                  <Browser size={13} weight={isActive ? "fill" : "regular"} style={{ color: isActive ? '#ffffff' : undefined }} className={!isActive ? "text-text-content-secondary" : ""} />
                 )}
                 {tab.id === 'terminal_tab' && (
-                  <Terminal size={13} className={isActive ? "text-slate-200" : "text-text-content-secondary"} />
+                  <Terminal size={13} weight={isActive ? "fill" : "regular"} style={{ color: isActive ? '#ffffff' : undefined }} className={!isActive ? "text-text-content-secondary" : ""} />
                 )}
 
-                <span className="truncate max-w-[150px] text-[11.5px]">{tab.label}</span>
+                <span className="truncate max-w-[150px] text-[11.5px]" style={{ color: isActive ? '#f5f5f5' : '#8a8a8a' }}>{tab.label}</span>
 
                 {tab.closable && (
                   <X 
@@ -342,43 +346,203 @@ export function Workspace({
         <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg-surface-panel">
           {/* Internal Navigation Bar for Workspace */}
           <div className="h-11 flex items-center justify-between px-3 border-b border-border-divider-subtle shrink-0 bg-bg-surface-panel">
-            <div style={{ backgroundColor: '#1a1a1a', borderWidth: '0px', borderRadius: '9px', borderColor: '#1a1a1a' }} className="flex items-center gap-1 p-0.5 border border-border-divider-subtle rounded-lg bg-bg-canvas-main/80 overflow-x-auto">
-              <NavButton 
-                active={workspaceSubTab === 'preview'} 
-                onClick={() => setWorkspaceSubTab('preview')}
-                icon={<Desktop size={13} />} 
-                label="Pré-visualização" 
-              />
-              <NavButton 
-                active={workspaceSubTab === 'code'} 
-                onClick={() => setWorkspaceSubTab('code')}
-                icon={<Code size={13} />} 
-                label="Editor de Código" 
-              />
-              <NavButton 
-                active={workspaceSubTab === 'terminal'} 
-                onClick={() => setWorkspaceSubTab('terminal')}
-                icon={<Terminal size={13} />} 
-                label="Terminal" 
-              />
-              <NavButton 
-                active={workspaceSubTab === 'projects'} 
-                onClick={() => setWorkspaceSubTab('projects')}
-                icon={<Folder size={13} />} 
-                label="Projetos & Git" 
-              />
-              <NavButton 
-                active={workspaceSubTab === 'automations'} 
-                onClick={() => setWorkspaceSubTab('automations')}
-                icon={<Calendar size={13} />} 
-                label="Execuções" 
-              />
-              <NavButton 
-                active={workspaceSubTab === 'settings'} 
-                onClick={() => setWorkspaceSubTab('settings')}
-                icon={<Gear size={13} />} 
-                label="Configurações" 
-              />
+            <div className="flex items-center">
+              <ToggleGroup 
+                value={[workspaceSubTab]} 
+                onValueChange={(val) => {
+                  if (val && val.length > 0) {
+                    setWorkspaceSubTab(val[0] as WorkspaceSubTab);
+                  }
+                }}
+                spacing={8}
+                className="bg-transparent border-none p-0 h-auto gap-2"
+              >
+                <ToggleGroupItem 
+                  value="preview" 
+                  className={cn(
+                    "relative transition-all duration-300 flex items-center gap-2 px-3 h-8 rounded-[10px] border",
+                    workspaceSubTab === 'preview' 
+                      ? "text-white bg-[#1f1f1f] border-[#323232] shadow-sm" 
+                      : "text-white/40 border-transparent hover:text-white/60 hover:bg-white/5"
+                  )}
+                >
+                  <Desktop size={12} weight="regular" />
+                  <AnimatePresence initial={false}>
+                    {workspaceSubTab === 'preview' && (
+                      <motion.span
+                        layout
+                        initial={{ opacity: 0, width: 0 }}
+                        animate={{ opacity: 1, width: "auto" }}
+                        exit={{ opacity: 0, width: 0 }}
+                        transition={{ 
+                          type: "spring",
+                          stiffness: 300,
+                          damping: 25,
+                          opacity: { duration: 0.15 }
+                        }}
+                        className="overflow-hidden whitespace-nowrap text-[11px] font-semibold"
+                      >
+                        Preview
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </ToggleGroupItem>
+
+                <ToggleGroupItem 
+                  value="code" 
+                  className={cn(
+                    "relative transition-all duration-300 flex items-center gap-2 px-3 h-8 rounded-[10px] border",
+                    workspaceSubTab === 'code' 
+                      ? "text-white bg-[#1f1f1f] border-[#323232] shadow-sm" 
+                      : "text-white/40 border-transparent hover:text-white/60 hover:bg-white/5"
+                  )}
+                >
+                  <Code size={12} weight="regular" />
+                  <AnimatePresence initial={false}>
+                    {workspaceSubTab === 'code' && (
+                      <motion.span
+                        layout
+                        initial={{ opacity: 0, width: 0 }}
+                        animate={{ opacity: 1, width: "auto" }}
+                        exit={{ opacity: 0, width: 0 }}
+                        transition={{ 
+                          type: "spring",
+                          stiffness: 300,
+                          damping: 25,
+                          opacity: { duration: 0.15 }
+                        }}
+                        className="overflow-hidden whitespace-nowrap text-[11px] font-semibold"
+                      >
+                        Editor
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </ToggleGroupItem>
+
+                <ToggleGroupItem 
+                  value="terminal" 
+                  className={cn(
+                    "relative transition-all duration-300 flex items-center gap-2 px-3 h-8 rounded-[10px] border",
+                    workspaceSubTab === 'terminal' 
+                      ? "text-white bg-[#1f1f1f] border-[#323232] shadow-sm" 
+                      : "text-white/40 border-transparent hover:text-white/60 hover:bg-white/5"
+                  )}
+                >
+                  <Terminal size={12} weight="regular" />
+                  <AnimatePresence initial={false}>
+                    {workspaceSubTab === 'terminal' && (
+                      <motion.span
+                        layout
+                        initial={{ opacity: 0, width: 0 }}
+                        animate={{ opacity: 1, width: "auto" }}
+                        exit={{ opacity: 0, width: 0 }}
+                        transition={{ 
+                          type: "spring",
+                          stiffness: 300,
+                          damping: 25,
+                          opacity: { duration: 0.15 }
+                        }}
+                        className="overflow-hidden whitespace-nowrap text-[11px] font-semibold"
+                      >
+                        Terminal
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </ToggleGroupItem>
+
+                <ToggleGroupItem 
+                  value="projects" 
+                  className={cn(
+                    "relative transition-all duration-300 flex items-center gap-2 px-3 h-8 rounded-[10px] border",
+                    workspaceSubTab === 'projects' 
+                      ? "text-white bg-[#1f1f1f] border-[#323232] shadow-sm" 
+                      : "text-white/40 border-transparent hover:text-white/60 hover:bg-white/5"
+                  )}
+                >
+                  <Folder size={12} weight="regular" />
+                  <AnimatePresence initial={false}>
+                    {workspaceSubTab === 'projects' && (
+                      <motion.span
+                        layout
+                        initial={{ opacity: 0, width: 0 }}
+                        animate={{ opacity: 1, width: "auto" }}
+                        exit={{ opacity: 0, width: 0 }}
+                        transition={{ 
+                          type: "spring",
+                          stiffness: 300,
+                          damping: 25,
+                          opacity: { duration: 0.15 }
+                        }}
+                        className="overflow-hidden whitespace-nowrap text-[11px] font-semibold"
+                      >
+                        Git
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </ToggleGroupItem>
+
+                <ToggleGroupItem 
+                  value="automations" 
+                  className={cn(
+                    "relative transition-all duration-300 flex items-center gap-2 px-3 h-8 rounded-[10px] border",
+                    workspaceSubTab === 'automations' 
+                      ? "text-white bg-[#1f1f1f] border-[#323232] shadow-sm" 
+                      : "text-white/40 border-transparent hover:text-white/60 hover:bg-white/5"
+                  )}
+                >
+                  <Calendar size={12} weight="regular" />
+                  <AnimatePresence initial={false}>
+                    {workspaceSubTab === 'automations' && (
+                      <motion.span
+                        layout
+                        initial={{ opacity: 0, width: 0 }}
+                        animate={{ opacity: 1, width: "auto" }}
+                        exit={{ opacity: 0, width: 0 }}
+                        transition={{ 
+                          type: "spring",
+                          stiffness: 300,
+                          damping: 25,
+                          opacity: { duration: 0.15 }
+                        }}
+                        className="overflow-hidden whitespace-nowrap text-[11px] font-semibold"
+                      >
+                        Execuções
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </ToggleGroupItem>
+
+                <ToggleGroupItem 
+                  value="settings" 
+                  className={cn(
+                    "relative transition-all duration-300 flex items-center gap-2 px-3 h-8 rounded-[10px] border",
+                    workspaceSubTab === 'settings' 
+                      ? "text-white bg-[#1f1f1f] border-[#323232] shadow-sm" 
+                      : "text-white/40 border-transparent hover:text-white/60 hover:bg-white/5"
+                  )}
+                >
+                  <Gear size={12} weight="regular" />
+                  <AnimatePresence initial={false}>
+                    {workspaceSubTab === 'settings' && (
+                      <motion.span
+                        layout
+                        initial={{ opacity: 0, width: 0 }}
+                        animate={{ opacity: 1, width: "auto" }}
+                        exit={{ opacity: 0, width: 0 }}
+                        transition={{ 
+                          type: "spring",
+                          stiffness: 300,
+                          damping: 25,
+                          opacity: { duration: 0.15 }
+                        }}
+                        className="overflow-hidden whitespace-nowrap text-[11px] font-semibold"
+                      >
+                        Ajustes
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </ToggleGroupItem>
+              </ToggleGroup>
             </div>
             
             <div className="flex items-center gap-2 shrink-0">
@@ -649,48 +813,36 @@ function InteractiveCodeEditor({ activeFile, onFileChange, customFiles, onFileUp
   return (
     <div className="h-full flex bg-[#0d0d0f] text-slate-100 overflow-hidden relative">
       {/* Left Sidebar: Dynamic Workspace File Tree */}
-      <div className="w-56 border-r border-white/10 flex flex-col shrink-0 bg-[#111218] select-none">
+      <div className="w-56 border-r border-white/10 flex flex-col shrink-0 select-none" style={{ backgroundColor: '#202020' }}>
         {/* Workspace Tree Header */}
-        <div className="p-3 border-b border-white/10 flex items-center justify-between shrink-0 bg-[#252525]">
+        <div className="h-9 px-3 border-b border-white/10 flex items-center justify-between shrink-0" style={{ backgroundColor: '#202020' }}>
           <div className="flex items-center gap-1.5 text-xs font-semibold text-white">
-            <Folder size={14} className="text-[#9d9d9d]" />
-            <span>Arquivos do Projeto</span>
+            <Folder size={14} className="text-[#f5f5f5]" style={{ color: '#f5f5f5' }} />
+            <span style={{ color: '#f5f5f5' }}>Arquivos</span>
           </div>
 
           <div className="flex items-center gap-1">
             <button
               onClick={() => setIsNewFileModalOpen(true)}
-              className="p-1 hover:bg-white/10 rounded text-slate-300 hover:text-white transition-colors cursor-pointer"
+              className="p-1 hover:bg-white/10 rounded transition-colors cursor-pointer"
+              style={{ color: '#f5f5f5' }}
               title="Novo Arquivo (+ File)"
             >
-              <FilePlus size={14} />
+              <FilePlus size={14} style={{ color: '#f5f5f5' }} />
             </button>
             <button
               onClick={() => setIsNewFolderModalOpen(true)}
-              className="p-1 hover:bg-white/10 rounded text-slate-300 hover:text-white transition-colors cursor-pointer"
+              className="p-1 hover:bg-white/10 rounded transition-colors cursor-pointer"
+              style={{ color: '#f5f5f5' }}
               title="Nova Pasta (+ Folder)"
             >
-              <FolderPlus size={14} />
+              <FolderPlus size={14} style={{ color: '#f5f5f5' }} />
             </button>
-          </div>
-        </div>
-
-        {/* Quick Search in Files */}
-        <div className="p-2 border-b border-white/5 bg-[#252525]">
-          <div className="flex items-center gap-1.5 bg-[#252525] border border-[#373737] rounded-lg px-2 py-1 text-xs text-[#d8d8d8]">
-            <MagnifyingGlass size={12} className="text-slate-500" />
-            <input 
-              type="text" 
-              value={searchTerm} 
-              onChange={e => setSearchTerm(e.target.value)} 
-              placeholder="Filtrar arquivos..." 
-              className="w-full bg-transparent text-[#5e5e5e] border-[#393939] placeholder:text-slate-600 focus:outline-none text-[11px]"
-            />
           </div>
         </div>
 
         {/* Tree Nodes List */}
-        <div className="flex-1 overflow-y-auto p-2 space-y-0.5 custom-scrollbar text-xs bg-[#252525]">
+        <div className="flex-1 overflow-y-auto p-2 space-y-0.5 custom-scrollbar text-xs" style={{ backgroundColor: '#202020' }}>
           {fileTree.map((node) => (
             <DynamicFileTreeNode 
               key={node.path} 
@@ -704,20 +856,20 @@ function InteractiveCodeEditor({ activeFile, onFileChange, customFiles, onFileUp
         </div>
 
         {/* Workspace Footer Stats */}
-        <div className="p-2.5 border-t border-white/5 text-[10px] text-slate-500 flex items-center justify-between font-mono bg-[#252525]">
-          <span>{Object.keys(customFiles).length || 4} arquivos</span>
-          <span className="text-emerald-400">● Workspace Pronto</span>
+        <div className="p-2.5 border-t border-white/5 text-[10px] flex items-center justify-between font-mono" style={{ backgroundColor: '#202020', color: '#f5f5f5' }}>
+          <span style={{ color: '#f5f5f5' }}>{Object.keys(customFiles).length || 4} arquivos</span>
+          <span style={{ color: '#f5f5f5' }}>● Workspace Pronto</span>
         </div>
       </div>
 
       {/* Main Code Editor View */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[#1a1a1a] overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 bg-[#191919] overflow-hidden" style={{ backgroundColor: '#191919' }}>
         {/* Editor Tab Bar & Actions */}
-        <div className="h-10 bg-[#252525] border-b border-white/10 px-4 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2 font-mono text-xs text-slate-300 truncate">
-            <FileCode size={15} className="text-slate-300 shrink-0" />
-            <span className="font-semibold text-white">{activeFile}</span>
-            <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-white/5 text-slate-400 border border-white/10 font-sans tracking-wide select-none">
+        <div className="h-9 border-b border-white/10 px-4 flex items-center justify-between shrink-0" style={{ backgroundColor: '#202020', color: '#f5f5f5' }}>
+          <div className="flex items-center gap-2 font-mono text-xs truncate" style={{ color: '#f5f5f5' }}>
+            <FileCode size={15} className="shrink-0" style={{ color: '#f5f5f5' }} />
+            <span className="font-semibold" style={{ color: '#f5f5f5' }}>{activeFile}</span>
+            <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-white/5 border border-white/10 font-sans tracking-wide select-none" style={{ color: '#f5f5f5' }}>
               Apenas Leitura
             </span>
             {!isSaved && (
@@ -731,8 +883,9 @@ function InteractiveCodeEditor({ activeFile, onFileChange, customFiles, onFileUp
               className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ${
                 !isSaved 
                   ? 'bg-white hover:bg-slate-200 text-black shadow-white/5' 
-                  : 'bg-white/10 hover:bg-white/15 text-white/80'
+                  : 'bg-white/10 hover:bg-white/15'
               }`}
+              style={{ color: !isSaved ? '#000000' : '#f5f5f5' }}
               title="Salvar arquivo e sincronizar runtime (Ctrl+S)"
             >
               <FloppyDisk size={13} weight="bold" />
@@ -745,10 +898,11 @@ function InteractiveCodeEditor({ activeFile, onFileChange, customFiles, onFileUp
                 setCopied(true);
                 setTimeout(() => setCopied(false), 2000);
               }}
-              className="p-1.5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-lg transition-colors cursor-pointer"
+              className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+              style={{ color: '#f5f5f5' }}
               title="Copiar código"
             >
-              {copied ? <Check size={14} className="text-emerald-400" /> : <Code size={14} />}
+              {copied ? <Check size={14} className="text-emerald-400" /> : <Code size={14} style={{ color: '#f5f5f5' }} />}
             </button>
 
             <button
@@ -760,10 +914,11 @@ function InteractiveCodeEditor({ activeFile, onFileChange, customFiles, onFileUp
                 a.download = activeFile.split('/').pop() || 'file.tsx';
                 a.click();
               }}
-              className="p-1.5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-lg transition-colors cursor-pointer"
+              className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+              style={{ color: '#f5f5f5' }}
               title="Baixar arquivo"
             >
-              <Download size={14} />
+              <Download size={14} style={{ color: '#f5f5f5' }} />
             </button>
 
             {activeFile !== 'client/src/App.tsx' && (
@@ -779,7 +934,7 @@ function InteractiveCodeEditor({ activeFile, onFileChange, customFiles, onFileUp
         </div>
 
         {/* Real Code Editor CodeMirror Surface (Apenas Leitura do Usuário) */}
-        <div className="flex-1 overflow-auto relative bg-[#1a1a1a] h-full flex flex-col font-mono text-xs select-text">
+        <div className="flex-1 overflow-auto relative bg-[#191919] h-full flex flex-col font-mono text-xs select-text" style={{ backgroundColor: '#191919' }}>
           <CodeMirror
             value={editorContent}
             height="100%"
@@ -792,14 +947,14 @@ function InteractiveCodeEditor({ activeFile, onFileChange, customFiles, onFileUp
         </div>
 
         {/* Editor Bottom Status Bar */}
-        <div className="h-6 bg-[#0E1017] border-t border-white/5 px-3 flex items-center justify-between text-[10px] text-slate-500 font-mono shrink-0 select-none">
-          <div className="flex items-center gap-3">
-            <span>{detectLanguage(activeFile, editorContent).toUpperCase()}</span>
-            <span>UTF-8</span>
-            <span>{lineCount} linhas</span>
+        <div className="h-6 bg-[#0E1017] border-t border-white/5 px-3 flex items-center justify-between text-[10px] font-mono shrink-0 select-none" style={{ color: '#f5f5f5' }}>
+          <div className="flex items-center gap-3" style={{ color: '#f5f5f5' }}>
+            <span style={{ color: '#f5f5f5' }}>{detectLanguage(activeFile, editorContent).toUpperCase()}</span>
+            <span style={{ color: '#f5f5f5' }}>UTF-8</span>
+            <span style={{ color: '#f5f5f5' }}>{lineCount} linhas</span>
           </div>
-          <div className="flex items-center gap-2 text-slate-400">
-            <span>⚡ Sincronização em Tempo Real Ativa</span>
+          <div className="flex items-center gap-2" style={{ color: '#f5f5f5' }}>
+            <span style={{ color: '#f5f5f5' }}>⚡ Sincronização em Tempo Real Ativa</span>
           </div>
         </div>
       </div>
@@ -873,6 +1028,70 @@ function InteractiveCodeEditor({ activeFile, onFileChange, customFiles, onFileUp
   );
 }
 
+function renderFileIcon(name: string) {
+  const ext = name.split('.').pop()?.toLowerCase();
+  
+  if (ext === 'tsx' || ext === 'jsx') {
+    return (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="shrink-0">
+        <ellipse cx="12" cy="12" rx="3.5" ry="8.5" transform="rotate(30 12 12)" />
+        <ellipse cx="12" cy="12" rx="3.5" ry="8.5" transform="rotate(90 12 12)" />
+        <ellipse cx="12" cy="12" rx="3.5" ry="8.5" transform="rotate(150 12 12)" />
+        <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+      </svg>
+    );
+  }
+  if (ext === 'ts') {
+    return (
+      <span className="font-bold font-mono px-1 rounded border border-current shrink-0" style={{ fontSize: '10px' }}>
+        TS
+      </span>
+    );
+  }
+  if (ext === 'js') {
+    return (
+      <span className="font-bold font-mono px-1 rounded border border-current shrink-0" style={{ fontSize: '10px' }}>
+        JS
+      </span>
+    );
+  }
+  if (ext === 'css') {
+    return (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+        <path d="M4 3l2 14.5L12 19l6-1.5L20 3H4z" />
+        <path d="M9 7h8l-1 4H8l.5 3 3.5 1 3.5-1 .3-2" />
+      </svg>
+    );
+  }
+  if (ext === 'html') {
+    return (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+        <polyline points="16 18 22 12 16 6" />
+        <polyline points="8 6 2 12 8 18" />
+      </svg>
+    );
+  }
+  if (ext === 'json') {
+    return (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="shrink-0">
+        <path d="M8 3v3a2 2 0 0 1-2 2H4v2h2a2 2 0 0 1 2 2v3" />
+        <path d="M16 3v3a2 2 0 0 0 2 2h2v2h-2a2 2 0 0 0-2 2v3" />
+      </svg>
+    );
+  }
+  if (ext === 'md') {
+    return (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+        <line x1="16" y1="13" x2="8" y2="13" />
+        <line x1="16" y1="17" x2="8" y2="17" />
+      </svg>
+    );
+  }
+  return <FileCode size={18} className="shrink-0" />;
+}
+
 // Tree Node Recursive Renderer
 function DynamicFileTreeNode({ node, level, activeFile, onFileChange, searchTerm }: {
   node: TreeNode;
@@ -895,22 +1114,26 @@ function DynamicFileTreeNode({ node, level, activeFile, onFileChange, searchTerm
   return (
     <div>
       <div 
-        className={`flex items-center gap-1.5 py-1 px-2 rounded-lg cursor-pointer transition-all ${
+        className={`flex items-center gap-1.5 py-1 px-2 cursor-pointer transition-all ${
           isActive 
-            ? 'bg-[#272727] text-[#bdbdbd] font-medium border border-[#363636] rounded-[6px]' 
-            : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
+            ? 'font-medium border rounded-[6px]' 
+            : 'hover:bg-white/5'
         }`}
-        style={{ paddingLeft: `${level * 12 + 6}px` }}
+        style={{ 
+          paddingLeft: `${level * 12 + 6}px`,
+          color: isActive ? '#f5f5f5' : '#8a8a8a',
+          ...(isActive ? { backgroundColor: '#252525', borderColor: '#202020', borderRadius: '6px', borderWidth: '1px', borderStyle: 'solid' } : {})
+        }}
         onClick={() => isFolder ? setIsOpen(!isOpen) : onFileChange(node.path)}
       >
         {isFolder ? (
-          <CaretRight size={11} className={`transition-transform shrink-0 ${isOpen ? 'rotate-90 text-white' : 'text-slate-500'}`} />
+          <CaretRight size={11} className={`transition-transform shrink-0 ${isOpen ? 'rotate-90' : ''}`} style={{ color: isActive ? '#f5f5f5' : '#8a8a8a' }} />
         ) : (
-          <FileCode size={13} className={isActive ? "text-white shrink-0" : "text-slate-500 shrink-0"} />
+          renderFileIcon(node.name)
         )}
         
         {isFolder && (
-          <Folder size={13} className={isOpen ? "text-white shrink-0" : "text-slate-500 shrink-0"} />
+          <Folder size={13} className="shrink-0" style={{ color: isActive ? '#f5f5f5' : '#8a8a8a' }} />
         )}
 
         <span className="text-[11px] truncate font-mono">{node.name}</span>

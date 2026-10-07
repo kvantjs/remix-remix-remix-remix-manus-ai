@@ -31,7 +31,7 @@ export function RuntimePreview({ activeCode, customFiles = {}, onSendPrompt, isW
   const [refreshKey, setRefreshKey] = useState(0);
   const [showConsole, setShowConsole] = useState(false);
   const [logs, setLogs] = useState<string[]>([
-    `[${new Date().toLocaleTimeString()}] Vite React Runtime inicializado`,
+    `[${new Date().toLocaleTimeString()}] Preview inicializado`,
     `[${new Date().toLocaleTimeString()}] HMR local aguardando alterações no workspace`
   ]);
 
@@ -50,7 +50,7 @@ export function RuntimePreview({ activeCode, customFiles = {}, onSendPrompt, isW
   const handleRefresh = () => {
     setRefreshKey(value => value + 1);
     setLogs(previous => [
-      `[${new Date().toLocaleTimeString()}] HMR: preview React + Vite recompilado`,
+      `[${new Date().toLocaleTimeString()}] HMR: preview recompilado`,
       ...previous
     ].slice(0, 40));
   };
@@ -59,40 +59,33 @@ export function RuntimePreview({ activeCode, customFiles = {}, onSendPrompt, isW
     <div className="h-full flex flex-col bg-[#1a1a1a] select-none">
       <div className="h-11 bg-[#1a1a1a] border-b border-white/5 flex items-center justify-between px-3 gap-3 shrink-0">
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5">
-            <div className="size-2.5 rounded-full bg-white/20" />
-            <div className="size-2.5 rounded-full bg-white/20" />
-            <div className="size-2.5 rounded-full bg-white/20" />
-          </div>
-          <div className="h-3 w-px bg-white/10" />
-          <div className="flex items-center bg-white/[0.04] border border-white/5 rounded-md p-0.5">
-            <button onClick={() => setDevice('desktop')} className={`p-1 rounded transition-colors cursor-pointer ${device === 'desktop' ? 'bg-white/15 text-white' : 'text-white/40 hover:text-white/70'}`} title="Visualização Desktop">
+
+
+          <div className="flex items-center bg-[#1a1a1a] border border-white/5 rounded-md p-0.5">
+            <button onClick={() => setDevice('desktop')} className={`p-1 rounded transition-colors cursor-pointer ${device === 'desktop' ? 'bg-[#323232] text-white' : 'text-white/40 hover:text-white/70'}`} title="Visualização Desktop">
               <Monitor size={13} />
             </button>
-            <button onClick={() => setDevice('mobile')} className={`p-1 rounded transition-colors cursor-pointer ${device === 'mobile' ? 'bg-white/15 text-white' : 'text-white/40 hover:text-white/70'}`} title="Visualização Mobile">
+            <button onClick={() => setDevice('mobile')} className={`p-1 rounded transition-colors cursor-pointer ${device === 'mobile' ? 'bg-[#323232] text-white' : 'text-white/40 hover:text-white/70'}`} title="Visualização Mobile">
               <DeviceMobile size={13} />
             </button>
           </div>
-          <span className="text-[10px] font-mono text-white/45">React + Vite</span>
+
         </div>
 
         <div className="flex-1 max-w-md mx-auto">
-          <div className="bg-[#202020] border border-white/5 rounded-lg px-2.5 py-1 flex items-center gap-2 text-xs text-white/50">
+          <div className="bg-[#1a1a1a] border border-white/5 rounded-lg px-2.5 py-1 flex items-center gap-2 text-xs text-white/50">
             <div className="flex items-center gap-1.5 text-white/40">
               <NavigationArrow size={12} />
               <PencilSimpleLine size={12} />
             </div>
             <span style={{ color: '#707070' }} className="font-mono text-[11px]">/</span>
-            <span style={{ color: '#2992f0', borderRadius: '10px', backgroundColor: '#1f2c39' }} className={`ml-auto text-[9px] px-1.5 py-0.5 rounded font-mono flex items-center gap-1 ${runtimeStatus.tone}`}>
-              {React.cloneElement(runtimeStatus.icon as any, { style: { color: '#2992f0' } })}
-              {runtimeStatus.label}
-            </span>
+            <ArrowSquareOut size={14} className="ml-auto text-white/30" />
           </div>
         </div>
 
         <div className="flex items-center gap-2 text-white/40">
           {hasApp && (
-            <button onClick={() => onSendPrompt?.('Valide o projeto React + Vite completo, corrija qualquer erro de compilação e mantenha todos os arquivos existentes.')} className="p-1.5 rounded-md hover:bg-white/5 hover:text-white transition-colors cursor-pointer" title="Solicitar validação do projeto">
+            <button onClick={() => onSendPrompt?.('Valide o projeto completo, corrija qualquer erro de compilação e mantenha todos os arquivos existentes.')} className="p-1.5 rounded-md hover:bg-white/5 hover:text-white transition-colors cursor-pointer" title="Solicitar validação do projeto">
               <ArrowSquareOut size={13} />
             </button>
           )}
@@ -106,20 +99,28 @@ export function RuntimePreview({ activeCode, customFiles = {}, onSendPrompt, isW
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden relative flex flex-col items-center justify-center p-2 bg-[#171717]">
-        <div className={`transition-all duration-300 bg-transparent border border-white/5 shadow-2xl overflow-hidden flex flex-col ${device === 'desktop' ? 'w-full h-full rounded-xl' : 'w-[375px] h-[667px] my-auto rounded-[36px] ring-8 ring-[#222] border-4 border-[#333]'}`}>
+      <div className="flex-1 overflow-hidden relative flex flex-col items-center justify-center p-2 bg-[#1a1a1a]">
+        <div className={`transition-all duration-300 bg-transparent border border-[#1a1a1a] shadow-2xl overflow-hidden flex flex-col ${device === 'desktop' ? 'w-full h-full rounded-xl' : 'w-[375px] h-[667px] my-auto rounded-[36px] ring-8 ring-[#222] border-4 border-[#333]'}`}>
           {device === 'mobile' && <div className="h-6 bg-[#161616] px-6 pt-1 flex items-center justify-between text-[10px] text-white/50 border-b border-white/5 shrink-0"><span>9:41</span><div className="w-16 h-3 bg-[#0a0a0a] rounded-full mx-auto" /><span>5G</span></div>}
           <div key={`${refreshKey}-${runtimeCode}`} className="flex-1 overflow-auto w-full h-full relative bg-transparent">
             {isWorking ? (
-              <div className="w-full h-full flex items-center justify-center bg-[#171717]">
+              <div className="w-full h-full flex items-center justify-center bg-[#1a1a1a]">
                 <Loader />
               </div>
             ) : hasApp ? (
               <DynamicRuntimeRunner key={refreshKey} code={runtimeCode} customFiles={customFiles} />
             ) : (
-              <div className="w-full h-full min-h-[260px] flex flex-col items-center justify-center gap-6 p-8 text-center">
+              <div 
+                className="w-full h-full min-h-[260px] flex flex-col items-center justify-center gap-6 p-8 text-center"
+                style={{ 
+                  backgroundImage: 'url(https://imgdb.io/i/bzXzFb0.png)',
+                  backgroundSize: '110%',
+                  backgroundPosition: 'center',
+                  backgroundRepeat: 'no-repeat'
+                }}
+              >
                 <div className="bg-[#1a1a1a] p-8 rounded-3xl border border-white/5 flex flex-col items-center gap-6 shadow-sm max-w-sm w-full">
-                  <img src="https://imgdb.io/i/uWdJOUg.png" alt="Espaço de trabalho vazio" className="w-32 h-32 rounded-2xl object-cover" />
+                  <img src="https://imgdb.io/i/uWdJOUg.png" alt="Espaço de trabalho vazio" className="w-36 h-36 rounded-2xl object-cover" />
                   <div className="space-y-2">
                     <span style={{ color: '#707070' }} className="text-lg font-bold">Espaço em branco</span>
                     <p style={{ color: '#6f6f6f' }} className="text-xs leading-relaxed">O runtime está esperando. Peça ao agente para criar uma nova aplicação.</p>
@@ -138,8 +139,8 @@ export function RuntimePreview({ activeCode, customFiles = {}, onSendPrompt, isW
         </div>
 
         {showConsole && (
-          <div className="absolute bottom-2 left-2 right-2 h-44 bg-[#141414] border border-white/10 rounded-xl shadow-2xl flex flex-col overflow-hidden z-20 font-mono text-[11px]">
-            <div className="h-7 bg-[#1c1c1c] border-b border-white/5 px-3 flex items-center justify-between text-white/40">
+          <div className="absolute bottom-2 left-2 right-2 h-44 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl flex flex-col overflow-hidden z-20 font-mono text-[11px]">
+            <div className="h-7 bg-[#1a1a1a] border-b border-white/5 px-3 flex items-center justify-between text-white/40">
               <span className="font-semibold text-white/70">Vite Dev Server · Console</span>
               <button onClick={() => setShowConsole(false)} className="hover:text-white cursor-pointer">✕</button>
             </div>

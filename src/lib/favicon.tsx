@@ -9,13 +9,15 @@ export function extractCleanDomain(urlOrDomain?: string | null): string {
   try {
     let clean = urlOrDomain.trim().toLowerCase();
     // Remove tags ou caracteres residuais
-    clean = clean.replace(/^[<>"'(\[]+|[>"')\]]+$/g, "");
+    clean = clean.replace(/^[<>"'(\[:]+|[>"')\],;:.]+$/g, "");
     // Remove protocolo
     clean = clean.replace(/^(?:https?:\/\/)?(?:www\.)?/i, "");
     // Remove query params, hash e caminhos
     clean = clean.split("/")[0].split("?")[0].split("#")[0];
     // Remove porta se houver (ex: localhost:3000 -> localhost)
     clean = clean.split(":")[0];
+    // Remove trailing dots or punctuation
+    clean = clean.replace(/[.,;:]+$/, "");
     return clean;
   } catch {
     return "";
@@ -73,9 +75,9 @@ export function Favicon({
     return (
       <span
         style={{ width: size, height: size }}
-        className={`inline-flex shrink-0 items-center justify-center rounded-sm bg-white/10 text-white/40 ${containerClassName}`}
+        className={`inline-flex shrink-0 items-center justify-center text-white/40 ${containerClassName}`}
       >
-        <svg width="60%" height="60%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+        <svg width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <circle cx="12" cy="12" r="9" />
           <path d="M3.5 12h17M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
         </svg>
@@ -86,7 +88,7 @@ export function Favicon({
   return (
     <span
       style={{ width: size, height: size }}
-      className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-sm bg-white/5 ${containerClassName}`}
+      className={`inline-flex shrink-0 items-center justify-center overflow-hidden ${containerClassName}`}
     >
       <img
         src={currentSrc}

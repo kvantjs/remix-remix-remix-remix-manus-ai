@@ -120,7 +120,7 @@ export default function AuraFintechApp() {
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <div className="lg:col-span-2 relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0B1B15] to-[#06120E] border border-emerald-800/30 p-6 sm:p-7 shadow-2xl flex flex-col justify-between">
+          <div className="lg:col-span-2 relative overflow-hidden rounded-3xl border border-emerald-800/30 p-6 sm:p-7 shadow-2xl flex flex-col justify-between" style={{ backgroundColor: '#222222' }}>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium uppercase tracking-wider text-emerald-300/60 flex items-center gap-1.5">
@@ -143,7 +143,7 @@ export default function AuraFintechApp() {
             </div>
 
             <div className="grid grid-cols-4 gap-2 pt-6 mt-4 border-t border-emerald-900/30">
-              <button onClick={() => setIsTransferModalOpen(true)} className="p-3 rounded-2xl bg-[#0F241C] hover:bg-[#153327] border border-emerald-800/40 text-center transition-all flex flex-col items-center gap-1.5">
+              <button onClick={() => setIsTransferModalOpen(true)} className="p-3 rounded-2xl text-center transition-all flex flex-col items-center gap-1.5" style={{ backgroundColor: '#1a1a1a', borderColor: '#1a1a1a', borderWidth: '1px', borderStyle: 'solid' }}>
                 <div className="size-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400">
                   <ArrowUpRight size={16} weight="bold" />
                 </div>
@@ -152,21 +152,21 @@ export default function AuraFintechApp() {
                 </span>
               </button>
 
-              <button onClick={() => setBalance(prev => prev + 1000)} className="p-3 rounded-2xl bg-[#0F241C] hover:bg-[#153327] border border-emerald-800/40 text-center transition-all flex flex-col items-center gap-1.5">
+              <button onClick={() => setBalance(prev => prev + 1000)} className="p-3 rounded-2xl text-center transition-all flex flex-col items-center gap-1.5" style={{ backgroundColor: '#1a1a1a', borderColor: '#1a1a1a', borderWidth: '1px', borderStyle: 'solid' }}>
                 <div className="size-8 rounded-xl bg-teal-500/10 flex items-center justify-center text-teal-400">
                   <ArrowDownLeft size={16} weight="bold" />
                 </div>
                 <span className="text-[11px] font-medium text-emerald-200">Depositar</span>
               </button>
 
-              <button onClick={() => setFilter('invest')} className="p-3 rounded-2xl bg-[#0F241C] hover:bg-[#153327] border border-emerald-800/40 text-center transition-all flex flex-col items-center gap-1.5">
+              <button onClick={() => setFilter('invest')} className="p-3 rounded-2xl text-center transition-all flex flex-col items-center gap-1.5" style={{ backgroundColor: '#1a1a1a', borderWidth: '1px', borderStyle: 'solid', borderColor: '#2e2e2e' }}>
                 <div className="size-8 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-400">
                   <TrendingUp size={16} weight="bold" />
                 </div>
                 <span className="text-[11px] font-medium text-emerald-200">Investir</span>
               </button>
 
-              <button onClick={() => setFilter('all')} className="p-3 rounded-2xl bg-[#0F241C] hover:bg-[#153327] border border-emerald-800/40 text-center transition-all flex flex-col items-center gap-1.5">
+              <button onClick={() => setFilter('all')} className="p-3 rounded-2xl text-center transition-all flex flex-col items-center gap-1.5" style={{ backgroundColor: '#1a1a1a', borderColor: '#1a1a1a', borderWidth: '1px', borderStyle: 'solid' }}>
                 <div className="size-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-300">
                   <CreditCard size={16} weight="bold" />
                 </div>

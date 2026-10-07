@@ -2,6 +2,7 @@ import React from 'react';
 import { ProfessionalCodeBlock } from './ProfessionalCodeBlock';
 import { InlineCodeSnippet } from './SyntaxCodeView';
 import { ArrowSquareOut } from '@phosphor-icons/react';
+import { Favicon, extractCleanDomain } from '@/lib/favicon';
 
 interface MarkdownRendererProps {
   content: string;
@@ -175,24 +176,93 @@ export function parseInlineMarkdown(text: string): React.ReactNode[] {
         );
       case 'code':
         return <InlineCodeSnippet key={key} code={token.text} />;
-      case 'link':
+      case 'link': {
+        const linkHref = token.url.startsWith('http://') || token.url.startsWith('https://') ? token.url : `https://${token.url}`;
         return (
           <a
             key={key}
-            href={token.url}
+            href={linkHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-blue-400 hover:text-blue-300 hover:underline transition-colors font-medium inline-flex items-center gap-0.5 cursor-pointer"
+            className="text-blue-400 hover:text-blue-300 hover:underline transition-colors font-medium inline-flex items-center gap-1 cursor-pointer align-baseline"
           >
+            <Favicon urlOrDomain={token.url || token.text} size={14} className="shrink-0 inline-block align-middle" />
             <span>{token.text}</span>
-            <ArrowSquareOut size={11} className="inline opacity-70" />
           </a>
         );
+      }
       case 'text':
       default:
-        return <React.Fragment key={key}>{token.text}</React.Fragment>;
+        return <React.Fragment key={key}>{renderTextWithDomainFavicons(token.text, key)}</React.Fragment>;
     }
   });
+}
+
+/**
+ * Detects domain and URL mentions in text and renders them with the site's Favicon on the left
+ * without any background container.
+ */
+export function renderTextWithDomainFavicons(rawText: string, keyPrefix: string): React.ReactNode {
+  if (!rawText) return null;
+
+  // Regex that captures URLs and domain names (e.g., https://..., www...., or domain.tld)
+  const URL_REGEX = /((?:https?:\/\/|www\.)[^\s<>"'()[\]{}]+|[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.(?:com|org|net|edu|gov|io|ai|tech|co|app|br|uk|de|fr|es|it|me|info|tv|xyz|dev|cloud|page|link|shop|store|online|site|space|top|club|pro|cc|to|is|gg|live|news|world|agency|studio|global|fm|social|blog|directory|guru|solutions|design|center|life)(?:\/[^\s<>"'()[\]{}]*)?)/gi;
+
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = URL_REGEX.exec(rawText)) !== null) {
+    const matchStart = match.index;
+    let matchStr = match[0];
+
+    // Push preceding regular text
+    if (matchStart > lastIndex) {
+      parts.push(rawText.slice(lastIndex, matchStart));
+    }
+
+    // Strip trailing punctuation (e.g. dots, commas, colons, brackets) so they don't break the domain
+    let trailingPunct = '';
+    const punctMatch = matchStr.match(/([.,;:!?)\]}>]+)$/);
+    if (punctMatch) {
+      trailingPunct = punctMatch[1];
+      matchStr = matchStr.slice(0, -trailingPunct.length);
+    }
+
+    const domain = extractCleanDomain(matchStr);
+    if (domain && domain.includes('.')) {
+      const targetHref = matchStr.startsWith('http://') || matchStr.startsWith('https://') 
+        ? matchStr 
+        : `https://${matchStr}`;
+
+      parts.push(
+        <a
+          key={`${keyPrefix}-dom-${matchStart}`}
+          href={targetHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-400 hover:text-blue-300 hover:underline transition-colors font-medium inline-flex items-center gap-1 cursor-pointer align-baseline"
+        >
+          <Favicon urlOrDomain={matchStr} size={14} className="shrink-0 inline-block align-middle" />
+          <span>{matchStr}</span>
+        </a>
+      );
+    } else {
+      parts.push(matchStr);
+    }
+
+    if (trailingPunct) {
+      parts.push(trailingPunct);
+    }
+
+    lastIndex = matchStart + match[0].length;
+  }
+
+  if (lastIndex < rawText.length) {
+    parts.push(rawText.slice(lastIndex));
+  }
+
+  return parts.length === 0 ? rawText : parts;
 }
 
 /**
