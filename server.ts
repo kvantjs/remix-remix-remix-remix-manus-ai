@@ -26,6 +26,7 @@ import { AGENT_SKILLS, buildSkillsSystemInstruction } from './src/server/agent-s
 import { agentIsolatedRuntime } from './src/server/agent-isolated-runtime.js';
 import { executeSandboxCommand, getSandboxBackend } from './src/server/sandbox-executor.js';
 import { buildExecutableSkillsInstruction, executeSkill, listExecutableSkills, materializeSkillArtifacts } from './src/server/skill-runtime.js';
+import { buildCognitiveSystemInstruction, COGNITIVE_DELIBERATION_STAGES } from './src/server/agent-cognition.js';
 import { synthesizeBespokeInterface } from './src/server/bespoke-ui-synthesizer.js';
 
 const execAsync = promisify(exec);
@@ -411,8 +412,14 @@ CONTRATO DE RACIOCÍNIO AVANÇADO — EXECUÇÃO CONTROLADA:
 6. Em código, valide arquivos, dependências, compilação, runtime e regressões antes da síntese.
 7. Se houver ambiguidade material, peça esclarecimento. Se houver falha técnica, relate a falha real e o próximo passo; não improvise sucesso.
 8. Produza somente resumos verificáveis no campo visível. Nunca revele cadeia de pensamento privada, tokens ocultos ou deliberação passo a passo.
+9. Classifique cada conclusão como fato observado, inferência ou hipótese; hipóteses nunca podem ser apresentadas como resultado.
+10. Faça uma crítica adversarial antes de concluir: procure regressões, permissões excessivas, dados inconsistentes, dependências ausentes e critérios de aceite não comprovados.
+11. Compare alternativas quando houver trade-off material e escolha explicitamente pela combinação de risco, custo, reversibilidade e adequação ao pedido.
+12. Defina uma condição de pausa para CAPTCHA, autorização, falha parcial, ambiente indisponível ou risco irreversível; não avance por inércia.
+13. Após cada ferramenta, registre mentalmente o retorno real, a evidência produzida e a decisão entre continuar, corrigir, pausar ou concluir.
+14. Resuma o resultado no formato executivo: resultado, decisão, evidências, riscos e próximo passo.
 `;
-const DEFAULT_THINKING_BUDGET = Math.max(4096, Number(process.env.GEMINI_THINKING_BUDGET || 8192));
+const DEFAULT_THINKING_BUDGET = Math.min(32768, Math.max(8192, Number(process.env.GEMINI_THINKING_BUDGET || 16384)));
 
 // System prompt strictly enforcing bespoke branding, production design rules, and high interactivity:
 const CORE_SPARK_SYSTEM_INSTRUCTION = `Você é o CoreSpark (Versão de Produção), o Agente Autônomo de Engenharia de Software e Design Director do Kvant.
@@ -4087,19 +4094,13 @@ async function runDeterministicExecutionCycle(message: string, intent: AgentInte
 }
 
 async function runVisibleReasoningGate(intent: AgentIntent, emit: (event: string, data: any) => void) {
-  const gates = [
-    ['Objetivo e contexto', 'Separando o resultado pedido, o contexto do usuário e o que precisa ser observado.'],
-    ['Plano de execução', 'Definindo a sequência de ferramentas e o ponto de parada de cada etapa.'],
-    ['Crítica e riscos', 'Verificando ambiguidades, bloqueios, CAPTCHAs, falhas parciais e riscos de avançar cedo demais.'],
-    ['Critério de evidência', 'Definindo quais URL, conteúdo, screenshot, arquivo ou teste provarão cada resultado.'],
-    ['Liberação controlada', `A execução será liberada por etapas no modo ${intent.mode}; nenhuma etapa será pulada sem evidência.`]
-  ];
-  for (const [label, text] of gates) {
-    const stage = label.toLowerCase().replace(/[^a-z]+/g, '_');
-    emit('deliberation', { stage, label, text, live: true });
+  const gates = COGNITIVE_DELIBERATION_STAGES.map(stage => [stage.stage, stage.label, stage.instruction] as const);
+  for (const [stage, label, instruction] of gates) {
+    emit('deliberation', { stage, label, text: instruction, live: true });
     await new Promise(resolve => setTimeout(resolve, 1200));
-    emit('deliberation', { stage, label, text: `${text} Gate validado.`, complete: true, live: true, durationMs: 1200 });
+    emit('deliberation', { stage, label, text: `${instruction} Gate validado.`, complete: true, live: true, durationMs: 1200 });
   }
+  emit('status', { text: `Constituição cognitiva validada para o modo ${intent.mode}; liberando somente ações autorizadas.` });
 }
 
 async function runDeepDeliberation(
@@ -4304,7 +4305,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
               model: modelCandidate,
               contents: chatContents,
               config: {
-                systemInstruction: CORE_SPARK_SYSTEM_INSTRUCTION + APP_CREATION_EXECUTION_CONTRACT + buildIntentInstruction(intent) + buildSkillsSystemInstruction() + buildExecutableSkillsInstruction() + '\n\nDIRETIVA DE RESPOSTA SEM CÓDIGO NO CHAT: NUNCA responda com blocos de código grandes ou listagens de código-fonte no chat. Só produza códigos se a intenção APP_CREATION estiver ativa.',
+                systemInstruction: CORE_SPARK_SYSTEM_INSTRUCTION + buildCognitiveSystemInstruction() + APP_CREATION_EXECUTION_CONTRACT + buildIntentInstruction(intent) + buildSkillsSystemInstruction() + buildExecutableSkillsInstruction() + '\n\nDIRETIVA DE RESPOSTA SEM CÓDIGO NO CHAT: NUNCA responda com blocos de código grandes ou listagens de código-fonte no chat. Só produza códigos se a intenção APP_CREATION estiver ativa.',
                 thinkingConfig: { thinkingBudget: DEFAULT_THINKING_BUDGET },
                 tools: intent.allowedTools.length ? [{ functionDeclarations: filterToolDeclarations(intent, AGENT_TOOL_DECLARATIONS) as any }] : undefined
               }
@@ -4508,7 +4509,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
             model: MODEL_CANDIDATES[0],
             contents: chatContents,
             config: {
-              systemInstruction: CORE_SPARK_SYSTEM_INSTRUCTION + '\n\nRELATÓRIO FINAL OBRIGATÓRIO: Você deve fornecer um relatório técnico completo e humanizado de todas as suas ações. Se pesquisou na web, liste as informações específicas (preços, dados, links, fatos). Se criou código, explique o que cada parte faz. NUNCA use frases genéricas como "Operação concluída" ou "Ação executada com sucesso". Seja direto, informativo e detalhado.',
+              systemInstruction: CORE_SPARK_SYSTEM_INSTRUCTION + buildCognitiveSystemInstruction() + '\n\nRELATÓRIO FINAL OBRIGATÓRIO: Você deve fornecer um relatório técnico completo e humanizado de todas as suas ações. Se pesquisou na web, liste as informações específicas (preços, dados, links, fatos). Se criou código, explique o que cada parte faz. NUNCA use frases genéricas como "Operação concluída" ou "Ação executada com sucesso". Seja direto, informativo e detalhado.',
             }
           });
           const summaryText = summaryResponse.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -4811,7 +4812,7 @@ app.post('/api/agent/chat', async (req, res) => {
             model: modelCandidate,
             contents: chatContents,
             config: {
-                systemInstruction: CORE_SPARK_SYSTEM_INSTRUCTION + APP_CREATION_EXECUTION_CONTRACT + buildIntentInstruction(intent) + buildSkillsSystemInstruction() + buildExecutableSkillsInstruction() + '\n\nDIRETIVA DE RESPOSTA SEM CÓDIGO NO CHAT: NUNCA responda com blocos de código grandes ou listagens de código-fonte no chat. Só produza códigos se a intenção APP_CREATION estiver ativa.',
+              systemInstruction: CORE_SPARK_SYSTEM_INSTRUCTION + buildCognitiveSystemInstruction() + APP_CREATION_EXECUTION_CONTRACT + buildIntentInstruction(intent) + buildSkillsSystemInstruction() + buildExecutableSkillsInstruction() + '\n\nDIRETIVA DE RESPOSTA SEM CÓDIGO NO CHAT: NUNCA responda com blocos de código grandes ou listagens de código-fonte no chat. Só produza códigos se a intenção APP_CREATION estiver ativa.',
               tools: intent.allowedTools.length ? [{ functionDeclarations: filterToolDeclarations(intent, AGENT_TOOL_DECLARATIONS) as any }] : undefined
             }
           });
