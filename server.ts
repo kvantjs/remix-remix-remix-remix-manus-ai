@@ -2297,10 +2297,18 @@ class PlaywrightBrowserManager {
       };
     }
 
+    const page = await this.ensurePage();
+    const searchInput = page.locator('textarea[name="q"], input[name="q"]').first();
+    const searchBox = await searchInput.boundingBox().catch(() => null);
+    if (searchBox) {
+      await this.moveMouse(page, searchBox.x + searchBox.width / 2, searchBox.y + searchBox.height / 2, 'Google aberto; cursor posicionado no campo de pesquisa', 'O agente posicionou o cursor no campo de pesquisa da página inicial do Google.', true);
+    } else {
+      await this.emitProgress(page, 'Google aberto; procurando campo de pesquisa', 'O agente está localizando o campo de pesquisa visível do Google.', true);
+    }
+
     const typed: any = await this.fill('textarea[name="q"], input[name="q"]', cleanQuery, true);
     if (!typed.success) throw new Error(`Não foi possível pesquisar no Google pela interface real: ${typed.error || 'campo de pesquisa indisponível'}`);
 
-    const page = await this.ensurePage();
     await page.waitForTimeout(900);
     await this.emitProgress(page, 'Resultados do Google carregados; lendo resultados', 'O agente pressionou Enter e está lendo os resultados renderizados do Google.', true);
     const domData = await this.extractDomData(page);
@@ -2357,8 +2365,19 @@ class PlaywrightBrowserManager {
         break;
       }
       if (!target?.url) return { success: false, error: 'Nenhum resultado orgânico do Google foi encontrado para abrir.' };
+      const targetAnchor = page.locator('a').filter({ has: page.locator('h3') }).filter({ hasText: target.title }).first();
+      const targetBox = await targetAnchor.boundingBox().catch(() => null);
+      if (targetBox) {
+        await this.moveMouse(page, targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, 'Resultado encontrado; abrindo página', `O cursor percorreu os resultados e está abrindo "${target.title.slice(0, 90)}".`, true);
+      } else {
+        await this.emitProgress(page, 'Resultado encontrado; abrindo página', `Abrindo "${target.title.slice(0, 90)}" a partir dos resultados do Google.`, true);
+      }
       const response = await page.goto(target.url, { waitUntil: 'domcontentloaded', timeout: 20000 });
       await page.waitForTimeout(600);
+      await this.settleReadablePage(page);
+      await this.emitProgress(page, 'Página aberta; iniciando leitura', 'O resultado foi aberto; o agente está lendo o conteúdo renderizado da página.', true);
+      const viewport = page.viewportSize() || { width: 1280, height: 800 };
+      await this.moveMouse(page, Math.round(viewport.width * 0.52), Math.round(viewport.height * 0.28), 'Lendo página aberta', 'O cursor acompanha a área de conteúdo enquanto o agente lê a página.', true);
       const domData = await this.extractDomData(page);
       const challenge = await this.inspectChallenge(page, domData.bodyText);
       const screenshotBuf = await page.screenshot({ type: 'jpeg', quality: 75 }).catch(() => null);
@@ -2428,12 +2447,26 @@ class PlaywrightBrowserManager {
       if (this.challenge) return { success: false, error: challengeMessage(this.challenge), challenge: this.challenge, requiresUserAction: true, browserStatus: 'blocked' };
       const input = page.locator(selector).first();
       const inputBox = await input.boundingBox().catch(() => null);
-      if (inputBox) await this.moveMouse(page, inputBox.x + inputBox.width / 2, inputBox.y + inputBox.height / 2, 'Cursor posicionado; preenchendo campo', `O cursor posicionou-se no campo ${selector} para digitação controlada.`);
-      await input.fill(text, { timeout: 8000 });
+      if (inputBox) await this.moveMouse(page, inputBox.x + inputBox.width / 2, inputBox.y + inputBox.height / 2, 'Cursor posicionado; caret ativo', `O cursor posicionou-se no campo ${selector}; o caret está pronto para digitar.`, true);
+      await input.click({ timeout: 8000 }).catch(() => {});
+      await input.fill('', { timeout: 8000 });
+      await this.emitProgress(page, 'Caret ativo; iniciando digitação', `O agente ativou o caret e começará a escrever "${text.slice(0, 100)}" letra por letra.`, true);
+      const chunks = Math.max(1, Math.ceil(text.length / 5));
+      for (let offset = 0; offset < text.length; offset += chunks) {
+        const chunk = text.slice(offset, offset + chunks);
+        await page.keyboard.type(chunk, { delay: 32 });
+        const typedSoFar = text.slice(0, offset + chunk.length);
+        const isCheckpoint = offset === 0 || offset + chunk.length >= text.length || (offset % (chunks * 4) === 0);
+        if (isCheckpoint) {
+          await this.emitProgress(page, `Digitando pesquisa (${Math.min(100, Math.round((typedSoFar.length / Math.max(1, text.length)) * 100))}%)`, `Caret do Google escrevendo: "${typedSoFar.slice(-80)}"`, true);
+        }
+      }
       if (pressEnter) {
+        await this.emitProgress(page, 'Pesquisa preenchida; pressionando Enter', 'O agente terminou de escrever a pesquisa e agora confirma com Enter.', true);
         await page.keyboard.press('Enter');
         await page.waitForLoadState('domcontentloaded', { timeout: 8000 }).catch(() => {});
         await this.settleReadablePage(page);
+        await this.emitProgress(page, 'Enter pressionado; aguardando resultados', 'A pesquisa foi enviada; aguardando o Google renderizar os resultados.', true);
       }
       await this.emitProgress(page, 'Campo preenchido; lendo atualização', `Campo ${selector} preenchido; verificando o conteúdo atualizado.`, true);
       const title = await page.title();
@@ -2501,7 +2534,7 @@ class PlaywrightBrowserManager {
       const segmentDelta = deltaY / segments;
       for (let index = 0; index < segments; index++) {
         await page.mouse.wheel(0, segmentDelta);
-        await this.emitProgress(page, `Rolando página (${index + 1}/${segments})`, `Rolagem real em andamento; lendo o trecho ${index + 1} de ${segments}.`);
+        await this.emitProgress(page, `Rolando página (${index + 1}/${segments})`, `Rolagem real em andamento; lendo o trecho ${index + 1} de ${segments}.`, true);
         await page.waitForTimeout(80);
       }
       await this.settleReadablePage(page);

@@ -117,7 +117,7 @@ type CursorAnimation = 'idle' | 'moving' | 'clicking' | 'typing' | 'scrolling' |
 function inferCursorAnimation(status = '', isClicking = false): CursorAnimation {
   const value = status.toLocaleLowerCase('pt-BR');
   if (isClicking || /clic|click|pression|selecion/.test(value)) return 'clicking';
-  if (/digit|preench|typing|campo de busca/.test(value)) return 'typing';
+  if (/digit|preench|typing|caret|campo de busca/.test(value)) return 'typing';
   if (/rol|scroll|descendo|subindo/.test(value)) return 'scrolling';
   if (/lendo|leitura|inspec|resultado|conteúdo|conteudo|dom/.test(value)) return 'reading';
   if (/carreg|inici|conect|naveg|acess|abrindo/.test(value)) return 'loading';
@@ -856,7 +856,7 @@ export function KvantComputer({
                         onError={() => setLiveScreenshot(null)}
                       />
 
-                      {browserStatus === 'loading' && !isLoading && (
+                      {browserStatus === 'loading' && !isLoading && !liveScreenshot && (
                         <div className="absolute inset-0 z-10 bg-[#1a1a1a] flex flex-col items-center justify-center animate-in fade-in duration-300">
                           <div className="flex flex-col items-center gap-4">
                             <div className="sp-vortex-loader" />
@@ -926,7 +926,7 @@ export function KvantComputer({
         )}
 
         {/* AGENT MOUSE CURSOR: Positioned over the remote desktop */}
-        {agentCursor.visible && isComputerActive && !isIdle && !isBooting && !(browserStatus === 'loading' && !isLoading) && (liveScreenshot || iframeLoaded || customCode) && (isWorking || userControlMode || liveScreenshot || customCode) && (
+        {agentCursor.visible && isComputerActive && !isIdle && !isBooting && (liveScreenshot || iframeLoaded || customCode) && (isWorking || userControlMode || liveScreenshot || customCode) && (
           <span 
             className="absolute pointer-events-none transition-all duration-300 ease-out z-50 bg-transparent !bg-transparent border-none !border-none shadow-none !shadow-none"
             style={{
