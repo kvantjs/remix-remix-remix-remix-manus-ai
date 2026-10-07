@@ -99,6 +99,9 @@ export function Workspace({
       setActiveTopTab(initialTab as TopLevelTab);
     }
   }, [initialTab]);
+  useEffect(() => {
+    if (isWorking) setActiveTopTab('computer');
+  }, [isWorking]);
 
   // Sub-tabs for the Workspace (Preview, Código, Terminal, Projetos, Execuções, Configurações)
   const [workspaceSubTab, setWorkspaceSubTab] = useState<WorkspaceSubTab>('preview');

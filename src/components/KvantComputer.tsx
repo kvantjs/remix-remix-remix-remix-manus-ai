@@ -125,6 +125,37 @@ function inferCursorAnimation(status = '', isClicking = false): CursorAnimation 
   return 'idle';
 }
 
+function LiveAgentDock({ toolCalls = [], customFiles, isWorking }: { toolCalls?: ToolCallTrace[]; customFiles?: Record<string, string>; isWorking: boolean }) {
+  const latestTerminal = [...toolCalls].reverse().find(t => t.actionType === 'terminal' || t.toolName.includes('bash') || t.toolName.includes('python') || t.screenData?.terminalOutput);
+  const latestCode = [...toolCalls].reverse().find(t => t.screenData?.fileContent || t.arguments?.content || t.arguments?.code);
+  const [tab, setTab] = useState<'terminal' | 'code'>('terminal');
+  useEffect(() => {
+    if (latestCode && !latestTerminal) setTab('code');
+  }, [latestCode?.id, latestTerminal?.id]);
+  if (!isWorking && !latestTerminal && !latestCode) return null;
+  const code = String(latestCode?.screenData?.fileContent || latestCode?.arguments?.content || latestCode?.arguments?.code || customFiles?.['client/src/App.tsx'] || '');
+  const output = String(latestTerminal?.screenData?.terminalOutput || latestTerminal?.result || 'Aguardando saída incremental...');
+  return (
+    <div className="absolute left-3 right-3 bottom-3 z-40 rounded-xl overflow-hidden border border-white/15 bg-[#111318]/95 shadow-2xl backdrop-blur-md text-white pointer-events-auto">
+      <div className="h-8 px-2 flex items-center justify-between border-b border-white/10 bg-white/5">
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] uppercase tracking-widest text-cyan-300 font-semibold mr-2">Execução ao vivo</span>
+          <button onClick={() => setTab('terminal')} className={`px-2 py-1 rounded text-[10px] ${tab === 'terminal' ? 'bg-green-400/20 text-green-300' : 'text-white/50'}`}>Terminal</button>
+          <button onClick={() => setTab('code')} className={`px-2 py-1 rounded text-[10px] ${tab === 'code' ? 'bg-blue-400/20 text-blue-300' : 'text-white/50'}`}>Editor</button>
+        </div>
+        <span className="text-[9px] text-white/40">sincronização incremental</span>
+      </div>
+      <div className="p-2 max-h-36 overflow-auto font-mono text-[10px] leading-relaxed">
+        {tab === 'terminal' ? (
+          <><div className="text-green-300 mb-1">$ {latestTerminal?.screenData?.command || latestTerminal?.arguments?.command || 'terminal aguardando comando'}</div><pre className="whitespace-pre-wrap text-white/75">{output.slice(-5000)}</pre></>
+        ) : (
+          <><div className="text-blue-300 mb-1">{latestCode?.screenData?.filePath || latestCode?.arguments?.filePath || latestCode?.arguments?.path || 'client/src/App.tsx'}</div><pre className="whitespace-pre-wrap text-white/75">{code.slice(-7000) || '// aguardando conteúdo do editor'}</pre></>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function sanitizeUrl(url: string): string {
   try {
     const parsed = new URL(url);
@@ -927,6 +958,8 @@ export function KvantComputer({
             )}
           </div>
         )}
+
+        <LiveAgentDock toolCalls={toolCalls} customFiles={customFiles} isWorking={isWorking} />
 
         {/* AGENT MOUSE CURSOR: Positioned over the remote desktop */}
         {agentCursor.visible && isComputerActive && !isIdle && !isBooting && (liveScreenshot || iframeLoaded || customCode) && (isWorking || userControlMode || liveScreenshot || customCode) && (

@@ -762,11 +762,23 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                       timestamp: new Date().toLocaleTimeString(),
                       status: 'running',
                       screenData: {
-                        url: data.arguments?.url || 'https://www.google.com',
+                        url: data.arguments?.url || 'about:blank',
                         title: 'Acessando ao vivo...',
-                        actionDescription: data.reason
+                        actionDescription: data.reason,
+                        command: data.arguments?.command,
+                        filePath: data.arguments?.filePath || data.arguments?.path || data.arguments?.filename,
+                        fileContent: data.arguments?.content || data.arguments?.code
                       }
                     };
+                    // O editor recebe o conteúdo no início da operação, não apenas
+                    // depois do tool_finish. Isso permite acompanhar a geração do arquivo.
+                    if (onFileUpdate && data.arguments?.content && (data.toolName.includes('write') || data.toolName.includes('create') || data.toolName.includes('edit'))) {
+                      const filePath = data.arguments.path || data.arguments.filePath || data.arguments.filename;
+                      if (filePath) {
+                        onFileUpdate([{ path: filePath, code: data.arguments.content, lang: data.arguments.lang || 'typescript' }]);
+                      }
+                    }
+                    liveToolCalls.push(activeTrace);
                     if (onAgentStateChange) {
                       onAgentStateChange({
                         isWorking: true,
@@ -807,6 +819,32 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                         contextText: data.actionDescription || 'Acompanhando mouse, rolagem e conteúdo da página.',
                         toolCalls: [...liveToolCalls, progressTrace],
                         browserStatus: 'loading'
+                      });
+                    }
+                  } else if (currentEvent === 'terminal_output') {
+                    activateExecutionAnimation();
+                    const command = data.command || 'comando do agente';
+                    const chunk = String(data.chunk || '');
+                    const terminalTrace: ToolCallTrace = {
+                      id: `terminal_live_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                      toolName: data.toolName || 'bash_exec',
+                      server: 'Terminal Bash MCP',
+                      arguments: { command },
+                      result: chunk || (data.done ? `Processo finalizado com exitCode ${data.exitCode ?? 0}` : 'Processo em execução...'),
+                      timestamp: new Date().toLocaleTimeString(),
+                      status: data.done ? (Number(data.exitCode || 0) === 0 ? 'success' : 'error') : 'running',
+                      actionType: 'terminal',
+                      screenData: { command, terminalOutput: chunk, actionDescription: data.done ? 'Comando finalizado' : 'Recebendo saída do terminal ao vivo' }
+                    };
+                    liveToolCalls.push(terminalTrace);
+                    updateProgressNote('Terminal ao vivo', chunk ? `${command}: ${chunk.slice(-240)}` : `${command} em execução...`, data.done ? 'complete' : 'running');
+                    setCurrentStep(chunk ? `Terminal: ${chunk.slice(-160)}` : `Executando: ${command}`);
+                    if (onAgentStateChange) {
+                      onAgentStateChange({
+                        isWorking: true,
+                        statusText: data.done ? `Terminal finalizado (exit ${data.exitCode ?? 0})` : `Terminal executando: ${command}`,
+                        contextText: chunk || `Recebendo saída incremental de ${command}`,
+                        toolCalls: [...liveToolCalls]
                       });
                     }
                   } else if (currentEvent === 'tool_finish') {

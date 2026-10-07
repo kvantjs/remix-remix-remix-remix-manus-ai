@@ -5,7 +5,7 @@ import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
 import { randomUUID } from 'crypto';
 import os from 'os';
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
 import { existsSync, createReadStream } from 'fs';
@@ -1982,7 +1982,7 @@ app.post('/api/agent/runtime/rollback', (req, res) => {
 });
 
 // 2. Real Shell / Terminal Command Execution
-async function handleTerminalExecution(rawCmd: string) {
+async function handleTerminalExecution(rawCmd: string, onProgress?: (event: { stream: string; chunk: string; done?: boolean; exitCode?: number }) => void) {
   const trimmed = (rawCmd || '').trim();
   if (!trimmed) {
     return { output: '', exitCode: 0 };
@@ -2015,17 +2015,20 @@ Comandos rápidos sugeridos:
 
   // Execute real bash command in the cloud environment
   try {
-    const { stdout, stderr } = await execAsync(trimmed, {
-      cwd: __dirname,
-      timeout: 15000,
-      maxBuffer: 1024 * 1024,
-      env: { ...process.env, PAGER: 'cat' }
+    const chunks: { stdout: string; stderr: string } = { stdout: '', stderr: '' };
+    const exitCode = await new Promise<number>((resolve) => {
+      const child = spawn(trimmed, { cwd: __dirname, shell: '/bin/bash', env: { ...process.env, PAGER: 'cat' } });
+      const timer = setTimeout(() => child.kill('SIGTERM'), 15000);
+      child.stdout.on('data', (chunk: Buffer) => { const text = chunk.toString(); chunks.stdout += text; onProgress?.({ stream: 'stdout', chunk: text }); });
+      child.stderr.on('data', (chunk: Buffer) => { const text = chunk.toString(); chunks.stderr += text; onProgress?.({ stream: 'stderr', chunk: text }); });
+      child.on('error', (error) => { chunks.stderr += error.message; onProgress?.({ stream: 'stderr', chunk: error.message }); clearTimeout(timer); resolve(1); });
+      child.on('close', (code) => { clearTimeout(timer); onProgress?.({ stream: code === 0 ? 'stdout' : 'stderr', chunk: '', done: true, exitCode: code ?? 0 }); resolve(code ?? 0); });
     });
 
-    const result = (stdout || '') + (stderr ? `\n[stderr]: ${stderr}` : '');
+    const result = chunks.stdout + (chunks.stderr ? `\n[stderr]: ${chunks.stderr}` : '');
     return {
       output: result.trim() || '[Comando executado com sucesso (sem retorno stdout)]',
-      exitCode: 0
+      exitCode
     };
   } catch (err: any) {
     const output = (err.stdout ? err.stdout + '\n' : '') + (err.stderr || err.message);
@@ -2713,7 +2716,17 @@ async function runPlaywrightInstallPreflight(emit?: (event: string, data: any) =
     arguments: { command, timeoutSeconds: 180 },
     reason: 'Preflight obrigatório antes de cada chamada do Computer MCP.'
   });
-  const result = await agentToolExecutor.executeTool('bash_exec', { command: executionCommand, timeoutSeconds: 180 });
+  const result = await agentToolExecutor.executeTool('bash_exec', { command: executionCommand, timeoutSeconds: 180 }, (progress) => {
+    emit?.('terminal_output', {
+      toolName: 'bash_exec',
+      command,
+      stream: progress.stream,
+      chunk: progress.chunk,
+      exitCode: progress.exitCode,
+      done: progress.done,
+      live: true
+    });
+  });
   const trace = {
     id: `playwright_install_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     toolName: 'bash_exec',
@@ -2844,7 +2857,7 @@ function normaliseGoogleResultUrl(raw: string, baseUrl: string) {
 }
 
 // 5. Unified Real Tool Execution Engine for the Agent (With Playwright Automation)
-async function runRealTool(toolName: string, args: Record<string, any>): Promise<any> {
+async function runRealTool(toolName: string, args: Record<string, any>, emit?: (event: string, data: any) => void): Promise<any> {
   const now = new Date().toLocaleTimeString();
   const id = `tc_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
 
@@ -3013,7 +3026,15 @@ async function runRealTool(toolName: string, args: Record<string, any>): Promise
   // Shell / Bash Terminal Exec
   if (toolName === 'shell.exec' || toolName === 'terminal.exec' || toolName === 'bash.exec' || toolName === 'computer.shell' || toolName === 'terminal') {
     const command = args.command || args.cmd || 'ls -la';
-    const execRes = await handleTerminalExecution(command);
+    const execRes = await handleTerminalExecution(command, (progress) => emit?.('terminal_output', {
+      toolName: 'shell.exec',
+      command,
+      stream: progress.stream,
+      chunk: progress.chunk,
+      exitCode: progress.exitCode,
+      done: progress.done,
+      live: true
+    }));
     return {
       id,
       toolName: 'shell.exec',
@@ -4335,7 +4356,19 @@ app.post('/api/agent/chat/stream', async (req, res) => {
             reason: `Executando ${toolName} solicitado pelo Gemini...`
           });
 
-          const execResult = await agentToolExecutor.executeTool(toolName, args);
+          const execResult = await agentToolExecutor.executeTool(toolName, args, (progress) => {
+            if (toolName === 'bash_exec' || toolName === 'python_exec') {
+              sendEvent('terminal_output', {
+                toolName,
+                command: args.command || 'python3 (script do agente)',
+                stream: progress.stream,
+                chunk: progress.chunk,
+                exitCode: progress.exitCode,
+                done: progress.done,
+                live: true
+              });
+            }
+          });
 
           if (Array.isArray(execResult.result?.steps)) {
             for (const step of execResult.result.steps) {
@@ -4573,7 +4606,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
             }
           };
         } else {
-          toolResult = await runRealTool(action.toolName, action.args);
+          toolResult = await runRealTool(action.toolName, action.args, sendEvent);
         }
       }
 
