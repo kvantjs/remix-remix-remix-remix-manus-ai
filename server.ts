@@ -527,19 +527,12 @@ AS 7 LEIS INVIOLÁVEIS DO AGENTE DE CRIAÇÃO:
   * "computer.search": Realiza buscas em tempo real na internet.
 - Registre cada operação de computador no array "toolCalls" com dados reais, permitindo ao usuário auditar e acompanhar no painel do Computador.
 
-10. ROTEAMENTO RIGOROSO DE INTENÇÃO E FRONTEIRAS DE AUTORIDADE (WEBDEV MCP VS COMPUTER MCP)
-- Quando o usuário pedir para criar, construir, modificar, programar ou desenvolver um site, landing page, dashboard ou aplicação web (ou pedir para usar WebDev):
-  * Você DEVE usar EXCLUSIVAMENTE o **WebDev MCP** (ferramentas de filesystem/código: 'fs.writeFile', 'file_write', 'file_read', gravando o código em 'client/src/App.tsx').
-  * É TERMINANTEMENTE PROIBIDO acionar o navegador web do computador ('computer.browser', 'web.navigate', 'browser_navigate', 'web_search') ou pesquisar na web quando a solicitação for de criação de software ou site!
-  * O preview de runtime e o workspace de código são os destinos exclusivos da criação de aplicações.
-- Quando o usuário pedir para PESQUISAR, BUSCAR, CONSULTAR ou mencionar o COMPUTADOR:
-  * Você DEVE usar EXCLUSIVAMENTE o **Computer MCP** (ferramentas de navegador e terminal: 'web_search', 'browser_navigate', 'bash_exec').
-  * É TERMINANTEMENTE PROIBIDO criar arquivos, pastas ou modificar o código no WebDev ('file_write', 'fs.writeFile') durante uma tarefa de pesquisa ou operação de computador.
-  * O Agente deve realizar APENAS UMA chamada de ferramenta por turno, focada no Computer MCP.
-- Antes de responder ou agir, diferencie explicitamente: CONVERSATION (resposta natural sem ferramentas), WEB_RESEARCH (pesquisa e leitura web), CLOUD_COMPUTER (terminal e navegador quando explicitamente solicitados), APP_CREATION (WebDev MCP: criação/modificação de aplicações e sites em client/src/App.tsx), EXPLICIT_TOOL_CALL (ferramenta nomeada pelo usuário) e PROJECT_OPERATION (arquivos, versões, snapshots e GitHub).
-- Uma pergunta, explicação, saudação ou pedido de opinião NÃO autoriza navegador, terminal, filesystem, edição de código ou chamada MCP.
-- Não transforme uma pergunta sobre o computador em uma alteração no computador; não transforme um pedido de criar um site em navegação web ou pesquisa; use sempre WebDev MCP para criação de sites e código.
-- Em cada turno, use somente as ferramentas permitidas pelo modo classificado. Se houver ambiguidade ou mudança de modo, peça esclarecimento antes de agir.
+10. ROTEAMENTO DE INTENÇÃO E FERRAMENTAS
+- Para uma tarefa exclusivamente de software, use WebDev; para uma tarefa exclusivamente de pesquisa/operação, use Computer MCP.
+- Se o mesmo pedido solicitar explicitamente software/código e navegação/pesquisa/ação no computador, trate-o como INTEGRATED: ambas as famílias de ferramentas estão autorizadas no mesmo turno. Não interrompa a geração ou edição de código só porque uma navegação começou, e não interrompa uma navegação solicitada apenas porque também há trabalho no WebDev.
+- Preserve as fronteiras de escopo: use WebDev apenas para os arquivos e operações do projeto; use Computer MCP apenas para ações web/computador solicitadas. Mantenha ações que compartilham a mesma sessão do navegador em sequência; trabalho de código independente pode avançar enquanto o navegador opera.
+- Uma pergunta, explicação, saudação ou pedido de opinião NÃO autoriza navegador, terminal, filesystem, edição de código ou chamada MCP por si só.
+- Antes de responder, classifique como CONVERSATION, WEB_RESEARCH, CLOUD_COMPUTER, APP_CREATION, INTEGRATED, EXPLICIT_TOOL_CALL ou PROJECT_OPERATION e ofereça as ferramentas autorizadas correspondentes sem misturar escopos não pedidos.
 - Nunca alegue ação, navegação, arquivo, chamada de ferramenta, fonte ou resultado que não tenha sido realmente executado e registrado.
 
 11. NAVEGAÇÃO INTELIGENTE E INSPEÇÃO WEB (PESQUISA PROFUNDA E PENSADA AO VIVO)
@@ -2134,13 +2127,15 @@ class PlaywrightBrowserManager {
   }
 
   private async waitForPageReading(page: Page, phase: string) {
-    await this.emitProgress(
-      page,
-      'Leitura da página em andamento',
-      `${phase} O agente está lendo o conteúdo visível antes de avançar.`,
-      true
-    );
-    await page.waitForTimeout(BROWSER_PAGE_READ_DELAY_MS);
+    const deadline = Date.now() + BROWSER_PAGE_READ_DELAY_MS;
+    const description = `${phase} O agente está lendo o conteúdo visível antes de avançar.`;
+    await this.emitProgress(page, 'Leitura da página em andamento', description, true);
+    while (Date.now() < deadline) {
+      await page.waitForTimeout(Math.min(900, deadline - Date.now()));
+      if (Date.now() < deadline) {
+        await this.emitProgress(page, 'Leitura da página em andamento', description, true);
+      }
+    }
     await this.emitProgress(
       page,
       'Leitura da página concluída',
@@ -2746,7 +2741,22 @@ function isComputerMcpTool(toolName: string) {
     || normalized.startsWith('web.');
 }
 
+let cachedPlaywrightInstallTrace: any = null;
+let playwrightInstallPromise: Promise<any> | null = null;
+
 async function runPlaywrightInstallPreflight(emit?: (event: string, data: any) => void) {
+  if (cachedPlaywrightInstallTrace) {
+    const cachedTrace = {
+      ...cachedPlaywrightInstallTrace,
+      id: `playwright_install_cached_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      timestamp: new Date().toLocaleTimeString(),
+      screenData: { ...cachedPlaywrightInstallTrace.screenData, actionDescription: 'Chromium já estava instalado; preflight reutilizou o cache.' }
+    };
+    return cachedTrace;
+  }
+  if (playwrightInstallPromise) return playwrightInstallPromise;
+
+  playwrightInstallPromise = (async () => {
   const browserCache = path.join(__dirname, 'workspace', '.cache', 'ms-playwright');
   const command = `PLAYWRIGHT_BROWSERS_PATH=${JSON.stringify(browserCache)} npx playwright install chromium`;
   const executionCommand = `cd ${JSON.stringify(__dirname)} && ${command}`;
@@ -2786,7 +2796,17 @@ async function runPlaywrightInstallPreflight(emit?: (event: string, data: any) =
     }
   };
   emit?.('tool_finish', { toolCall: trace });
+  if (result.success) cachedPlaywrightInstallTrace = trace;
   return trace;
+  })();
+  try {
+    return await playwrightInstallPromise;
+  } catch (error) {
+    playwrightInstallPromise = null;
+    throw error;
+  } finally {
+    if (!cachedPlaywrightInstallTrace) playwrightInstallPromise = null;
+  }
 }
 
 ensureSandboxDir().catch(err => console.error('Failed to init sandbox dir:', err));
@@ -3785,8 +3805,8 @@ function planRealAgentActions(message: string): Array<{ toolName: string; args: 
 
   const intent = classifyAgentIntent(cleanMsg);
 
-  // If intent is app/website creation (WebDev MCP)
-  if (intent.mode === 'app_creation') {
+  // Software work stays available alongside browser actions in integrated tasks.
+  if (intent.mode === 'app_creation' || intent.mode === 'integrated') {
     plan.push({
       toolName: 'agent.planArchitecture',
       args: { target: 'client/src/App.tsx', prompt: cleanMsg },
@@ -3797,7 +3817,7 @@ function planRealAgentActions(message: string): Array<{ toolName: string; args: 
       args: { filePath: 'client/src/App.tsx', prompt: cleanMsg },
       reason: 'WebDev MCP: Gravando e sincronizando código-fonte interativo em client/src/App.tsx'
     });
-    return plan;
+    if (intent.mode === 'app_creation') return plan;
   }
 
   // Extract destination address according to what the user explicitly requested
@@ -4198,13 +4218,13 @@ async function runDeepDeliberation(
     const plan = await call('Planejamento estruturado', 'plan', `Defina objetivo, escopo, dependências, premissas e uma sequência curta de ações. Não escreva código e não chame ferramentas.`);
     const critique = await call('Crítica independente', 'critique', `Avalie o plano abaixo contra o pedido. Procure ambiguidades, riscos técnicos, segurança, regressões e critérios ausentes. Sugira correções objetivas.\nPLANO:\n${JSON.stringify(plan).slice(0, 5000)}`);
     const verification = await call('Verificação e critérios de aceite', 'verify', `Consolide um plano aprovado e uma checklist testável. Só marque decision como aprovado se os riscos críticos estiverem tratados.\nPLANO:\n${JSON.stringify(plan).slice(0, 3500)}\nCRÍTICA:\n${JSON.stringify(critique).slice(0, 4500)}`);
-    const fileManifest = intent.mode === 'app_creation'
+    const fileManifest = intent.mode === 'app_creation' || intent.mode === 'integrated'
       ? await call('Manifesto de arquivos e dependências', 'manifest', `Defina o manifesto mínimo e completo de arquivos para esta aplicação. Para cada arquivo, informe responsabilidade, dependências e se é obrigatório. Diferencie criação nova de edição existente. Audite que client/src/App.tsx tenha ponto de entrada, que nenhum arquivo prometido seja parcial e que README/metadata existam quando aplicáveis.`)
       : null;
-    const runtimeAudit = intent.mode === 'app_creation'
+    const runtimeAudit = intent.mode === 'app_creation' || intent.mode === 'integrated'
       ? await call('QA visual e funcional do preview', 'runtime', `Crie uma checklist de validação do preview: fundo próprio no root sem herdar o shell, imports válidos, componentes resolvíveis, CSS isolado, estados loading/empty/error, responsividade e interações principais. Aponte correções preventivas objetivas; não escreva código.`)
       : null;
-    const browserAudit = intent.mode === 'cloud_computer'
+    const browserAudit = intent.mode === 'cloud_computer' || intent.mode === 'integrated'
       ? await call('Análise visual de navegação', 'browser', `Para este pedido de Computer MCP, defina uma sequência verificável de navegação: como posicionar o cursor, qual elemento ou região inspecionar, quando rolar em incrementos, como confirmar que a página mudou e quais sinais indicam bloqueio ou CAPTCHA. Não invente resultados e não chame ferramentas nesta etapa.`)
       : null;
     const evidenceAudit = await call('Auditoria adversarial de evidências', 'evidence', `Examine o plano aprovado e as auditorias disponíveis. Liste o que precisa ser observado após cada ferramenta para provar sucesso, quais falhas parciais devem bloquear a conclusão e qual é o critério mínimo de aceite. Não chame ferramentas e não presuma que qualquer ação já foi executada.\nPLANO:\n${JSON.stringify(plan).slice(0, 3500)}\nVERIFICAÇÃO:\n${JSON.stringify(verification).slice(0, 4500)}\nAUDITORIA ESPECÍFICA:\n${JSON.stringify(browserAudit || runtimeAudit || {}).slice(0, 3500)}`);
@@ -4332,6 +4352,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
         chatContents.push({ role: 'user', parts: [{ text: deliberation.context }] });
       }
 
+      let browserPreflightTrace: any = null;
       let iterationCount = 0;
       let modelTextResponse = '';
       let successfulModel: string | null = null;
@@ -4348,7 +4369,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
               model: modelCandidate,
               contents: chatContents,
               config: {
-                systemInstruction: KOPILOT_SYSTEM_INSTRUCTION + buildCognitiveSystemInstruction() + APP_CREATION_EXECUTION_CONTRACT + buildIntentInstruction(intent) + buildSkillsSystemInstruction() + buildExecutableSkillsInstruction() + '\n\nDIRETIVA DE RESPOSTA SEM CÓDIGO NO CHAT: NUNCA responda com blocos de código grandes ou listagens de código-fonte no chat. Só produza códigos se a intenção APP_CREATION estiver ativa.',
+                systemInstruction: KOPILOT_SYSTEM_INSTRUCTION + buildCognitiveSystemInstruction() + APP_CREATION_EXECUTION_CONTRACT + buildIntentInstruction(intent) + buildSkillsSystemInstruction() + buildExecutableSkillsInstruction() + '\n\nDIRETIVA DE RESPOSTA SEM CÓDIGO NO CHAT: NUNCA responda com blocos de código grandes ou listagens de código-fonte no chat. Só produza códigos se a intenção APP_CREATION ou INTEGRATED estiver ativa.',
                 ...(isFlashLite ? {} : { thinkingConfig: { thinkingBudget: Math.min(DEFAULT_THINKING_BUDGET, 8192) } }),
                 tools: intent.allowedTools.length ? [{ functionDeclarations: filterToolDeclarations(intent, AGENT_TOOL_DECLARATIONS) as any }] : undefined
               }
@@ -4446,22 +4467,35 @@ app.post('/api/agent/chat/stream', async (req, res) => {
         // Append model response to conversation history
         chatContents.push(candidate.content);
 
-        // Execute each proposed function call in the backend
-        const responseParts: any[] = [];
-        for (const call of functionCalls) {
+        // Tool lanes allow browser work and independent WebDev writes to
+        // overlap, while preserving order inside the shared browser session
+        // and the project filesystem.
+        let computerLane: Promise<unknown> = Promise.resolve();
+        let workspaceLane: Promise<unknown> = Promise.resolve();
+        let terminalLane: Promise<unknown> = Promise.resolve();
+        const enqueue = <T,>(lane: 'computer' | 'workspace' | 'terminal', operation: () => Promise<T>) => {
+          const previous = lane === 'computer' ? computerLane : lane === 'workspace' ? workspaceLane : terminalLane;
+          const result = previous.then(operation, operation);
+          const settled = result.then(() => undefined, () => undefined);
+          if (lane === 'computer') computerLane = settled;
+          else if (lane === 'workspace') workspaceLane = settled;
+          else terminalLane = settled;
+          return result;
+        };
+        const responseParts: any[] = await Promise.all(functionCalls.map(async (call: any) => {
           const toolName = call.name;
           const args = call.args || {};
 
           if (!isToolAllowed(intent, toolName)) {
             const blocked = { error: `A ferramenta ${toolName} não está autorizada no modo ${intent.mode}.` };
             sendEvent('tool_finish', { toolCall: { id: `blocked_${Date.now()}`, toolName, arguments: args, result: JSON.stringify(blocked), timestamp: new Date().toLocaleTimeString(), status: 'error' } });
-            responseParts.push({ functionResponse: { name: toolName, response: blocked } });
-            continue;
+            return { functionResponse: { name: toolName, response: blocked } };
           }
 
-          if (isComputerMcpTool(toolName)) {
-            const preflightTrace = await runPlaywrightInstallPreflight(sendEvent);
-            executedToolCalls.push(preflightTrace);
+          const executeCall = async () => {
+          if (isComputerMcpTool(toolName) && !browserPreflightTrace) {
+            browserPreflightTrace = await runPlaywrightInstallPreflight(sendEvent);
+            executedToolCalls.push(browserPreflightTrace);
           }
           await waitForExecutionPhase();
           sendEvent('tool_start', {
@@ -4530,15 +4564,24 @@ app.post('/api/agent/chat/stream', async (req, res) => {
           });
           await new Promise(r => setTimeout(r, 700));
 
-          responseParts.push({
+          await new Promise(r => setTimeout(r, 400));
+          return {
             functionResponse: {
               name: toolName,
               response: execResult.success ? execResult.result : { error: execResult.error }
             }
-          });
-
-          await new Promise(r => setTimeout(r, 400));
-        }
+          };
+          };
+          const normalizedName = String(toolName).toLowerCase();
+          const lane = isComputerMcpTool(normalizedName)
+            ? 'computer'
+            : /^(?:file_|fs\.|fs_|webdev\.)|writefile|deletefile|readfile|listfiles|mkdir/.test(normalizedName)
+              ? 'workspace'
+              : /^(?:bash_exec|python_exec|terminal\.|bash\.)/.test(normalizedName)
+                ? 'terminal'
+                : null;
+          return lane ? enqueue(lane, executeCall) : executeCall();
+        }));
 
         chatContents.push({
           role: 'user',
@@ -4587,7 +4630,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
         }
       }
 
-      if (intent.mode === 'app_creation') {
+      if (intent.mode === 'app_creation' || intent.mode === 'integrated') {
         const requiredManifest = [
           'client/package.json', 'client/index.html', 'client/vite.config.ts',
           'client/tsconfig.json', 'client/src/main.tsx', 'client/src/index.css', 'client/src/App.tsx'
@@ -4639,7 +4682,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
       }
 
       const finalResult: any = {
-        thought: `Agente completou raciocínio com ${executedToolCalls.length} execuções de ferramentas reais${intent.mode === 'app_creation' ? ' no WebDev Workspace' : ''}.`,
+        thought: `Agente completou raciocínio com ${executedToolCalls.length} execuções de ferramentas reais${intent.mode === 'app_creation' || intent.mode === 'integrated' ? ' no WebDev Workspace e, quando solicitado, no Computer MCP' : ''}.`,
         explanation: finalExplanation,
         files: generatedFiles,
         sources: webSources,
@@ -4658,7 +4701,19 @@ app.post('/api/agent/chat/stream', async (req, res) => {
       await runDeterministicExecutionCycle(message, intent, sendEvent);
     }
     const plannedActions = intent.mode === 'conversation' ? [] : planRealAgentActions(message);
-    for (const action of plannedActions) {
+    let fallbackComputerLane: Promise<unknown> = Promise.resolve();
+    let fallbackWorkspaceLane: Promise<unknown> = Promise.resolve();
+    let fallbackPreflightTrace: any = null;
+    const enqueueFallback = <T,>(lane: 'computer' | 'workspace', operation: () => Promise<T>) => {
+      const previous = lane === 'computer' ? fallbackComputerLane : fallbackWorkspaceLane;
+      const result = previous.then(operation, operation);
+      const settled = result.then(() => undefined, () => undefined);
+      if (lane === 'computer') fallbackComputerLane = settled;
+      else fallbackWorkspaceLane = settled;
+      return result;
+    };
+    await Promise.all(plannedActions.map((action) => {
+      const executeAction = async () => {
       if (action.toolName === 'fs.writeFile') {
         const fallback = generateAutonomousRuleEnforcedFallback(message, history, currentFiles);
         const filesToWrite = fallback.files || [{ path: 'client/src/App.tsx', code: '// App code', lang: 'typescript' }];
@@ -4676,11 +4731,13 @@ app.post('/api/agent/chat/stream', async (req, res) => {
           sendEvent('tool_finish', { toolCall: fileToolResult });
           await new Promise(r => setTimeout(r, 500));
         }
-        continue;
+        return;
       }
       if (isComputerMcpTool(action.toolName)) {
-        const preflightTrace = await runPlaywrightInstallPreflight(sendEvent);
-        executedToolCalls.push(preflightTrace);
+        if (!fallbackPreflightTrace) {
+          fallbackPreflightTrace = await runPlaywrightInstallPreflight(sendEvent);
+          executedToolCalls.push(fallbackPreflightTrace);
+        }
       }
       await waitForExecutionPhase();
       sendEvent('tool_start', {
@@ -4749,12 +4806,15 @@ app.post('/api/agent/chat/stream', async (req, res) => {
           requestedAt: new Date().toISOString()
         };
         sendEvent('approval_required', { approval: pendingApproval, toolName: action.toolName, arguments: action.args });
-        break;
+        return;
       }
       await new Promise(r => setTimeout(r, 500));
-    }
+      };
+      const lane = action.toolName === 'fs.writeFile' ? 'workspace' : isComputerMcpTool(action.toolName) ? 'computer' : null;
+      return lane ? enqueueFallback(lane, executeAction) : executeAction();
+    }));
 
-    const isCodeAction = intent.mode === 'app_creation';
+    const isCodeAction = intent.mode === 'app_creation' || intent.mode === 'integrated';
     let finalResult: any;
 
     if (intent.mode === 'conversation') {
@@ -4836,7 +4896,7 @@ app.post('/api/agent/chat', async (req, res) => {
       }
     }
 
-    const isCodeAction = intent.mode === 'app_creation';
+    const isCodeAction = intent.mode === 'app_creation' || intent.mode === 'integrated';
     const preserveExistingProject = intent.taskMode === 'edit_existing';
     let userPromptWithContext = message;
     if (isCodeAction && preserveExistingProject && currentAppCode && typeof currentAppCode === 'string' && currentAppCode.length > 50) {
@@ -4867,7 +4927,7 @@ app.post('/api/agent/chat', async (req, res) => {
             model: modelCandidate,
             contents: chatContents,
             config: {
-              systemInstruction: KOPILOT_SYSTEM_INSTRUCTION + buildCognitiveSystemInstruction() + APP_CREATION_EXECUTION_CONTRACT + buildIntentInstruction(intent) + buildSkillsSystemInstruction() + buildExecutableSkillsInstruction() + '\n\nDIRETIVA DE RESPOSTA SEM CÓDIGO NO CHAT: NUNCA responda com blocos de código grandes ou listagens de código-fonte no chat. Só produza códigos se a intenção APP_CREATION estiver ativa.',
+              systemInstruction: KOPILOT_SYSTEM_INSTRUCTION + buildCognitiveSystemInstruction() + APP_CREATION_EXECUTION_CONTRACT + buildIntentInstruction(intent) + buildSkillsSystemInstruction() + buildExecutableSkillsInstruction() + '\n\nDIRETIVA DE RESPOSTA SEM CÓDIGO NO CHAT: NUNCA responda com blocos de código grandes ou listagens de código-fonte no chat. Só produza códigos se a intenção APP_CREATION ou INTEGRATED estiver ativa.',
               ...(isFlashLite ? {} : { thinkingConfig: { thinkingBudget: Math.min(DEFAULT_THINKING_BUDGET, 8192) } }),
               tools: intent.allowedTools.length ? [{ functionDeclarations: filterToolDeclarations(intent, AGENT_TOOL_DECLARATIONS) as any }] : undefined
             }
@@ -4958,7 +5018,7 @@ app.post('/api/agent/chat', async (req, res) => {
             });
           }
         }
-        if (intent.mode === 'app_creation' && generatedFiles.length === 0) {
+        if ((intent.mode === 'app_creation' || intent.mode === 'integrated') && generatedFiles.length === 0) {
           const fallback = generateAutonomousRuleEnforcedFallback(message, history, currentFiles);
           if (fallback.files && fallback.files.length > 0) {
             generatedFiles.push(...fallback.files);
@@ -5027,7 +5087,7 @@ app.post('/api/agent/chat', async (req, res) => {
     }
   }
 
-  const isCodeAction = intent.mode === 'app_creation';
+        const isCodeAction = intent.mode === 'app_creation' || intent.mode === 'integrated';
   let fallback: any;
 
   if (intent.mode === 'conversation') {
@@ -5081,7 +5141,7 @@ async function startServer() {
       server: {
         middlewareMode: true,
         hmr: false,
-        allowedHosts: ['3000-i8duyrn4fdg37anqrw9v4-6043b547.us4.manus.computer'],
+        allowedHosts: ['.manus.computer', '3000-i8duyrn4fdg37anqrw9v4-6043b547.us4.manus.computer'],
       },
       appType: 'spa',
     });

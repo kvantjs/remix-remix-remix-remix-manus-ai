@@ -3,6 +3,7 @@ export type AgentIntentMode =
   | 'web_research'
   | 'cloud_computer'
   | 'app_creation'
+  | 'integrated'
   | 'explicit_tool_call'
   | 'project_operation';
 
@@ -12,7 +13,7 @@ export type AgentIntent = {
   reason: string;
   allowedTools: string[];
   requiresUserAction?: boolean;
-  taskMode?: 'new_project' | 'edit_existing' | 'computer_action' | 'research' | 'conversation';
+  taskMode?: 'new_project' | 'edit_existing' | 'computer_action' | 'research' | 'integrated' | 'conversation';
 };
 
 const TOOL_ALIASES: Record<string, string> = {
@@ -85,6 +86,7 @@ const SKILL_TOOLS = ['skill_execute'];
 const WEB_TOOLS = ['web_search', 'web_fetch', 'browser_navigate', 'browser_inspect', 'browser_click', 'browser_scroll', 'browser_open_result', ...SKILL_TOOLS];
 const COMPUTER_TOOLS = [...WEB_TOOLS, 'browser_type', 'bash_exec', 'python_exec', 'job_create', 'job_status', 'job_cancel', 'subagent_parallel'];
 const APP_TOOLS = ['file_list', 'file_read', 'file_write', 'file_create_directory', 'webdev_secret_set', 'webdev_secret_get', 'webdev_snapshot', 'webdev_rollback', 'bash_exec', 'python_exec', 'job_create', 'job_status', 'job_cancel', 'subagent_parallel', ...SKILL_TOOLS];
+const INTEGRATED_TOOLS = [...new Set([...APP_TOOLS, ...COMPUTER_TOOLS])];
 const PROJECT_TOOLS = ['file_list', 'file_read', 'file_write', 'file_create_directory', 'file_delete', 'webdev_secret_set', 'webdev_secret_get', 'webdev_snapshot', 'webdev_rollback', 'bash_exec', 'job_create', 'job_status', 'job_cancel', 'subagent_parallel', ...SKILL_TOOLS];
 
 function hasAny(text: string, terms: string[]) {
@@ -119,9 +121,13 @@ export function classifyAgentIntent(message: string, history: Array<{ role?: str
   }
 
   // 1. High Priority: Software, WebDev, UI and Website Creation/Modification
-  const appCreationTerms = [
+  const softwareActionTerms = [
     'crie', 'criar', 'cria', 'faça', 'fazer', 'faz', 'monte', 'montar', 'desenvolva', 'desenvolver',
     'construa', 'construir', 'gere', 'gerar', 'programe', 'programar', 'implemente', 'implementar',
+    'escreva', 'edite', 'editar', 'modifique', 'modificar', 'corrija', 'corrigir', 'melhore', 'melhorar', 'ajuste', 'ajustar',
+    'adicione', 'adicionar', 'remova', 'remover'
+  ];
+  const softwareArtifactTerms = [
     'escreva o código', 'escreva código', 'edite o código', 'modifique o arquivo', 'corrija o código',
     'código', 'codigo', 'webdev', 'frontend', 'front-end', 'interface', 'ui', 'ux',
     'site', 'landing page', 'dashboard', 'ecommerce', 'e-commerce', 'loja', 'fintech', 'saas',
@@ -130,7 +136,8 @@ export function classifyAgentIntent(message: string, history: Array<{ role?: str
     '[contexto', 'contexto definido', 'contexto selecionado'
   ];
 
-  const hasAppCreation = hasAny(lower, appCreationTerms);
+  const hasAppCreation = (hasAny(lower, softwareActionTerms) && hasAny(lower, softwareArtifactTerms))
+    || /\bquero\s+(?:um|uma)\s+(?:site|aplica(?:ção|cao)|app|aplicativo|dashboard|landing page)\b/i.test(lower);
   const editTerms = ['edite', 'editar', 'edit', 'modifique', 'modificar', 'altere', 'alterar', 'corrija', 'corrigir', 'melhore', 'melhorar', 'ajuste', 'ajustar', 'remova', 'remover', 'adicione', 'adicionar', 'no site atual', 'na aplicação atual', 'no projeto atual', 'já existente'];
   const isExistingProjectEdit = hasAny(lower, editTerms) && (hasAppCreation || history.some(item => /site|aplicação|aplicacao|app|projeto|código|codigo/i.test(String(item.content || ''))));
   const hasSequentialCreationThenComputer = hasAppCreation && /(?:depois|após|apos|quando terminar|em seguida).*(?:computador|navegador|terminal)/i.test(lower);
@@ -156,6 +163,17 @@ export function classifyAgentIntent(message: string, history: Array<{ role?: str
     'npx', 'playwright install', 'playwright', 'bash', 'terminal', 'computador'
   ]);
 
+  // Combined software + browser requests must retain both tool families.
+  if (hasAppCreation && (cloudComputer || research || isDirectNavigationRequest)) {
+    return {
+      mode: 'integrated',
+      confidence: 'high',
+      reason: 'Pedido combina alterações de software com pesquisa ou operação explícita do navegador; os dois conjuntos de ferramentas ficam disponíveis no mesmo turno.',
+      allowedTools: INTEGRATED_TOOLS,
+      taskMode: isExistingProjectEdit ? 'edit_existing' : 'integrated'
+    };
+  }
+
   // Uma URL explícita com verbo operacional é navegação real, mesmo que a frase
   // também contenha termos amplos como "site", "página" ou "portal".
   if (isDirectNavigationRequest && !isExplicitNewAppRequest) {
@@ -170,7 +188,7 @@ export function classifyAgentIntent(message: string, history: Array<{ role?: str
       return { mode: 'cloud_computer', confidence: 'high', reason: 'Pedido autoriza uma operação no computador ou navegador da nuvem; criação e edição permanecem separadas deste turno.', allowedTools: COMPUTER_TOOLS, taskMode: 'computer_action' };
     }
     if (research && !isExplicitNewAppRequest) {
-      return { mode: 'web_research', confidence: 'high', reason: 'Pedido solicita informação externa, atual ou verificável na web (Prioridade Total - Proibido WebDev).', allowedTools: WEB_TOOLS, taskMode: 'research' };
+      return { mode: 'web_research', confidence: 'high', reason: 'Pedido solicita informação externa, atual ou verificável na web; não foi detectada uma solicitação de alteração de software.', allowedTools: WEB_TOOLS, taskMode: 'research' };
     }
   }
 
@@ -178,7 +196,7 @@ export function classifyAgentIntent(message: string, history: Array<{ role?: str
     return { 
       mode: 'app_creation', 
       confidence: 'high', 
-      reason: isExistingProjectEdit ? 'Edição explícita de projeto existente; preservar arquivos e alterar somente o escopo solicitado.' : hasSequentialCreationThenComputer ? 'Duas fases detectadas: criar primeiro; Computer MCP somente em uma mensagem operacional posterior.' : 'Criação de um projeto novo com identidade visual e arquivos próprios.',
+      reason: isExistingProjectEdit ? 'Edição explícita de projeto existente; preservar arquivos e alterar somente o escopo solicitado.' : 'Criação de um projeto novo com identidade visual e arquivos próprios.',
       allowedTools: APP_TOOLS,
       taskMode: isExistingProjectEdit ? 'edit_existing' : 'new_project'
     };
@@ -217,7 +235,7 @@ export function filterToolDeclarations(intent: AgentIntent, declarations: any[])
 
 export function buildIntentInstruction(intent: AgentIntent) {
   const tools = intent.allowedTools.length ? intent.allowedTools.join(', ') : 'nenhuma';
-  return `\n\nROTEADOR RIGOROSO DE INTENÇÃO — MODO ATIVO: ${intent.mode.toUpperCase()}\nMotivo: ${intent.reason}\nFerramentas autorizadas neste turno: ${tools}.\nREGRAS INVIOLÁVEIS:\n1. Não confunda conversa com autorização operacional. Em CONVERSATION, responda em linguagem natural e não chame ferramentas, navegador, terminal ou filesystem.\n2. Em WEB_RESEARCH, utilize web_search ou browser_search para obter resultados, LEIA o conteúdo da página acessada, PENSE e ANALISE criticamente as informações coletadas e elabore uma resposta rica, completa e sintetizada. Se necessário, acesse links adicionais com web_fetch ou browser_navigate para aprofundar seu conhecimento antes de concluir.\n3. Em CLOUD_COMPUTER, execute somente ações no computador/navegador descritas pelo usuário; não transforme uma pergunta em criação de software.\n4. Em APP_CREATION, crie aplicações e sites React+Vite ULTRA COMPLETOS DO ZERO para cada solicitação, sem repetir interfaces. O site DEVE ter fundo próprio e visível (nunca o padrão da aplicação). Escreva o código completo, rico em recursos e de verdade (sem simulações vazias ou parciais). Crie múltiplos arquivos e pastas estruturados se necessário (README.md completo e detalhado, .md de documentação, tipos .ts, metadata.json, etc.), defina e importe no topo todos os ícones utilizados no JSX (incluindo TrendUp as TrendingUp). Não navegue na web por iniciativa própria.\n5. Em EXPLICIT_TOOL_CALL, chame somente a ferramenta nomeada; se o pedido estiver incompleto, peça esclarecimento em vez de escolher outra ferramenta.\n6. Em PROJECT_OPERATION, trate arquivos, snapshots, diffs e versões como operações de projeto; não publique, restaure ou faça push sem confirmação explícita do usuário.\n7. Nunca alegue que uma ferramenta foi executada se ela não aparecer em toolCalls com resultado real.\n8. Se a intenção mudar no meio da tarefa, pare e peça confirmação antes de trocar de modo.\n9. taskMode=new_project significa composição nova mesmo quando o prompt se repete; não copie o projeto atual.\n10. taskMode=edit_existing exige leitura, diff mínimo e preservação do que não foi pedido.\n11. Em criação seguida de computador, conclua WebDev primeiro e aguarde nova mensagem para Computer MCP.\n12. Antes de finalizar, valide manifesto, fundo próprio, imports, interações e compilação do preview.\n`;
+  return `\n\nROTEADOR DE INTENÇÃO — MODO ATIVO: ${intent.mode.toUpperCase()}\nMotivo: ${intent.reason}\nFerramentas autorizadas neste turno: ${tools}.\nREGRAS:\n1. Em CONVERSATION, responda sem ferramentas.\n2. Em WEB_RESEARCH, use as ferramentas web autorizadas, leia e analise os resultados.\n3. Em CLOUD_COMPUTER, execute apenas as operações de computador solicitadas.\n4. Em APP_CREATION, use as ferramentas WebDev autorizadas para criar ou editar código; não navegue por iniciativa própria.\n5. Em INTEGRATED, o usuário autorizou ambos os escopos: use Computer MCP para as ações web/computador pedidas e WebDev para gerar ou modificar código no escopo solicitado. Não trate os escopos como mutuamente exclusivos nem pare a execução apenas por ter começado a navegar. Você pode chamar as ferramentas de ambos os grupos no mesmo turno; mantenha ações no mesmo navegador sequenciais, mas permita que trabalho independente de código avance em paralelo.\n6. Em EXPLICIT_TOOL_CALL, chame somente a ferramenta nomeada. Em PROJECT_OPERATION, respeite aprovações para operações destrutivas ou publicação crítica.\n7. Nunca alegue execução sem retorno real da ferramenta; preserve o escopo, não invente resultados, e valide as alterações.\n8. taskMode=edit_existing exige leitura e alterações mínimas preservando o restante; taskMode=new_project cria conteúdo novo.\n`;
 }
 
 export function conversationFallback(message = '', history: Array<{ role?: string; content?: string }> = []) {
