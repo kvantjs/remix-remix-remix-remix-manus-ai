@@ -2091,6 +2091,110 @@ class PlaywrightBrowserManager {
     return detected;
   }
 
+  private async createStealthContext(browser: Browser) {
+    const context = await browser.newContext({
+      viewport: { width: 1366, height: 768 },
+      screen: { width: 1920, height: 1080 },
+      deviceScaleFactor: 1,
+      isMobile: false,
+      hasTouch: false,
+      locale: 'pt-BR',
+      timezoneId: 'America/Sao_Paulo',
+      colorScheme: 'light',
+      permissions: ['geolocation', 'notifications'],
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      extraHTTPHeaders: {
+        'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+        'sec-ch-ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"Windows"',
+        'sec-ch-ua-platform-version': '"15.0.0"',
+        'Upgrade-Insecure-Requests': '1'
+      }
+    });
+
+    // Comprehensive Anti-Fingerprinting & Stealth Evasion Init Script
+    await context.addInitScript(() => {
+      // 1. Mask navigator.webdriver
+      try {
+        Object.defineProperty(navigator, 'webdriver', {
+          get: () => undefined,
+          configurable: true
+        });
+        const proto = Object.getPrototypeOf(navigator);
+        if (proto && 'webdriver' in proto) {
+          delete (proto as any).webdriver;
+        }
+      } catch {}
+
+      // 2. Mock window.chrome runtime object
+      try {
+        (window as any).chrome = {
+          app: { isInstalled: false },
+          runtime: {
+            PlatformOs: 'win',
+            PlatformArch: 'x86-64',
+            OnInstalledReason: { INSTALL: 'install', UPDATE: 'update' }
+          },
+          loadTimes: function() {},
+          csi: function() {}
+        };
+      } catch {}
+
+      // 3. Realistic navigator.plugins & mimeTypes
+      try {
+        const fakePlugins = [
+          { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer', description: 'Portable Document Format' },
+          { name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai', description: 'Portable Document Format' },
+          { name: 'Native Client', filename: 'internal-nacl-plugin', description: 'Native Client Executable' }
+        ];
+        Object.defineProperty(navigator, 'plugins', {
+          get: () => fakePlugins,
+          configurable: true
+        });
+      } catch {}
+
+      // 4. Consistent language preferences
+      try {
+        Object.defineProperty(navigator, 'languages', {
+          get: () => ['pt-BR', 'pt', 'en-US', 'en'],
+          configurable: true
+        });
+      } catch {}
+
+      // 5. Hardware concurrency and memory
+      try {
+        Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8, configurable: true });
+        Object.defineProperty(navigator, 'deviceMemory', { get: () => 8, configurable: true });
+      } catch {}
+
+      // 6. WebGL Vendor & Renderer spoofing
+      try {
+        const getParameterProto = WebGLRenderingContext.prototype.getParameter;
+        WebGLRenderingContext.prototype.getParameter = function(parameter: number) {
+          // UNMASKED_VENDOR_WEBGL
+          if (parameter === 37445) return 'Google Inc. (NVIDIA)';
+          // UNMASKED_RENDERER_WEBGL
+          if (parameter === 37446) return 'ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 Direct3D11 vs_5_0 ps_5_0, D3D11)';
+          return getParameterProto.apply(this, [parameter]);
+        };
+      } catch {}
+
+      // 7. Permissions query consistency
+      try {
+        if (navigator.permissions && navigator.permissions.query) {
+          const originalQuery = navigator.permissions.query;
+          navigator.permissions.query = (parameters: any) =>
+            parameters.name === 'notifications'
+              ? Promise.resolve({ state: 'default' } as any)
+              : originalQuery(parameters);
+        }
+      } catch {}
+    });
+
+    return context;
+  }
+
   async ensurePage(): Promise<Page> {
     if (this.page && !this.page.isClosed()) {
       return this.page;
@@ -2118,22 +2222,12 @@ class PlaywrightBrowserManager {
             '--no-zygote',
             '--disable-blink-features=AutomationControlled',
             '--disable-features=IsolateOrigins,site-per-process',
-            '--window-size=1280,800'
+            '--disable-infobars',
+            '--window-size=1366,768'
           ]
         });
-        const context = await this.browser.newContext({
-          viewport: { width: 1280, height: 800 },
-          locale: 'pt-BR',
-          userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
-        });
-        
-        // Anti-CAPTCHA stealth evasion script
-        await context.addInitScript(() => {
-          Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-          Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
-          Object.defineProperty(navigator, 'languages', { get: () => ['pt-BR', 'pt', 'en-US', 'en'] });
-        });
 
+        const context = await this.createStealthContext(this.browser);
         this.page = await context.newPage();
         console.log('[StealthBrowser] Anti-CAPTCHA browser instance initialized.');
       } finally {
@@ -2142,9 +2236,7 @@ class PlaywrightBrowserManager {
     }
 
     if (!this.page || this.page.isClosed()) {
-      const context = this.browser.contexts()[0] || await this.browser.newContext({
-        viewport: { width: 1280, height: 800 }
-      });
+      const context = this.browser.contexts()[0] || await this.createStealthContext(this.browser);
       this.page = await context.newPage();
     }
 
@@ -2410,7 +2502,13 @@ class PlaywrightBrowserManager {
         ? page.locator(target).first()
         : page.getByText(target, { exact: false }).first();
       const box = await locator.boundingBox().catch(() => null);
-      if (box) await this.moveMouse(page, box.x + box.width / 2, box.y + box.height / 2, 'Cursor posicionado; clicando', `O cursor encontrou o alvo "${target.slice(0, 80)}" e está clicando.`);
+      if (box) {
+        // Humanized mouse move with slight natural offset within target bounds
+        const offsetX = (Math.random() - 0.5) * Math.min(box.width * 0.4, 16);
+        const offsetY = (Math.random() - 0.5) * Math.min(box.height * 0.4, 12);
+        await this.moveMouse(page, Math.round(box.x + box.width / 2 + offsetX), Math.round(box.y + box.height / 2 + offsetY), 'Cursor posicionado; clicando', `O cursor encontrou o alvo "${target.slice(0, 80)}" e está clicando.`);
+        await page.waitForTimeout(Math.floor(Math.random() * 120) + 80);
+      }
       await locator.click({ timeout: 8000 });
 
       await page.waitForLoadState('domcontentloaded', { timeout: 8000 }).catch(() => {});
@@ -2454,7 +2552,9 @@ class PlaywrightBrowserManager {
       const chunks = Math.max(1, Math.ceil(text.length / 5));
       for (let offset = 0; offset < text.length; offset += chunks) {
         const chunk = text.slice(offset, offset + chunks);
-        await page.keyboard.type(chunk, { delay: 32 });
+        // Realistic human keystroke cadence with jitter
+        const randomDelay = Math.floor(Math.random() * 45) + 35;
+        await page.keyboard.type(chunk, { delay: randomDelay });
         const typedSoFar = text.slice(0, offset + chunk.length);
         const isCheckpoint = offset === 0 || offset + chunk.length >= text.length || (offset % (chunks * 4) === 0);
         if (isCheckpoint) {
@@ -2462,6 +2562,8 @@ class PlaywrightBrowserManager {
         }
       }
       if (pressEnter) {
+        // Natural human hesitation before pressing Enter
+        await page.waitForTimeout(Math.floor(Math.random() * 150) + 120);
         await this.emitProgress(page, 'Pesquisa preenchida; pressionando Enter', 'O agente terminou de escrever a pesquisa e agora confirma com Enter.', true);
         await page.keyboard.press('Enter');
         await page.waitForLoadState('domcontentloaded', { timeout: 8000 }).catch(() => {});
