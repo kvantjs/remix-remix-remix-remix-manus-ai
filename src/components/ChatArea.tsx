@@ -831,18 +831,41 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                     activateExecutionAnimation();
                     const command = data.command || 'comando do agente';
                     const chunk = String(data.chunk || '');
-                    const terminalTrace: ToolCallTrace = {
-                      id: `terminal_live_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-                      toolName: data.toolName || 'bash_exec',
-                      server: 'Terminal Bash MCP',
-                      arguments: { command },
-                      result: chunk || (data.done ? `Processo finalizado com exitCode ${data.exitCode ?? 0}` : 'Processo em execução...'),
-                      timestamp: new Date().toLocaleTimeString(),
-                      status: data.done ? (Number(data.exitCode || 0) === 0 ? 'success' : 'error') : 'running',
-                      actionType: 'terminal',
-                      screenData: { command, terminalOutput: chunk, actionDescription: data.done ? 'Comando finalizado' : 'Recebendo saída do terminal ao vivo' }
-                    };
-                    liveToolCalls.push(terminalTrace);
+                    
+                    const existingTraceIdx = [...liveToolCalls].reverse().findIndex(
+                      t => t.actionType === 'terminal' && 
+                           (t.screenData?.command === command || t.arguments?.command === command) &&
+                           t.status === 'running'
+                    );
+
+                    if (existingTraceIdx !== -1) {
+                      const realIdx = liveToolCalls.length - 1 - existingTraceIdx;
+                      const trace = liveToolCalls[realIdx];
+                      if (trace.screenData) {
+                        trace.screenData.terminalOutput = (trace.screenData.terminalOutput || '') + chunk;
+                        if (data.done) {
+                          trace.screenData.actionDescription = 'Comando finalizado';
+                        }
+                      }
+                      trace.result = (trace.result || '') + chunk;
+                      if (data.done) {
+                        trace.status = Number(data.exitCode || 0) === 0 ? 'success' : 'error';
+                      }
+                    } else {
+                      const terminalTrace: ToolCallTrace = {
+                        id: `terminal_live_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                        toolName: data.toolName || 'bash_exec',
+                        server: 'Terminal Bash MCP',
+                        arguments: { command },
+                        result: chunk || (data.done ? `Processo finalizado com exitCode ${data.exitCode ?? 0}` : 'Processo em execução...'),
+                        timestamp: new Date().toLocaleTimeString(),
+                        status: data.done ? (Number(data.exitCode || 0) === 0 ? 'success' : 'error') : 'running',
+                        actionType: 'terminal',
+                        screenData: { command, terminalOutput: chunk, actionDescription: data.done ? 'Comando finalizado' : 'Recebendo saída do terminal ao vivo' }
+                      };
+                      liveToolCalls.push(terminalTrace);
+                    }
+
                     updateProgressNote('Terminal ao vivo', chunk ? `${command}: ${chunk.slice(-240)}` : `${command} em execução...`, data.done ? 'complete' : 'running');
                     setCurrentStep(chunk ? `Terminal: ${chunk.slice(-160)}` : `Executando: ${command}`);
                     if (onAgentStateChange) {
@@ -860,7 +883,25 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                     const finishedFilePath = String(toolCall.arguments?.filePath || toolCall.arguments?.path || toolCall.arguments?.filename || '').trim();
                     const finishedLabel = finishedFilePath ? `${finishedPresentation.label} · ${finishedFilePath}` : finishedPresentation.label;
                     updateProgressNote(finishedLabel, `Etapa concluída: ${finishedPresentation.detail || 'resultado incorporado ao contexto.'}`, toolCall.status === 'error' ? 'warning' : 'complete');
-                    liveToolCalls.push(toolCall);
+                    
+                    const runningIdx = [...liveToolCalls].reverse().findIndex(
+                      t => t.toolName === toolCall.toolName && t.status === 'running'
+                    );
+                    if (runningIdx !== -1) {
+                      const realIdx = liveToolCalls.length - 1 - runningIdx;
+                      liveToolCalls[realIdx] = {
+                        ...liveToolCalls[realIdx],
+                        ...toolCall,
+                        status: toolCall.status || 'success',
+                        screenData: {
+                          ...liveToolCalls[realIdx].screenData,
+                          ...toolCall.screenData,
+                          terminalOutput: liveToolCalls[realIdx].screenData?.terminalOutput || toolCall.screenData?.terminalOutput
+                        }
+                      };
+                    } else {
+                      liveToolCalls.push(toolCall);
+                    }
                     
                     // Live build: If the tool updated a file, sync with workspace immediately
                     if (onFileUpdate && toolCall.arguments?.content && (toolCall.toolName.includes('write') || toolCall.toolName.includes('create') || toolCall.toolName.includes('edit'))) {

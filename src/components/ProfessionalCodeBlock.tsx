@@ -30,7 +30,7 @@ export function ProfessionalCodeBlock({
   const title = filename || `snippet.${resolvedLang}`;
 
   return (
-    <div className={`w-full my-3 animate-in fade-in slide-in-from-bottom-2 duration-300 ${className}`}>
+    <div className={`w-full my-3     ${className}`}>
       <CodeBlock
         code={code}
         language={resolvedLang}

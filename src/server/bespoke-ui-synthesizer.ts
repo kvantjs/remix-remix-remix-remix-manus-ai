@@ -256,7 +256,7 @@ export function synthesizeBespokeInterface(message: string, currentCode?: string
             <Calendar size={16} /> Reservar uma Mesa
           </h3>
           {bookingSuccess ? (
-            <div className="py-6 text-center space-y-2 animate-in fade-in duration-300">
+            <div className="py-6 text-center space-y-2   ">
               <div className="size-10 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full flex items-center justify-center mx-auto">
                 <Check size={18} />
               </div>
@@ -457,7 +457,7 @@ export function synthesizeBespokeInterface(message: string, currentCode?: string
                 <span className={serverLoad > 80 ? 'text-red-400 font-bold' : 'text-emerald-400 font-bold'}>{serverLoad}%</span>
               </div>
               <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
-                <div className="h-full transition-all duration-500" style={{ width: \`\${serverLoad}%\`, backgroundColor: serverLoad > 80 ? '#F87171' : '#10B981' }} />
+                <div className="h-full transition-all " style={{ width: \`\${serverLoad}%\`, backgroundColor: serverLoad > 80 ? '#F87171' : '#10B981' }} />
               </div>
             </div>
             <div className="bg-black/60 p-3 rounded-xl border border-white/5 font-mono text-[10px] space-y-1.5 max-h-32 overflow-y-auto">
@@ -566,7 +566,7 @@ export default function App() {
 
   return (
     <div 
-      className="min-h-full w-full font-sans p-6 sm:p-10 flex flex-col relative select-none animate-in duration-300"
+      className="min-h-full w-full font-sans p-6 sm:p-10 flex flex-col relative select-none  "
       style={{ 
         backgroundColor: '${chosenTheme.bg}', 
         color: '${chosenTheme.textColor}',
@@ -632,7 +632,7 @@ export default function App() {
             
             <div className="grid grid-cols-1 gap-4">
               {filteredItems.map(item => (
-                <div key={item.id} className="p-5 rounded-3xl bg-white/[0.01] border ${chosenTheme.border} space-y-2.5 hover:border-white/10 transition-all duration-300 relative overflow-hidden group shadow-md hover:-translate-y-0.5">
+                <div key={item.id} className="p-5 rounded-3xl bg-white/[0.01] border ${chosenTheme.border} space-y-2.5 hover:border-white/10 transition-all  relative overflow-hidden group shadow-md hover:-translate-y-0.5">
                   <div className="flex justify-between items-start">
                     <div>
                       <span className="text-[9px] font-bold uppercase bg-white/5 text-white border border-white/10 px-2.5 py-1 rounded-full font-mono">
@@ -675,7 +675,7 @@ export default function App() {
         <footer className="p-5 rounded-3xl bg-black/10 border ${chosenTheme.border} text-[10px] opacity-60 flex items-center justify-between font-mono">
           <span>© {new Date().getFullYear()} ${title} · All Rights Reserved</span>
           <span className="text-emerald-400 flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="size-2 rounded-full bg-emerald-500 " />
             <span>Kvant Sandbox Execution Mode Active</span>
           </span>
         </footer>
@@ -795,7 +795,7 @@ export default function Header() {
   return (
     <div className="p-4 bg-white/5 border-b border-white/10 flex items-center justify-between rounded-t-2xl">
       <div className="flex items-center gap-2">
-        <PhosphorIcons.RocketLaunch className="text-white animate-pulse" size={16} />
+        <PhosphorIcons.RocketLaunch className="text-white " size={16} />
         <span className="text-xs font-mono font-bold uppercase tracking-wider text-white">Painel de Controle Integrado</span>
       </div>
       <div className="text-[10px] font-mono text-slate-400">Status: Conectado</div>

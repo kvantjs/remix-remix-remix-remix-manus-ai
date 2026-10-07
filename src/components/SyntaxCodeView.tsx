@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { cn } from "@/lib/utils";
 import {
   CodeBlock,
   CodeBlockCopyButton,
@@ -15,6 +16,7 @@ export interface SyntaxCodeViewProps {
   compact?: boolean;
   className?: string;
   maxHeight?: string;
+  variant?: 'default' | 'bare';
 }
 
 /**
@@ -201,13 +203,26 @@ export function SyntaxCodeView({
   showLineNumbers = true,
   compact = false,
   className = '',
-  maxHeight = '500px'
+  maxHeight = '500px',
+  variant = 'default'
 }: SyntaxCodeViewProps) {
   const resolvedLanguage = useMemo(() => {
     return detectLanguage(language || filename, code);
   }, [language, filename, code]);
 
   const title = filename || `snippet.${language || resolvedLanguage}`;
+
+  if (variant === 'bare') {
+    return (
+      <CodeBlock
+        code={code}
+        language={resolvedLanguage}
+        showLineNumbers={false}
+        className={cn("bg-transparent border-0 text-[12px]", className)}
+        variant="ghost"
+      />
+    );
+  }
 
   return (
     <div className={`rounded-xl border border-border-divider-subtle bg-bg-surface-panel overflow-hidden shadow-2xl my-2.5 ${className}`}>

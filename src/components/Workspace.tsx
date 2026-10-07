@@ -1,3 +1,4 @@
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   X, 
   ArrowsOut, 
@@ -33,7 +34,6 @@ import {
   Sparkle,
   LinuxLogo
 } from '@phosphor-icons/react';
-import React, { useState, useEffect, useMemo } from 'react';
 import { RuntimePreview } from './RuntimePreview';
 import { TerminalView } from './TerminalView';
 import { detectLanguage } from './SyntaxCodeView';
@@ -43,8 +43,7 @@ import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { KvantComputer } from './KvantComputer';
 import { ToolCallTrace } from '../types/project';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { cn } from "cn";
-import { motion, AnimatePresence } from "motion/react";
+import { cn } from "@/lib/utils";
 
 export type TopLevelTab = 'computer' | 'workspace' | 'code_tab' | 'preview_tab' | 'terminal_tab';
 export type WorkspaceSubTab = 'preview' | 'code' | 'terminal' | 'projects' | 'automations' | 'settings';
@@ -84,18 +83,16 @@ export function Workspace({
   agentIntent,
   browserStatus
 }: WorkspaceProps) {
-  // Top Level Application Tabs
+  // Top Level Application Tabs - Simplified per user request
   const [openTabs, setOpenTabs] = useState<TabItem[]>([
-    { id: 'workspace', label: 'Espaço de Trabalho', closable: false },
-    { id: 'computer', label: 'Computador do Agente', closable: true },
+    { id: 'computer', label: 'Computador do Agente', closable: false },
     { id: 'code_tab', label: 'Editor de Código', closable: true }
   ]);
-  const [activeTopTab, setActiveTopTab] = useState<TopLevelTab>((initialTab as TopLevelTab) || 'workspace');
-  const [showNewTabMenu, setShowNewTabMenu] = useState(false);
+  const [activeTopTab, setActiveTopTab] = useState<TopLevelTab>('computer');
   const [isMaximized, setIsMaximized] = useState(false);
 
   useEffect(() => {
-    if (initialTab && ['computer', 'workspace', 'code_tab', 'preview_tab', 'terminal_tab'].includes(initialTab)) {
+    if (initialTab && ['computer', 'code_tab'].includes(initialTab)) {
       setActiveTopTab(initialTab as TopLevelTab);
     }
   }, [initialTab]);
@@ -103,30 +100,20 @@ export function Workspace({
     if (isWorking) setActiveTopTab('computer');
   }, [isWorking]);
 
-  // Sub-tabs for the Workspace (Preview, Código, Terminal, Projetos, Execuções, Configurações)
-  const [workspaceSubTab, setWorkspaceSubTab] = useState<WorkspaceSubTab>('preview');
-  const [activeFile, setActiveFile] = useState('client/src/App.tsx');
-
   // Resolve active code content for editor
   const activeCodeContent = useMemo(() => {
-    if (customFiles[activeFile]) return customFiles[activeFile];
     if (customFiles['client/src/App.tsx']) return customFiles['client/src/App.tsx'];
     if (customFiles['App.tsx']) return customFiles['App.tsx'];
     const keys = Object.keys(customFiles);
     if (keys.length > 0) return customFiles[keys[0]];
-    return DEFAULT_INITIAL_APP_CODE;
-  }, [customFiles, activeFile]);
-
-  // Resolve code content for runtime preview (always App component code)
-  const runtimeAppCode = useMemo(() => {
-    return customFiles['client/src/App.tsx'] || customFiles['App.tsx'] || customFiles['client/src/DynamicApp.tsx'] || DEFAULT_INITIAL_APP_CODE;
+    return '';
   }, [customFiles]);
 
   const handleCloseTab = (tabId: TopLevelTab, e: React.MouseEvent) => {
     e.stopPropagation();
     const remaining = openTabs.filter(t => t.id !== tabId);
     if (remaining.length === 0) {
-      onClose();
+      setActiveTopTab('computer');
       return;
     }
     setOpenTabs(remaining);
@@ -135,19 +122,11 @@ export function Workspace({
     }
   };
 
-  const handleAddTab = (type: TopLevelTab, label: string) => {
-    if (!openTabs.some(t => t.id === type)) {
-      setOpenTabs(prev => [...prev, { id: type, label, closable: true }]);
-    }
-    setActiveTopTab(type);
-    setShowNewTabMenu(false);
-  };
-
   return (
-    <div className={`${isMaximized ? 'w-full absolute inset-0 z-30' : 'w-full lg:w-[56%] lg:min-w-[460px] min-w-0 h-[58%] min-h-[360px] lg:h-full shrink-0'} border-l-0 lg:border-l border-t lg:border-t-0 border-border-divider-subtle bg-bg-surface-panel flex flex-col animate-in duration-200 select-none`}>
+    <div className={`${isMaximized ? 'w-full absolute inset-0 z-30' : 'w-full lg:w-[56%] lg:min-w-[460px] min-w-0 h-[58%] min-h-[360px] lg:h-full shrink-0'} border-l-0 lg:border-l border-t lg:border-t-0 border-border-divider-subtle bg-bg-surface-panel flex flex-col select-none`}>
       
       {/* Top Application Tab Bar */}
-      <div className="h-11 flex items-center px-3 bg-bg-canvas-main/60 border-b border-border-divider-subtle shrink-0 relative select-none">
+      <div className="h-11 flex items-center px-3 bg-[#1a1a1a] border-b border-border-divider-subtle shrink-0 relative select-none">
         
         {/* Tabs list of the application */}
         <div className="flex items-center gap-1 overflow-x-auto custom-scrollbar">
@@ -159,24 +138,15 @@ export function Workspace({
                 onClick={() => setActiveTopTab(tab.id)}
                 className={`h-7 px-3 rounded-t-md text-xs font-normal transition-all flex items-center gap-2 group relative border-t border-x cursor-pointer ${
                   isActive 
-                    ? 'bg-bg-surface-panel text-text-content-primary border-border-divider-subtle shadow-xs font-medium' 
+                    ? 'bg-[#1a1a1a] text-text-content-primary border-border-divider-subtle shadow-xs font-medium' 
                     : 'text-text-content-secondary hover:text-text-content-primary hover:bg-bg-action-hover border-transparent'
                 }`}
               >
                 {tab.id === 'computer' && (
                   <Desktop size={13} weight={isActive ? "fill" : "regular"} style={{ color: isActive ? '#ffffff' : undefined }} className={!isActive ? "text-text-content-secondary" : ""} />
                 )}
-                {tab.id === 'workspace' && (
-                  <LinuxLogo size={13} weight={isActive ? "fill" : "regular"} style={{ color: isActive ? '#ffffff' : undefined }} className={!isActive ? "text-text-content-secondary" : ""} />
-                )}
                 {tab.id === 'code_tab' && (
                   <FileCode size={13} weight={isActive ? "fill" : "regular"} style={{ color: isActive ? '#ffffff' : undefined }} className={!isActive ? "text-text-content-secondary" : ""} />
-                )}
-                {tab.id === 'preview_tab' && (
-                  <Browser size={13} weight={isActive ? "fill" : "regular"} style={{ color: isActive ? '#ffffff' : undefined }} className={!isActive ? "text-text-content-secondary" : ""} />
-                )}
-                {tab.id === 'terminal_tab' && (
-                  <Terminal size={13} weight={isActive ? "fill" : "regular"} style={{ color: isActive ? '#ffffff' : undefined }} className={!isActive ? "text-text-content-secondary" : ""} />
                 )}
 
                 <span className="truncate max-w-[150px] text-[11.5px]" style={{ color: isActive ? '#f5f5f5' : '#8a8a8a' }}>{tab.label}</span>
@@ -194,88 +164,11 @@ export function Workspace({
               </button>
             );
           })}
-
-          {/* Plus and Caret Down buttons to add application tabs */}
-          <div className="flex items-center text-text-content-secondary hover:text-text-content-primary px-0.5">
-            <button 
-              onClick={() => setShowNewTabMenu(!showNewTabMenu)}
-              className="p-1 hover:bg-bg-action-hover rounded cursor-pointer transition-colors"
-              title="Nova aba na aplicação"
-            >
-              <Plus size={13} />
-            </button>
-            <button 
-              onClick={() => setShowNewTabMenu(!showNewTabMenu)}
-              className="p-0.5 hover:bg-bg-action-hover rounded cursor-pointer transition-colors"
-            >
-              <CaretDown size={11} />
-            </button>
-          </div>
         </div>
-
-        {/* Dropdown Menu for New Application Tab */}
-        {showNewTabMenu && (
-          <div className="absolute top-9 left-28 z-50 w-64 bg-bg-surface-panel border border-border-divider-subtle rounded-xl shadow-2xl p-1.5 space-y-1 text-xs text-text-content-primary/80 animate-in fade-in zoom-in-95 duration-150">
-            <button
-              onClick={() => handleAddTab('workspace', 'Espaço de Trabalho')}
-              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-bg-action-hover text-left transition-colors cursor-pointer"
-            >
-              <Code size={15} className="text-slate-400" />
-              <div>
-                <div className="font-medium text-text-content-primary">Espaço de Trabalho WebDev</div>
-                <div className="text-[10px] text-text-content-secondary/60">Preview ao vivo, editor e terminal</div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => handleAddTab('code_tab', 'Editor de Código')}
-              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-bg-action-hover text-left transition-colors cursor-pointer"
-            >
-              <FileCode size={15} className="text-slate-400" />
-              <div>
-                <div className="font-medium text-text-content-primary">Editor de Código Completo</div>
-                <div className="text-[10px] text-text-content-secondary/60">Edição direta de arquivos e pastas</div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => handleAddTab('computer', 'Computador do Agente')}
-              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-bg-action-hover text-left transition-colors cursor-pointer"
-            >
-              <Desktop size={15} className="text-slate-400" />
-              <div>
-                <div className="font-medium text-text-content-primary">Computador na Nuvem</div>
-                <div className="text-[10px] text-text-content-secondary/60">Ubuntu 24.04 · Playwright e shell Bash</div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => handleAddTab('preview_tab', 'Pré-visualização')}
-              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-bg-action-hover text-left transition-colors cursor-pointer"
-            >
-              <Browser size={15} className="text-emerald-400" />
-              <div>
-                <div className="font-medium text-text-content-primary">Preview de Runtime</div>
-                <div className="text-[10px] text-text-content-secondary/60">Renderização em tempo real</div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => handleAddTab('terminal_tab', 'Terminal Bash')}
-              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-bg-action-hover text-left transition-colors cursor-pointer"
-            >
-              <Terminal size={15} className="text-amber-400" />
-              <div>
-                <div className="font-medium text-text-content-primary">Terminal Bash</div>
-                <div className="text-[10px] text-text-content-secondary/60">Linha de comando do container</div>
-              </div>
-            </button>
-          </div>
-        )}
 
         <div className="flex-1" />
 
-        {/* Top Right Window Controls: Fullscreen expand and Sidebar dock toggle */}
+        {/* Top Right Window Controls */}
         <div className="flex items-center gap-1.5 text-text-content-secondary">
           <button 
             onClick={() => setIsMaximized(!isMaximized)}
@@ -316,277 +209,13 @@ export function Workspace({
 
       {/* 2. Direct Code Tab */}
       {activeTopTab === 'code_tab' && (
-        <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg-canvas-main">
+        <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#1a1a1a]">
           <InteractiveCodeEditor 
-            activeFile={activeFile} 
-            onFileChange={setActiveFile} 
+            activeFile={activeCodeContent === '' ? 'App.tsx' : 'client/src/App.tsx'} 
+            onFileChange={() => {}} 
             customFiles={customFiles}
             onFileUpdate={onFileUpdate}
           />
-        </div>
-      )}
-
-      {/* 3. Direct Preview Tab */}
-      {activeTopTab === 'preview_tab' && (
-        <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg-surface-panel">
-          <RuntimePreview 
-            activeCode={runtimeAppCode} 
-            customFiles={customFiles}
-            onSendPrompt={onSendPrompt}
-            isWorking={isWorking}
-          />
-        </div>
-      )}
-
-      {/* 4. Terminal Tab */}
-      {activeTopTab === 'terminal_tab' && (
-        <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg-canvas-main">
-          <TerminalView activeCode={activeCodeContent} />
-        </div>
-      )}
-
-      {/* 5. Espaço de Trabalho Completo (Sub-abas: Preview, Código, Terminal, Projetos, Execuções, Configurações) */}
-      {activeTopTab === 'workspace' && (
-        <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg-surface-panel">
-          {/* Internal Navigation Bar for Workspace */}
-          <div className="h-11 flex items-center justify-between px-3 border-b border-border-divider-subtle shrink-0 bg-bg-surface-panel">
-            <div className="flex items-center">
-              <ToggleGroup 
-                value={[workspaceSubTab]} 
-                onValueChange={(val) => {
-                  if (val && val.length > 0) {
-                    setWorkspaceSubTab(val[0] as WorkspaceSubTab);
-                  }
-                }}
-                spacing={8}
-                className="bg-transparent border-none p-0 h-auto gap-2"
-              >
-                <ToggleGroupItem 
-                  value="preview" 
-                  className={cn(
-                    "relative transition-all duration-300 flex items-center gap-2 px-3 h-8 rounded-[10px] border",
-                    workspaceSubTab === 'preview' 
-                      ? "text-white bg-[#1f1f1f] border-[#323232] shadow-sm" 
-                      : "text-white/40 border-transparent hover:text-white/60 hover:bg-white/5"
-                  )}
-                >
-                  <Desktop size={12} weight="regular" />
-                  <AnimatePresence initial={false}>
-                    {workspaceSubTab === 'preview' && (
-                      <motion.span
-                        layout
-                        initial={{ opacity: 0, width: 0 }}
-                        animate={{ opacity: 1, width: "auto" }}
-                        exit={{ opacity: 0, width: 0 }}
-                        transition={{ 
-                          type: "spring",
-                          stiffness: 300,
-                          damping: 25,
-                          opacity: { duration: 0.15 }
-                        }}
-                        className="overflow-hidden whitespace-nowrap text-[11px] font-semibold"
-                      >
-                        Preview
-                      </motion.span>
-                    )}
-                  </AnimatePresence>
-                </ToggleGroupItem>
-
-                <ToggleGroupItem 
-                  value="code" 
-                  className={cn(
-                    "relative transition-all duration-300 flex items-center gap-2 px-3 h-8 rounded-[10px] border",
-                    workspaceSubTab === 'code' 
-                      ? "text-white bg-[#1f1f1f] border-[#323232] shadow-sm" 
-                      : "text-white/40 border-transparent hover:text-white/60 hover:bg-white/5"
-                  )}
-                >
-                  <Code size={12} weight="regular" />
-                  <AnimatePresence initial={false}>
-                    {workspaceSubTab === 'code' && (
-                      <motion.span
-                        layout
-                        initial={{ opacity: 0, width: 0 }}
-                        animate={{ opacity: 1, width: "auto" }}
-                        exit={{ opacity: 0, width: 0 }}
-                        transition={{ 
-                          type: "spring",
-                          stiffness: 300,
-                          damping: 25,
-                          opacity: { duration: 0.15 }
-                        }}
-                        className="overflow-hidden whitespace-nowrap text-[11px] font-semibold"
-                      >
-                        Editor
-                      </motion.span>
-                    )}
-                  </AnimatePresence>
-                </ToggleGroupItem>
-
-                <ToggleGroupItem 
-                  value="terminal" 
-                  className={cn(
-                    "relative transition-all duration-300 flex items-center gap-2 px-3 h-8 rounded-[10px] border",
-                    workspaceSubTab === 'terminal' 
-                      ? "text-white bg-[#1f1f1f] border-[#323232] shadow-sm" 
-                      : "text-white/40 border-transparent hover:text-white/60 hover:bg-white/5"
-                  )}
-                >
-                  <Terminal size={12} weight="regular" />
-                  <AnimatePresence initial={false}>
-                    {workspaceSubTab === 'terminal' && (
-                      <motion.span
-                        layout
-                        initial={{ opacity: 0, width: 0 }}
-                        animate={{ opacity: 1, width: "auto" }}
-                        exit={{ opacity: 0, width: 0 }}
-                        transition={{ 
-                          type: "spring",
-                          stiffness: 300,
-                          damping: 25,
-                          opacity: { duration: 0.15 }
-                        }}
-                        className="overflow-hidden whitespace-nowrap text-[11px] font-semibold"
-                      >
-                        Terminal
-                      </motion.span>
-                    )}
-                  </AnimatePresence>
-                </ToggleGroupItem>
-
-                <ToggleGroupItem 
-                  value="projects" 
-                  className={cn(
-                    "relative transition-all duration-300 flex items-center gap-2 px-3 h-8 rounded-[10px] border",
-                    workspaceSubTab === 'projects' 
-                      ? "text-white bg-[#1f1f1f] border-[#323232] shadow-sm" 
-                      : "text-white/40 border-transparent hover:text-white/60 hover:bg-white/5"
-                  )}
-                >
-                  <Folder size={12} weight="regular" />
-                  <AnimatePresence initial={false}>
-                    {workspaceSubTab === 'projects' && (
-                      <motion.span
-                        layout
-                        initial={{ opacity: 0, width: 0 }}
-                        animate={{ opacity: 1, width: "auto" }}
-                        exit={{ opacity: 0, width: 0 }}
-                        transition={{ 
-                          type: "spring",
-                          stiffness: 300,
-                          damping: 25,
-                          opacity: { duration: 0.15 }
-                        }}
-                        className="overflow-hidden whitespace-nowrap text-[11px] font-semibold"
-                      >
-                        Git
-                      </motion.span>
-                    )}
-                  </AnimatePresence>
-                </ToggleGroupItem>
-
-                <ToggleGroupItem 
-                  value="automations" 
-                  className={cn(
-                    "relative transition-all duration-300 flex items-center gap-2 px-3 h-8 rounded-[10px] border",
-                    workspaceSubTab === 'automations' 
-                      ? "text-white bg-[#1f1f1f] border-[#323232] shadow-sm" 
-                      : "text-white/40 border-transparent hover:text-white/60 hover:bg-white/5"
-                  )}
-                >
-                  <Calendar size={12} weight="regular" />
-                  <AnimatePresence initial={false}>
-                    {workspaceSubTab === 'automations' && (
-                      <motion.span
-                        layout
-                        initial={{ opacity: 0, width: 0 }}
-                        animate={{ opacity: 1, width: "auto" }}
-                        exit={{ opacity: 0, width: 0 }}
-                        transition={{ 
-                          type: "spring",
-                          stiffness: 300,
-                          damping: 25,
-                          opacity: { duration: 0.15 }
-                        }}
-                        className="overflow-hidden whitespace-nowrap text-[11px] font-semibold"
-                      >
-                        Execuções
-                      </motion.span>
-                    )}
-                  </AnimatePresence>
-                </ToggleGroupItem>
-
-                <ToggleGroupItem 
-                  value="settings" 
-                  className={cn(
-                    "relative transition-all duration-300 flex items-center gap-2 px-3 h-8 rounded-[10px] border",
-                    workspaceSubTab === 'settings' 
-                      ? "text-white bg-[#1f1f1f] border-[#323232] shadow-sm" 
-                      : "text-white/40 border-transparent hover:text-white/60 hover:bg-white/5"
-                  )}
-                >
-                  <Gear size={12} weight="regular" />
-                  <AnimatePresence initial={false}>
-                    {workspaceSubTab === 'settings' && (
-                      <motion.span
-                        layout
-                        initial={{ opacity: 0, width: 0 }}
-                        animate={{ opacity: 1, width: "auto" }}
-                        exit={{ opacity: 0, width: 0 }}
-                        transition={{ 
-                          type: "spring",
-                          stiffness: 300,
-                          damping: 25,
-                          opacity: { duration: 0.15 }
-                        }}
-                        className="overflow-hidden whitespace-nowrap text-[11px] font-semibold"
-                      >
-                        Ajustes
-                      </motion.span>
-                    )}
-                  </AnimatePresence>
-                </ToggleGroupItem>
-              </ToggleGroup>
-            </div>
-            
-            <div className="flex items-center gap-2 shrink-0">
-               <button 
-                onClick={() => {
-                  setWorkspaceSubTab('preview');
-                }}
-                className="bg-interactive-cta-bg text-bg-canvas-main px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shadow-xs cursor-pointer"
-               >
-                  <Sparkle size={13} weight="fill" />
-                  <span>Preview Vivo</span>
-               </button>
-            </div>
-          </div>
-
-          {/* Sub-tab content */}
-          <div className="flex-1 overflow-hidden relative">
-            {workspaceSubTab === 'preview' && (
-              <RuntimePreview 
-                activeCode={runtimeAppCode} 
-                customFiles={customFiles}
-                onSendPrompt={onSendPrompt}
-                isWorking={isWorking}
-              />
-            )}
-            {workspaceSubTab === 'code' && (
-              <InteractiveCodeEditor 
-                activeFile={activeFile} 
-                onFileChange={setActiveFile} 
-                customFiles={customFiles}
-                onFileUpdate={onFileUpdate}
-              />
-            )}
-            {workspaceSubTab === 'terminal' && (
-              <TerminalView activeCode={activeCodeContent} />
-            )}
-            {workspaceSubTab === 'automations' && <AutomationsView />}
-            {workspaceSubTab === 'projects' && <ProjectsView />}
-            {workspaceSubTab === 'settings' && <SettingsView />}
-          </div>
         </div>
       )}
 
@@ -815,11 +444,11 @@ function InteractiveCodeEditor({ activeFile, onFileChange, customFiles, onFileUp
   const linesArray = useMemo(() => Array.from({ length: lineCount }, (_, i) => i + 1), [lineCount]);
 
   return (
-    <div className="h-full flex bg-[#0d0d0f] text-slate-100 overflow-hidden relative">
+    <div className="h-full flex bg-[#1a1a1a] text-slate-100 overflow-hidden relative">
       {/* Left Sidebar: Dynamic Workspace File Tree */}
-      <div className="w-56 border-r border-white/10 flex flex-col shrink-0 select-none" style={{ backgroundColor: '#202020' }}>
+      <div className="w-56 border-r border-white/10 flex flex-col shrink-0 select-none" style={{ backgroundColor: '#1a1a1a' }}>
         {/* Workspace Tree Header */}
-        <div className="h-9 px-3 border-b border-white/10 flex items-center justify-between shrink-0" style={{ backgroundColor: '#202020' }}>
+        <div className="h-9 px-3 border-b border-white/10 flex items-center justify-between shrink-0" style={{ backgroundColor: '#1a1a1a' }}>
           <div className="flex items-center gap-1.5 text-xs font-semibold text-white">
             <Folder size={14} className="text-[#f5f5f5]" style={{ color: '#f5f5f5' }} />
             <span style={{ color: '#f5f5f5' }}>Arquivos</span>
@@ -846,7 +475,7 @@ function InteractiveCodeEditor({ activeFile, onFileChange, customFiles, onFileUp
         </div>
 
         {/* Tree Nodes List */}
-        <div className="flex-1 overflow-y-auto p-2 space-y-0.5 custom-scrollbar text-xs" style={{ backgroundColor: '#202020' }}>
+        <div className="flex-1 overflow-y-auto p-2 space-y-0.5 custom-scrollbar text-xs" style={{ backgroundColor: '#1a1a1a' }}>
           {fileTree.map((node) => (
             <DynamicFileTreeNode 
               key={node.path} 
@@ -860,16 +489,16 @@ function InteractiveCodeEditor({ activeFile, onFileChange, customFiles, onFileUp
         </div>
 
         {/* Workspace Footer Stats */}
-        <div className="p-2.5 border-t border-white/5 text-[10px] flex items-center justify-between font-mono" style={{ backgroundColor: '#202020', color: '#f5f5f5' }}>
+        <div className="p-2.5 border-t border-white/5 text-[10px] flex items-center justify-between font-mono" style={{ backgroundColor: '#1a1a1a', color: '#f5f5f5' }}>
           <span style={{ color: '#f5f5f5' }}>{Object.keys(customFiles).length || 4} arquivos</span>
           <span style={{ color: '#f5f5f5' }}>● Workspace Pronto</span>
         </div>
       </div>
 
       {/* Main Code Editor View */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[#191919] overflow-hidden" style={{ backgroundColor: '#191919' }}>
+      <div className="flex-1 flex flex-col min-w-0 bg-[#1a1a1a] overflow-hidden" style={{ backgroundColor: '#1a1a1a' }}>
         {/* Editor Tab Bar & Actions */}
-        <div className="h-9 border-b border-white/10 px-4 flex items-center justify-between shrink-0" style={{ backgroundColor: '#202020', color: '#f5f5f5' }}>
+        <div className="h-9 border-b border-white/10 px-4 flex items-center justify-between shrink-0" style={{ backgroundColor: '#1a1a1a', color: '#f5f5f5' }}>
           <div className="flex items-center gap-2 font-mono text-xs truncate" style={{ color: '#f5f5f5' }}>
             <FileCode size={15} className="shrink-0" style={{ color: '#f5f5f5' }} />
             <span className="font-semibold" style={{ color: '#f5f5f5' }}>{activeFile}</span>
@@ -877,7 +506,7 @@ function InteractiveCodeEditor({ activeFile, onFileChange, customFiles, onFileUp
               Apenas Leitura
             </span>
             {!isSaved && (
-              <span className="size-2 rounded-full bg-amber-400 animate-pulse" title="Alterações não salvas" />
+              <span className="size-2 rounded-full bg-amber-400 " title="Alterações não salvas" />
             )}
           </div>
 
@@ -938,7 +567,7 @@ function InteractiveCodeEditor({ activeFile, onFileChange, customFiles, onFileUp
         </div>
 
         {/* Real Code Editor CodeMirror Surface (Apenas Leitura do Usuário) */}
-        <div className="flex-1 overflow-auto relative bg-[#191919] h-full flex flex-col font-mono text-xs select-text" style={{ backgroundColor: '#191919' }}>
+        <div className="flex-1 overflow-auto relative bg-[#1a1a1a] h-full flex flex-col font-mono text-xs select-text" style={{ backgroundColor: '#1a1a1a' }}>
           <CodeMirror
             value={editorContent}
             height="100%"
@@ -951,7 +580,7 @@ function InteractiveCodeEditor({ activeFile, onFileChange, customFiles, onFileUp
         </div>
 
         {/* Editor Bottom Status Bar */}
-        <div className="h-6 bg-[#0E1017] border-t border-white/5 px-3 flex items-center justify-between text-[10px] font-mono shrink-0 select-none" style={{ color: '#f5f5f5' }}>
+        <div className="h-6 bg-[#1a1a1a] border-t border-white/5 px-3 flex items-center justify-between text-[10px] font-mono shrink-0 select-none" style={{ color: '#f5f5f5' }}>
           <div className="flex items-center gap-3" style={{ color: '#f5f5f5' }}>
             <span style={{ color: '#f5f5f5' }}>{detectLanguage(activeFile, editorContent).toUpperCase()}</span>
             <span style={{ color: '#f5f5f5' }}>UTF-8</span>

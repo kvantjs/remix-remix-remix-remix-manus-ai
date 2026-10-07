@@ -16,7 +16,7 @@ export function Button({
   disabled,
   ...props
 }: ButtonProps) {
-  const base = "inline-flex items-center justify-center font-medium transition-all duration-150 rounded-control cursor-pointer select-none outline-none disabled:pointer-events-none disabled:opacity-40";
+  const base = "inline-flex items-center justify-center font-medium transition-all  rounded-control cursor-pointer select-none outline-none disabled:pointer-events-none disabled:opacity-40";
   
   const sizes = {
     xs: "h-6 px-2 text-[11px] gap-1",

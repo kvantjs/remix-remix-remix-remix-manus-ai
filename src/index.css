@@ -107,7 +107,7 @@
   --invert-foreground: var(--color-zinc-50);
 
   /* Application Specific Variables */
-  --app-bg: #0a0a0a;
+  --app-bg: #1a1a1a;
   --sidebar-bg: #161616;
   --panel-border: #232323;
   --chat-bubble-user-text: #ffffff;
@@ -125,9 +125,9 @@
   --line-strong: #3f3f46;
   --hover: rgba(255, 255, 255, 0.06);
   --hover-2: rgba(255, 255, 255, 0.1);
-  --field: #18181b;
-  --surface: #18181b;
-  --inset: #09090b;
+  --field: #1a1a1a;
+  --surface: #1a1a1a;
+  --inset: #1a1a1a;
   --orange: #f97316;
   --green: #22c55e;
   --red: #ef4444;

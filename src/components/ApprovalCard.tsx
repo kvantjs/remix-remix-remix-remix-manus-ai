@@ -256,7 +256,7 @@ export default function ApprovalCard({
       <button 
         type="button" 
         onClick={() => setOpen(true)} 
-        className="rounded-xl bg-[#18181b] border border-[#27272a] hover:border-zinc-500 px-3 py-2 text-xs font-medium shadow-xl transition-all duration-150 hover:bg-[#222226] flex items-center gap-2 cursor-pointer"
+        className="rounded-xl bg-[#18181b] border border-[#27272a] hover:border-zinc-500 px-3 py-2 text-xs font-medium shadow-xl transition-all  hover:bg-[#222226] flex items-center gap-2 cursor-pointer"
       >
         <Spinner size={14} className="text-zinc-400 shrink-0" />
         <span className="text-zinc-300">Configurações de Contexto ({questions.length} perguntas)</span>
@@ -365,14 +365,14 @@ export default function ApprovalCard({
                             aria-pressed={on}
                             tabIndex={active ? 0 : -1}
                             onClick={() => { if (active) toggle(i); }}
-                            className={`group relative z-10 flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-all duration-150 cursor-pointer border ${
+                            className={`group relative z-10 flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-all  cursor-pointer border ${
                               on 
                                 ? "bg-white/10 border-white/25 text-white font-medium shadow-xs" 
                                 : "bg-[#202024]/70 border-[#2b2b30] hover:bg-[#25252a] hover:border-zinc-500/50 text-zinc-300 hover:text-white"
                             }`}
                           >
                             <span
-                              className={`flex size-4 shrink-0 items-center justify-center transition-all duration-200 ${
+                              className={`flex size-4 shrink-0 items-center justify-center transition-all  ${
                                 isRadio ? "rounded-full" : "rounded-[4px]"
                               } ${
                                 on
@@ -381,7 +381,7 @@ export default function ApprovalCard({
                               }`}
                             >
                               {isRadio ? (
-                                <span className={`size-1.5 rounded-full bg-black transition-transform duration-200 ${on ? "scale-100" : "scale-0"}`} />
+                                <span className={`size-1.5 rounded-full bg-black transition-transform  ${on ? "scale-100" : "scale-0"}`} />
                               ) : (
                                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                                   <path d="M20 6L9 17l-5-5" />
@@ -398,7 +398,7 @@ export default function ApprovalCard({
                       {/* Custom Input Option */}
                       <label 
                         data-menu-row 
-                        className={`relative z-10 flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-all duration-150 border ${
+                        className={`relative z-10 flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-all  border ${
                           custom[qIdx]?.trim() 
                             ? "bg-white/10 border-white/25 text-white" 
                             : "bg-[#202024]/40 border-[#27272a] hover:border-zinc-600"

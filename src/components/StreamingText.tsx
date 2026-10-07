@@ -30,7 +30,7 @@ function SourceChip({ source }: { source?: StreamingSource }) {
       rel="noreferrer"
       className="ml-0 mr-1 inline-flex h-4.5 translate-y-[-1px] items-center gap-1 rounded-[5px]
         bg-black/30 dark:bg-white/10 pr-[4px] pl-[4px] align-middle font-mono text-[10.5px] text-slate-300 border border-white/10
-        transition-colors duration-150 hover:bg-white/15 hover:text-white cursor-pointer"
+        transition-colors  hover:bg-white/15 hover:text-white cursor-pointer"
       style={{ animation: "pop-in 250ms cubic-bezier(0.23,1,0.32,1) both" }}
     >
       <img src={sourceImage(source)} alt="" className="source-avatar size-3 rounded-[3px]" />
@@ -162,7 +162,7 @@ export default function StreamingText({
       {/* action icons row (when sources available) */}
       {sources && sources.length > 0 && (
         <div
-          className="mt-2.5 flex items-center gap-0.5 transition-opacity duration-300"
+          className="mt-2.5 flex items-center gap-0.5 transition-opacity "
           style={{ opacity: done ? 1 : 0.6, pointerEvents: done ? "auto" : "none" }}
         >
           {ACTION_ICONS.map((icon, i) => (
@@ -171,7 +171,7 @@ export default function StreamingText({
               type="button"
               aria-label="Action"
               className="flex size-6 items-center justify-center rounded-[6px] text-slate-400
-                transition-colors duration-100 hover:bg-white/10 hover:text-white cursor-pointer"
+                transition-colors  hover:bg-white/10 hover:text-white cursor-pointer"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 {icon}
@@ -182,7 +182,7 @@ export default function StreamingText({
             type="button"
             aria-expanded={sourcesOpen}
             onClick={() => setSourcesOpen((current) => !current)}
-            className="ml-1.5 flex items-center gap-1.5 rounded-[6px] px-2 py-0.5 text-left transition-colors duration-150 hover:bg-white/5 cursor-pointer"
+            className="ml-1.5 flex items-center gap-1.5 rounded-[6px] px-2 py-0.5 text-left transition-colors  hover:bg-white/5 cursor-pointer"
           >
             <span className="flex -space-x-1">
               {sources.slice(0, 3).map((source, idx) => (
@@ -202,7 +202,7 @@ export default function StreamingText({
       {/* Collapsible Sources Box */}
       {sources && sources.length > 0 && (
         <div
-          className="grid transition-[grid-template-rows,opacity] duration-300"
+          className="grid transition-[grid-template-rows,opacity] "
           style={{
             gridTemplateRows: done && sourcesOpen ? "1fr" : "0fr",
             opacity: done && sourcesOpen ? 1 : 0,
@@ -217,7 +217,7 @@ export default function StreamingText({
                   href={source.href}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center gap-2 rounded-[6px] px-2 py-1.5 text-[12px] text-slate-300 transition-colors duration-150 hover:bg-white/5 hover:text-white"
+                  className="flex items-center gap-2 rounded-[6px] px-2 py-1.5 text-[12px] text-slate-300 transition-colors  hover:bg-white/5 hover:text-white"
                 >
                   <img src={sourceImage(source)} alt="" className="source-avatar size-4 rounded-[4px]" />
                   <span className="hover:underline font-medium text-white">{source.name}</span>
