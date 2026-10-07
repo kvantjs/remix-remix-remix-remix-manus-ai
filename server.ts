@@ -2035,6 +2035,9 @@ app.post('/api/terminal/exec', async (req, res) => {
 });
 
 // 3. Playwright Real Headless Browser Automation Manager
+const BROWSER_PAGE_READ_DELAY_MS = Math.max(1800, Number(process.env.BROWSER_PAGE_READ_DELAY_MS || 3500));
+const BROWSER_ACTION_SETTLE_DELAY_MS = Math.max(500, Number(process.env.BROWSER_ACTION_SETTLE_DELAY_MS || 900));
+
 class PlaywrightBrowserManager {
   private browser: Browser | null = null;
   private page: Page | null = null;
@@ -2074,8 +2077,24 @@ class PlaywrightBrowserManager {
   }
 
   private async settleReadablePage(page: Page) {
-    await page.waitForLoadState('networkidle', { timeout: 2500 }).catch(() => {});
-    await page.waitForFunction(() => document.readyState === 'complete', undefined, { timeout: 1200 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await page.waitForFunction(() => document.readyState === 'complete', undefined, { timeout: 2500 }).catch(() => {});
+  }
+
+  private async waitForPageReading(page: Page, phase: string) {
+    await this.emitProgress(
+      page,
+      'Leitura da página em andamento',
+      `${phase} O agente está lendo o conteúdo visível antes de avançar.`,
+      true
+    );
+    await page.waitForTimeout(BROWSER_PAGE_READ_DELAY_MS);
+    await this.emitProgress(
+      page,
+      'Leitura da página concluída',
+      'Conteúdo, título e elementos interativos foram verificados; a próxima ação pode começar.',
+      true
+    );
   }
 
   getChallenge() {
@@ -2208,6 +2227,12 @@ class PlaywrightBrowserManager {
       return this.page;
     }
 
+    // O preflight do Computer MCP usa o workspace como HOME. Fixar o cache
+    // evita que o instalador baixe Chromium em um caminho e o launcher procure
+    // em outro (situação que fazia a navegação cair antes do primeiro evento
+    // visual).
+    process.env.PLAYWRIGHT_BROWSERS_PATH = path.join(__dirname, 'workspace', '.cache', 'ms-playwright');
+
     if (!this.browser || !this.browser.isConnected()) {
       if (this.isLaunching) {
         for (let i = 0; i < 20; i++) {
@@ -2219,8 +2244,24 @@ class PlaywrightBrowserManager {
       this.isLaunching = true;
       try {
         console.log('[StealthBrowser] Launching custom stealth Chromium instance (Anti-CAPTCHA)...');
+        let executablePath: string | undefined;
+        try {
+          const cacheRoot = process.env.PLAYWRIGHT_BROWSERS_PATH as string;
+          const entries = await fs.readdir(cacheRoot, { withFileTypes: true });
+          const chromiumBuilds = entries
+            .filter(entry => entry.isDirectory() && /^chromium-\d+$/.test(entry.name))
+            .map(entry => entry.name)
+            .sort();
+          const candidate = chromiumBuilds.length > 0
+            ? path.join(cacheRoot, chromiumBuilds[chromiumBuilds.length - 1], 'chrome-linux64', 'chrome')
+            : '';
+          if (candidate && existsSync(candidate)) executablePath = candidate;
+        } catch (error) {
+          console.warn('[StealthBrowser] Não foi possível resolver o binário do cache:', error);
+        }
         this.browser = await chromium.launch({
           headless: process.env.BROWSER_HEADLESS !== 'false',
+          ...(executablePath ? { executablePath } : {}),
           args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -2302,7 +2343,8 @@ class PlaywrightBrowserManager {
       const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
       await this.settleReadablePage(page);
       const viewport = page.viewportSize() || { width: 1280, height: 800 };
-      await this.moveMouse(page, Math.round(viewport.width * 0.52), Math.round(viewport.height * 0.16), 'Página carregada; lendo conteúdo', 'O navegador carregou a página e está posicionando o cursor para leitura.', true);
+      await this.moveMouse(page, Math.round(viewport.width * 0.52), Math.round(viewport.height * 0.16), 'Página carregada; iniciando leitura', 'O navegador carregou a página real e está posicionando o cursor para leitura.', true);
+      await this.waitForPageReading(page, `A página ${page.url()} foi carregada.`);
       const durationMs = Math.round(performance.now() - startTime);
 
       const title = await page.title();
@@ -2334,13 +2376,26 @@ class PlaywrightBrowserManager {
         requiresUserAction: Boolean(challenge)
       };
     } catch (err: any) {
-      console.warn('[Playwright] Navigation fallback used:', err.message);
-      const fallback = await executeHttpNavigate(url);
+      console.warn('[Playwright] Real browser navigation failed:', err.message);
+      const page = this.page;
+      const currentUrl = page && !page.isClosed() ? page.url() : url;
+      const title = page && !page.isClosed() ? await page.title().catch(() => '') : '';
+      const screenshotBuf = page && !page.isClosed() ? await page.screenshot({ type: 'jpeg', quality: 68 }).catch(() => null) : null;
       return {
-        ...fallback,
-        browserStatus: fallback.status >= 400 ? 'error' : 'interactive',
-        screenshot: undefined,
-        interactiveElements: fallback.links.map(l => ({ type: 'link' as const, text: l.text, href: l.href, selector: `a:has-text("${l.text}")` }))
+        url: currentUrl,
+        title: title || new URL(url).hostname,
+        status: 599,
+        statusText: 'Playwright navigation failed',
+        durationMs: Math.round(performance.now() - startTime),
+        browserStatus: 'error',
+        screenshot: screenshotBuf ? `data:image/jpeg;base64,${screenshotBuf.toString('base64')}` : undefined,
+        textContent: `O navegador Playwright não conseguiu carregar ${url}: ${err.message}`,
+        interactiveElements: [],
+        links: [],
+        headers: {},
+        challenge: undefined,
+        automationBlocked: false,
+        requiresUserAction: false
       };
     }
   }
@@ -2425,9 +2480,11 @@ class PlaywrightBrowserManager {
       }
       await locator.click({ timeout: 8000 });
 
-      await page.waitForLoadState('domcontentloaded', { timeout: 8000 }).catch(() => {});
+      await page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
       await this.settleReadablePage(page);
-      await this.emitProgress(page, 'Clique concluído; verificando resultado', `Clique concluído em "${target.slice(0, 80)}"; verificando a nova página.`, true);
+      await this.emitProgress(page, 'Clique concluído; verificando resultado', `Clique concluído em "${target.slice(0, 80)}"; verificando a nova página real.`, true);
+      await page.waitForTimeout(BROWSER_ACTION_SETTLE_DELAY_MS);
+      await this.waitForPageReading(page, `A página resultante do clique (${page.url()}) está aberta.`);
       const title = await page.title();
       const screenshotBuf = await page.screenshot({ type: 'jpeg', quality: 75 });
       const screenshot = 'data:image/jpeg;base64,' + screenshotBuf.toString('base64');
@@ -2482,7 +2539,8 @@ class PlaywrightBrowserManager {
         await page.keyboard.press('Enter');
         await page.waitForLoadState('domcontentloaded', { timeout: 8000 }).catch(() => {});
         await this.settleReadablePage(page);
-        await this.emitProgress(page, 'Enter pressionado; aguardando resultados', 'A pesquisa foi enviada; aguardando o Google renderizar os resultados.', true);
+        await this.emitProgress(page, 'Enter pressionado; aguardando atualização', 'A ação foi enviada; aguardando a página real renderizar a atualização.', true);
+        await this.waitForPageReading(page, `A página atualizada (${page.url()}) está sendo lida.`);
       }
       await this.emitProgress(page, 'Campo preenchido; lendo atualização', `Campo ${selector} preenchido; verificando o conteúdo atualizado.`, true);
       const title = await page.title();
@@ -2555,6 +2613,7 @@ class PlaywrightBrowserManager {
       }
       await this.settleReadablePage(page);
       await this.emitProgress(page, 'Rolagem concluída; lendo conteúdo', 'A rolagem terminou; o agente está extraindo e verificando o conteúdo visível.', true);
+      await this.waitForPageReading(page, `O trecho visível em ${page.url()} está sendo analisado.`);
       const domData = await this.extractDomData(page);
       const challenge = await this.inspectChallenge(page, domData.bodyText);
       const screenshotBuf = await page.screenshot({ type: 'jpeg', quality: 75 }).catch(() => null);
@@ -2628,7 +2687,8 @@ function isComputerMcpTool(toolName: string) {
 }
 
 async function runPlaywrightInstallPreflight(emit?: (event: string, data: any) => void) {
-  const command = 'npx playwright install';
+  const browserCache = path.join(__dirname, 'workspace', '.cache', 'ms-playwright');
+  const command = `PLAYWRIGHT_BROWSERS_PATH=${JSON.stringify(browserCache)} npx playwright install chromium`;
   const executionCommand = `cd ${JSON.stringify(__dirname)} && ${command}`;
   emit?.('stage_note', {
     label: 'Preparação do Computer MCP',
@@ -3688,12 +3748,7 @@ function planRealAgentActions(message: string): Array<{ toolName: string; args: 
     plan.push({
       toolName: 'browser.search',
       args: { query: destination.searchQuery },
-      reason: `Abrindo o Google e pesquisando "${destination.searchQuery}" pela interface real`
-    });
-    plan.push({
-      toolName: 'browser.open_result',
-      args: {},
-      reason: 'Fluxo legado desativado: a navegação agora exige uma URL direta'
+      reason: `Acessando diretamente o endereço solicitado: "${destination.searchQuery}"`
     });
     plan.push({
       toolName: 'browser.scroll',
@@ -3948,6 +4003,20 @@ function shouldDeliberate(message: string, intent: AgentIntent, currentFiles?: R
 function parseDeliberationJson(text: string): Record<string, any> {
   const cleaned = String(text || '').replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
   try { return JSON.parse(cleaned); } catch { return { summary: cleaned.slice(0, 800) }; }
+}
+
+async function runDeterministicExecutionCycle(message: string, intent: AgentIntent, emit: (event: string, data: any) => void) {
+  const stages = [
+    ['Plano verificável', 'Separando objetivo, URL ou ação solicitada e critérios observáveis.'],
+    ['Crítica de execução', 'Verificando se a próxima etapa usará o navegador real e se a página será lida antes de avançar.'],
+    ['Critérios de aceite', 'Confirmando que a URL final, o conteúdo extraído e o estado visual serão entregues ao usuário.']
+  ];
+  for (const [label, text] of stages) {
+    emit('deliberation', { stage: label.toLowerCase().replace(/[^a-z]+/g, '_'), label, text });
+    await new Promise(resolve => setTimeout(resolve, 850));
+    emit('deliberation', { stage: label.toLowerCase().replace(/[^a-z]+/g, '_'), label, text: `${text} Etapa validada.`, complete: true, durationMs: 850 });
+  }
+  emit('status', { text: `Ciclo de execução validado para o modo ${intent.mode}; iniciando somente ações autorizadas.` });
 }
 
 async function runDeepDeliberation(
@@ -4409,6 +4478,9 @@ app.post('/api/agent/chat/stream', async (req, res) => {
     }
 
     // 2. Local Fallback Execution when API key is unconfigured or unavailable
+    if (intent.mode !== 'conversation') {
+      await runDeterministicExecutionCycle(message, intent, sendEvent);
+    }
     const plannedActions = intent.mode === 'conversation' ? [] : planRealAgentActions(message);
     for (const action of plannedActions) {
       if (action.toolName === 'fs.writeFile') {

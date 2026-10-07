@@ -132,6 +132,11 @@ export function classifyAgentIntent(message: string, history: Array<{ role?: str
   const hasSequentialCreationThenComputer = hasAppCreation && /(?:depois|após|apos|quando terminar|em seguida).*(?:computador|navegador|terminal)/i.test(lower);
   const isExplicitWebResearchOnly = (lower.includes('pesquise na web') || lower.includes('pesquisar na web') || lower.includes('busque na internet') || lower.includes('procure na web')) && !hasAppCreation;
   const isExplicitNewAppRequest = /(?:crie|criar|cria|faça|fazer|desenvolva|desenvolver|construa|construir|implemente|implementar|programe|programar)\s+(?:um|uma|o|a)?\s*(?:site|aplica(?:ção|cao)|app|aplicativo|dashboard|interface|sistema|plataforma|componente|landing|loja)/i.test(lower);
+  const hasExplicitUrl = /(?:https?:\/\/|www\.)[^\s"'<>]+|\b[a-z0-9-]+\.(?:com|org|net|io|ai|dev|app|br|co|tv)(?:\.[a-z]{2,3})?(?:\/[^\s"'<>]*)?/i.test(lower);
+  const isDirectNavigationRequest = hasExplicitUrl && hasAny(lower, [
+    'acesse', 'acessar', 'abra', 'abrir', 'navegue', 'navegar', 'visite', 'visitar',
+    'leia a página', 'leia a pagina', 'consulte a página', 'consulte a pagina', 'entre no site'
+  ]);
 
   const research = hasAny(lower, [
     'pesquise', 'pesquisar', 'busque', 'buscar', 'procure', 'pesquisa na web', 'informação atual',
@@ -146,6 +151,12 @@ export function classifyAgentIntent(message: string, history: Array<{ role?: str
     'leia o arquivo', 'liste os arquivos', 'grave o arquivo', 'escreva no arquivo', 'sistema de arquivos',
     'npx', 'playwright install', 'playwright', 'bash', 'terminal', 'computador'
   ]);
+
+  // Uma URL explícita com verbo operacional é navegação real, mesmo que a frase
+  // também contenha termos amplos como "site", "página" ou "portal".
+  if (isDirectNavigationRequest && !isExplicitNewAppRequest) {
+    return { mode: 'cloud_computer', confidence: 'high', reason: 'URL explícita e ação de navegação autorizam acesso real pelo Playwright.', allowedTools: COMPUTER_TOOLS, taskMode: 'computer_action' };
+  }
 
   // STRICTOR RULE: If user explicitly mentions "computador" or "pesquisa/busca", PRIORITIZE these over app_creation
   // This prevents "Faça uma pesquisa" from being classified as app_creation just because of "Faça".
