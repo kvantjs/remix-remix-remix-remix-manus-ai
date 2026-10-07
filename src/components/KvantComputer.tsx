@@ -112,6 +112,19 @@ const KNOWN_WEB_PORTALS: Record<string, string> = {
   anthropic: 'https://www.anthropic.com'
 };
 
+type CursorAnimation = 'idle' | 'moving' | 'clicking' | 'typing' | 'scrolling' | 'reading' | 'loading';
+
+function inferCursorAnimation(status = '', isClicking = false): CursorAnimation {
+  const value = status.toLocaleLowerCase('pt-BR');
+  if (isClicking || /clic|click|pression|selecion/.test(value)) return 'clicking';
+  if (/digit|preench|typing|campo de busca/.test(value)) return 'typing';
+  if (/rol|scroll|descendo|subindo/.test(value)) return 'scrolling';
+  if (/lendo|leitura|inspec|resultado|conteúdo|conteudo|dom/.test(value)) return 'reading';
+  if (/carreg|inici|conect|naveg|acess|abrindo/.test(value)) return 'loading';
+  if (/posicion|movendo|cursor|encontr/.test(value)) return 'moving';
+  return 'idle';
+}
+
 function sanitizeUrl(url: string): string {
   try {
     const parsed = new URL(url);
@@ -307,13 +320,14 @@ export function KvantComputer({
   const [isLive, setIsLive] = useState<boolean>(true);
 
   // Realistic Agent Mouse Cursor
-  const [agentCursor, setAgentCursor] = useState<{ x: number; y: number; visible: boolean; isClicking: boolean; label: string; status: string; viewportWidth?: number; viewportHeight?: number }>({
+  const [agentCursor, setAgentCursor] = useState<{ x: number; y: number; visible: boolean; isClicking: boolean; label: string; status: string; animation?: CursorAnimation; viewportWidth?: number; viewportHeight?: number }>({
     x: 380,
     y: 190,
     visible: true,
     isClicking: false,
     label: 'Manus',
     status: 'Agente no controle',
+    animation: 'idle',
     viewportWidth: 1280,
     viewportHeight: 800
   });
@@ -444,13 +458,15 @@ export function KvantComputer({
         visible: true,
         isClicking: false,
         label: 'Manus',
-        status: `Acessando ${displayHostname}...`
+        status: `Acessando ${displayHostname}...`,
+        animation: 'loading'
       });
 
       const t1 = setTimeout(() => {
         setAgentCursor(prev => ({
           ...prev,
           isClicking: true,
+          animation: 'moving',
           status: `Carregando página...`
         }));
         const domainLetters = displayHostname.slice(0, 10).split('');
@@ -463,6 +479,7 @@ export function KvantComputer({
         setAgentCursor(prev => ({
           ...prev,
           isClicking: false,
+          animation: 'reading',
           status: `Conectado em ${displayHostname}`
         }));
         setCurrentUrl(cleanTarget);
@@ -478,7 +495,8 @@ export function KvantComputer({
           visible: true,
           isClicking: false,
           label: 'Manus',
-          status: `Interagindo em ${displayHostname}`
+          status: `Interagindo em ${displayHostname}`,
+          animation: 'moving'
         });
       }, 1400);
       animationTimersRef.current.push(t3);
@@ -488,7 +506,8 @@ export function KvantComputer({
           ...prev,
           x: 450,
           y: 260,
-          status: `Agente ativo`
+          status: `Agente ativo`,
+          animation: 'reading'
         }));
         setBrowserStatus('interactive');
         setIsLoading(false);
@@ -499,7 +518,8 @@ export function KvantComputer({
         setAgentCursor(prev => ({
           ...prev,
           isClicking: false,
-          status: `Pronto`
+          status: `Pronto`,
+          animation: 'idle'
         }));
       }, 3000);
       animationTimersRef.current.push(t5);
@@ -514,16 +534,17 @@ export function KvantComputer({
         visible: true,
         isClicking: false,
         label: 'Manus',
-        status: `Clicando em "${targetVal}"...`
+        status: `Clicando em "${targetVal}"...`,
+        animation: 'moving'
       });
 
       const t1 = setTimeout(() => {
-        setAgentCursor(prev => ({ ...prev, isClicking: true }));
+        setAgentCursor(prev => ({ ...prev, isClicking: true, animation: 'clicking' }));
       }, 400);
       animationTimersRef.current.push(t1);
 
       const t2 = setTimeout(() => {
-        setAgentCursor(prev => ({ ...prev, isClicking: false, status: `Clique concluído` }));
+        setAgentCursor(prev => ({ ...prev, isClicking: false, animation: 'idle', status: `Clique concluído` }));
         setIsLoading(false);
       }, 950);
       animationTimersRef.current.push(t2);
@@ -537,18 +558,19 @@ export function KvantComputer({
         visible: true,
         isClicking: false,
         label: 'Manus',
-        status: 'Rolando a página...'
+        status: 'Rolando a página...',
+        animation: 'scrolling'
       });
 
       const t1 = setTimeout(() => {
-        setAgentCursor(prev => ({ ...prev, y: 330, isClicking: true }));
+        setAgentCursor(prev => ({ ...prev, y: 330, isClicking: true, animation: 'scrolling' }));
         // Also send message to iframe if it's there
         iframeRef.current?.contentWindow?.postMessage({ type: 'AGENT_EXEC_SCROLL', deltaY: 450 }, '*');
       }, 350);
       animationTimersRef.current.push(t1);
 
       const t2 = setTimeout(() => {
-        setAgentCursor(prev => ({ ...prev, isClicking: false, status: 'Rolagem concluída' }));
+        setAgentCursor(prev => ({ ...prev, isClicking: false, animation: 'idle', status: 'Rolagem concluída' }));
         setIsLoading(false);
       }, 1000);
       animationTimersRef.current.push(t2);
@@ -562,7 +584,8 @@ export function KvantComputer({
         visible: true,
         isClicking: true,
         label: 'Manus',
-        status: `Digitando: "${targetVal}"`
+        status: `Digitando: "${targetVal}"`,
+        animation: 'typing'
       });
       setActiveTypingBanner(targetVal);
       setTypedKeys(targetVal.slice(0, 10).split(''));
@@ -570,7 +593,7 @@ export function KvantComputer({
       const t1 = setTimeout(() => {
         setTypedKeys([]);
         setActiveTypingBanner(null);
-        setAgentCursor(prev => ({ ...prev, isClicking: false, status: `Digitação concluída` }));
+        setAgentCursor(prev => ({ ...prev, isClicking: false, animation: 'idle', status: `Digitação concluída` }));
         setIsLoading(false);
       }, 1100);
       animationTimersRef.current.push(t1);
@@ -633,6 +656,7 @@ export function KvantComputer({
           viewportHeight: liveMouse.viewportHeight || 800,
           visible: true,
           isClicking: /clic|click|pression/i.test(lastTool.screenData?.liveStatus || lastTool.screenData?.actionDescription || ''),
+          animation: inferCursorAnimation(lastTool.screenData?.liveStatus || lastTool.screenData?.actionDescription || prev.status, /clic|click|pression/i.test(lastTool.screenData?.liveStatus || lastTool.screenData?.actionDescription || '')),
           status: lastTool.screenData?.liveStatus || lastTool.screenData?.actionDescription || prev.status
         }));
       }
@@ -911,14 +935,31 @@ export function KvantComputer({
               backgroundColor: 'transparent'
             }}
           >
-            <span className="relative flex items-center bg-transparent !bg-transparent" style={{ backgroundColor: 'transparent' }}>
-              {agentCursor.isClicking && (
-                <span className="absolute inset-0 size-10 -left-2 -top-2 rounded-full bg-blue-500/20 animate-ping" />
+            <span className={`relative flex items-center bg-transparent !bg-transparent cursor-animation-${agentCursor.animation || 'idle'}`} style={{ backgroundColor: 'transparent' }}>
+              {(agentCursor.animation === 'moving' || agentCursor.animation === 'loading') && (
+                <span className="absolute -left-3 top-1 flex gap-0.5 opacity-70">
+                  <span className="size-1 rounded-full bg-cyan-300 animate-ping" />
+                  <span className="size-1 rounded-full bg-blue-300 animate-pulse" />
+                </span>
+              )}
+              {agentCursor.animation === 'clicking' && (
+                <span className="absolute inset-0 size-11 -left-2.5 -top-2.5 rounded-full border-2 border-blue-400/70 animate-ping" />
+              )}
+              {agentCursor.animation === 'scrolling' && (
+                <span className="absolute -right-5 -top-1 flex flex-col items-center text-cyan-300 animate-bounce">
+                  <span className="text-[9px] leading-none">⌃</span><span className="text-[9px] leading-none">⌄</span>
+                </span>
+              )}
+              {agentCursor.animation === 'typing' && (
+                <span className="absolute -right-3 -top-2 h-5 w-0.5 bg-amber-300 animate-pulse" />
+              )}
+              {agentCursor.animation === 'reading' && (
+                <span className="absolute -left-2 top-3 h-0.5 w-8 bg-emerald-300/80 blur-[0.5px] animate-pulse" />
               )}
               <NavigationArrow 
                 size={22} 
                 weight="fill" 
-                className={`text-white transition-transform duration-200 ${agentCursor.isClicking ? 'scale-75 text-blue-400' : 'scale-100'}`} 
+                className={`text-white transition-transform duration-200 ${agentCursor.animation === 'clicking' ? 'scale-75 text-blue-400' : agentCursor.animation === 'loading' ? 'animate-spin text-cyan-300' : 'scale-100'}`}
                 style={{ 
                   stroke: '#000000', 
                   strokeWidth: '1.75px', 
