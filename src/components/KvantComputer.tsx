@@ -130,7 +130,7 @@ function sanitizeUrl(url: string): string {
     const parsed = new URL(url);
     if (parsed.hostname.startsWith('api.')) {
       // Hard block on api subdomains in the UI to match server policy
-      return 'https://www.google.com?blocked_api_access';
+      return 'about:blank';
     }
   } catch {}
   return url;
@@ -139,7 +139,7 @@ function sanitizeUrl(url: string): string {
 // Intelligent Web URL Parser - accurately extracts destination URLs requested by user
 export function resolveWebUrl(raw: string): string {
   let clean = (raw || '').trim();
-  if (!clean) return sanitizeUrl('https://www.google.com');
+  if (!clean) return sanitizeUrl('about:blank');
 
   // 1. Direct explicit URL match (http/https, www, or domain with known TLDs or localhost/IP)
   const explicitUrlRegex = /(https?:\/\/[^\s"'<>]+|localhost(?::\d+)?(?:\/[^\s"'<>]*)?|127\.0\.0\.1(?::\d+)?(?:\/[^\s"'<>]*)?|www\.[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+(?::\d+)?(?:\/[^\s"'<>]*)?|[a-zA-Z0-9-]+\.(?:com|org|net|edu|gov|io|ai|tech|co|app|br|uk|de|fr|es|it|me|info|tv|xyz|dev|cloud|page|link|shop|store|online|site|space|top|club|pro|cc|to|is|gg|live|news|world|agency|studio|global|fm|social|blog|directory|guru|solutions|design|center|life)(?:\.[a-zA-]{2,3})*(?::\d+)?(?:\/[^\s"'<>]*)?)/i;
@@ -174,7 +174,7 @@ export function resolveWebUrl(raw: string): string {
   clean = clean.replace(/^[:\-–—\s"'`<([]+/, '').replace(/[>'"`\)\]]+$/, '').replace(/^(?:de|do|da|dos|das|o|a|os|as|um|uma)\s+/i, '').trim();
 
   if (!clean || /^(?:endereço|endereco|site|web|internet|computador|navegador|browser|página|pagina|portal|url|link)$/i.test(clean)) {
-    return sanitizeUrl('https://www.google.com');
+    return sanitizeUrl('about:blank');
   }
 
   // 4. Known brand check
@@ -204,7 +204,7 @@ export function resolveWebUrl(raw: string): string {
   }
 
   // 8. Default to search portal
-  return sanitizeUrl('https://www.google.com');
+  return sanitizeUrl('about:blank');
 }
 
 interface NavHistoryItem {
@@ -225,12 +225,12 @@ export function KvantComputer({
   agentIntent,
   browserStatus: externalBrowserStatus
 }: KvantComputerProps) {
-  const [currentUrl, setCurrentUrl] = useState<string>('https://www.google.com');
+  const [currentUrl, setCurrentUrl] = useState<string>('about:blank');
 
   // Computer active / inactive state (Inactive by default per user request)
   const [isComputerActive, setIsComputerActive] = useState<boolean>(false);
   const [forceIdle, setForceIdle] = useState<boolean>(false);
-  const [pageTitle, setPageTitle] = useState<string>('Navegador do Agente');
+  const [pageTitle, setPageTitle] = useState<string>('Aguardando navegação do agente');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isExternalWeb, setIsExternalWeb] = useState<boolean>(true);
   const [liveScreenshot, setLiveScreenshot] = useState<string | null>(null);
@@ -307,8 +307,8 @@ export function KvantComputer({
   // History stack for navigation & scrubber
   const [navHistory, setNavHistory] = useState<NavHistoryItem[]>([
     {
-      url: 'https://www.google.com',
-      title: 'Navegador do Agente',
+      url: 'about:blank',
+      title: 'Aguardando navegação do agente',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       action: 'Inicialização'
     }
@@ -666,8 +666,9 @@ export function KvantComputer({
       lastProcessedToolRef.current = toolKey;
 
       if (lastTool.toolName.includes('navigate') || lastTool.toolName === 'browser') {
-        const rawUrl = lastTool.screenData?.url || lastTool.arguments?.url || currentUrl || 'https://www.google.com';
-        const clean = resolveWebUrl(rawUrl);
+        const rawUrl = lastTool.screenData?.url || lastTool.arguments?.url || '';
+        const clean = rawUrl ? resolveWebUrl(rawUrl) : '';
+        if (!clean || clean === 'about:blank') return;
         setCurrentUrl(clean);
         setIsExternalWeb(true);
         if (!hasLiveProgress) {
@@ -701,9 +702,12 @@ export function KvantComputer({
         const text = lastTool.arguments?.text || 'texto';
         if (!hasLiveProgress) runAgentLiveActionAnimation('type', text); else setIsLoading(false);
       } else if (lastTool.toolName.includes('search') || lastTool.toolName.includes('inspect')) {
-        const rawUrl = lastTool.screenData?.url || lastTool.arguments?.url || currentUrl;
-        setCurrentUrl(rawUrl);
-        setPageTitle(lastTool.screenData?.title || new URL(rawUrl).hostname);
+        const rawUrl = lastTool.screenData?.url || lastTool.arguments?.url || '';
+        if (!rawUrl) return;
+        const clean = resolveWebUrl(rawUrl);
+        if (!clean || clean === 'about:blank') return;
+        setCurrentUrl(clean);
+        setPageTitle(lastTool.screenData?.title || new URL(clean).hostname);
         setIsExternalWeb(true);
         setIsLoading(false);
       }

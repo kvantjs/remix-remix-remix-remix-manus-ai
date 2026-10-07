@@ -80,7 +80,7 @@ const VARIANTS: Record<
     done: "Pesquisa na web concluída",
     query: "consultando fontes na web",
     rows: [
-      { primary: "Google Search", secondary: "google.com", href: "https://www.google.com" },
+      { primary: "Navegação direta", secondary: "URL solicitada pelo usuário" },
       { primary: "Documentação Oficial", secondary: "docs.dev", href: "https://github.com" },
       { primary: "Repositório de Código", secondary: "github.com", href: "https://github.com" },
     ],

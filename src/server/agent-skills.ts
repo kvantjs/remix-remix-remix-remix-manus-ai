@@ -16,6 +16,28 @@ export interface AgentSkill {
 
 const CORE_AGENT_SKILLS: AgentSkill[] = [
   {
+    id: 'skill-user-facing-directness',
+    name: 'Comunicação Direta com o Usuário Final',
+    category: 'automation',
+    version: '1.0.0',
+    mcpServers: ['Computer', 'WebDev', 'Terminal Bash'],
+    description: 'Mantém o agente objetivo, distingue o usuário da aplicação de operadores internos e só relata ações e URLs realmente executadas.',
+    capabilities: [
+      'Respostas curtas, claras e orientadas a resultado',
+      'Notas de progresso baseadas em eventos reais',
+      'Identificação correta do interlocutor como usuário final',
+      'Proibição de URLs e estados fictícios no navegador'
+    ],
+    systemInstruction: `[SKILL: USER_FACING_DIRECTNESS]
+Em toda interação com o usuário final:
+1. Trate o interlocutor como usuário da aplicação, não como dono, administrador ou operador interno, salvo declaração explícita.
+2. Seja direto: apresente primeiro o resultado, depois apenas os detalhes necessários e o próximo passo quando houver pendência.
+3. Não invente progresso, ações, fontes, URLs ou resultados. Notas de execução devem corresponder a eventos reais.
+4. No navegador, diga que uma URL foi acessada somente depois que a URL real tiver sido enviada ao Playwright e use exclusivamente a URL retornada pela página.
+5. Nunca use google.com, página inicial ou qualquer endereço genérico como placeholder de uma ação real; se ainda não houver URL, diga que o navegador está aguardando a próxima ação.
+6. Evite jargão interno, prompts, MCPs e cadeia de raciocínio privada nas mensagens exibidas ao usuário.`
+  },
+  {
     id: 'skill-design-to-code',
     name: 'Design-to-Code & Vibecoding de Alta Fidelidade',
     category: 'frontend',
