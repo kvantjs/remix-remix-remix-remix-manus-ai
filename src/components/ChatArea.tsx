@@ -750,7 +750,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                     setCurrentStep(`${presentation.label}: ${presentation.chip}`);
                     beginExecutionStep(presentation.label, presentation.detail);
                     const activeTrace: ToolCallTrace = {
-                      id: `active_${Date.now()}`,
+                      id: `active_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
                       toolName: data.toolName,
                       server: data.toolName.includes('fs') || data.toolName.includes('file') || data.toolName.includes('write') || data.toolName.includes('read') 
                         ? 'WebDev MCP' 
@@ -789,7 +789,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                         isWorking: true,
                         statusText: `Agente chamando ${activeTrace.server}`,
                         contextText: data.reason,
-                        toolCalls: [...liveToolCalls, activeTrace],
+                        toolCalls: [...liveToolCalls],
                         browserStatus: data.toolName.includes('browser') || data.toolName.includes('navigate') ? 'loading' : undefined
                       });
                     }
@@ -798,7 +798,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                     activateExecutionAnimation();
                     updateProgressNote('Navegador ao vivo', data.actionDescription || data.status || 'Acompanhando mouse, rolagem e conteúdo da página.', 'running');
                     const progressTrace: ToolCallTrace = {
-                      id: `active_browser_${data.toolName || 'action'}_${browserProgressSequenceRef.current}`,
+                      id: `active_browser_${data.toolName || 'action'}_${Date.now()}_${browserProgressSequenceRef.current}_${Math.random().toString(36).slice(2, 6)}`,
                       toolName: data.toolName || 'browser_action',
                       server: 'Computer MCP',
                       arguments: data.arguments || {},

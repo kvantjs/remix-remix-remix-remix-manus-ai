@@ -58,8 +58,8 @@ export function TerminalView({ liveToolCalls = [] }: { activeCode?: string; live
             <div className="text-blue-400/80 text-[11px] font-sans">{line.content}</div>
           </div>
         ))}
-        {traces.map(trace => (
-          <div key={`live-${trace.id}`} className="leading-relaxed border-l-2 border-emerald-400/40 pl-2">
+        {traces.map((trace, idx) => (
+          <div key={`live-${trace.id || 'trace'}-${idx}`} className="leading-relaxed border-l-2 border-emerald-400/40 pl-2">
             <div className="text-emerald-300/80 text-[10px]">ubuntu@kvant:~/workspace$ {trace.screenData?.command || trace.arguments?.command || trace.toolName}</div>
             <TerminalOutput content={String(trace.screenData?.terminalOutput || trace.result || '')} />
           </div>
