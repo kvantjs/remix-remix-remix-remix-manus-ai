@@ -24,6 +24,7 @@ import { auditProjectAction, ensureProjectOwner, getProjectRole, hasProjectRole,
 import { challengeMessage, detectBrowserChallenge, type BrowserChallenge } from './src/server/browser-challenge.js';
 import { AGENT_SKILLS, buildSkillsSystemInstruction } from './src/server/agent-skills.js';
 import { agentIsolatedRuntime } from './src/server/agent-isolated-runtime.js';
+import { executeSandboxCommand, getSandboxBackend } from './src/server/sandbox-executor.js';
 import { synthesizeBespokeInterface } from './src/server/bespoke-ui-synthesizer.js';
 
 const execAsync = promisify(exec);
@@ -410,6 +411,7 @@ CONTRATO DE RACIOCÍNIO AVANÇADO — EXECUÇÃO CONTROLADA:
 7. Se houver ambiguidade material, peça esclarecimento. Se houver falha técnica, relate a falha real e o próximo passo; não improvise sucesso.
 8. Produza somente resumos verificáveis no campo visível. Nunca revele cadeia de pensamento privada, tokens ocultos ou deliberação passo a passo.
 `;
+const DEFAULT_THINKING_BUDGET = Math.max(4096, Number(process.env.GEMINI_THINKING_BUDGET || 8192));
 
 // System prompt strictly enforcing bespoke branding, production design rules, and high interactivity:
 const CORE_SPARK_SYSTEM_INSTRUCTION = `Você é o CoreSpark (Versão de Produção), o Agente Autônomo de Engenharia de Software e Design Director do Kvant.
@@ -1936,7 +1938,7 @@ app.get('/api/agent/skills', (_req, res) => {
 
 // 1.2 Dedicated Isolated Runtime status & telemetry
 app.get('/api/agent/runtime/status', (_req, res) => {
-  return res.json(agentIsolatedRuntime.getMetrics());
+  return res.json({ ...agentIsolatedRuntime.getMetrics(), sandbox: getSandboxBackend() });
 });
 
 // 1.3 Isolated Runtime Secrets Management
@@ -1993,18 +1995,20 @@ async function handleTerminalExecution(rawCmd: string, onProgress?: (event: { st
 
   if (mainCmd === 'help') {
     return {
-      output: `Kvant Cloud Computer Terminal (Ubuntu Linux Container · Node.js ${process.version})
-Acesso irrestrito a shell, rede externa, compiladores e sistema de arquivos.
+      output: `Kvant Sandbox Terminal (Ubuntu 24.04 · Node.js ${process.version})
+Execução controlada pelo pipeline interno do agente, com workspace isolado e limites de tempo.
 
 Comandos rápidos sugeridos:
-  ls -la                 - Lista todos os arquivos e permissões no container
-  curl <url>             - Executa requisição HTTP real para qualquer endpoint externo
+  ls -la                 - Lista arquivos do workspace isolado
+  curl <url>             - Executa requisição HTTP real dentro do sandbox
   node -v / tsx -v       - Exibe versões dos motores JavaScript/TypeScript
-  uname -a / uptime      - Exibe dados do kernel do servidor na nuvem
+  uname -a / uptime      - Exibe dados do ambiente de execução
   free -m / df -h        - Exibe memória RAM e espaço em disco do computador
   cat <arquivo>          - Imprime o conteúdo de arquivos (ex: cat package.json)
   npm test / vite build  - Executa compilação e validações de código
-  clear                  - Limpa a tela do terminal`,
+  clear                  - Limpa a tela do terminal
+
+A interface visual é somente leitura; novos comandos são liberados pelo agente em etapas.`,
       exitCode: 0
     };
   }
@@ -2013,22 +2017,14 @@ Comandos rápidos sugeridos:
     return { output: '__CLEAR__', exitCode: 0 };
   }
 
-  // Execute real bash command in the cloud environment
   try {
-    const chunks: { stdout: string; stderr: string } = { stdout: '', stderr: '' };
-    const exitCode = await new Promise<number>((resolve) => {
-      const child = spawn(trimmed, { cwd: __dirname, shell: '/bin/bash', env: { ...process.env, PAGER: 'cat' } });
-      const timer = setTimeout(() => child.kill('SIGTERM'), 15000);
-      child.stdout.on('data', (chunk: Buffer) => { const text = chunk.toString(); chunks.stdout += text; onProgress?.({ stream: 'stdout', chunk: text }); });
-      child.stderr.on('data', (chunk: Buffer) => { const text = chunk.toString(); chunks.stderr += text; onProgress?.({ stream: 'stderr', chunk: text }); });
-      child.on('error', (error) => { chunks.stderr += error.message; onProgress?.({ stream: 'stderr', chunk: error.message }); clearTimeout(timer); resolve(1); });
-      child.on('close', (code) => { clearTimeout(timer); onProgress?.({ stream: code === 0 ? 'stdout' : 'stderr', chunk: '', done: true, exitCode: code ?? 0 }); resolve(code ?? 0); });
-    });
-
-    const result = chunks.stdout + (chunks.stderr ? `\n[stderr]: ${chunks.stderr}` : '');
+    const execution = await executeSandboxCommand(trimmed, 15000, onProgress);
+    const result = execution.stdout + (execution.stderr ? `\n[stderr]: ${execution.stderr}` : '');
     return {
       output: result.trim() || '[Comando executado com sucesso (sem retorno stdout)]',
-      exitCode
+      exitCode: execution.exitCode,
+      backend: execution.backend,
+      workingDir: execution.workingDir
     };
   } catch (err: any) {
     const output = (err.stdout ? err.stdout + '\n' : '') + (err.stderr || err.message);
@@ -2040,20 +2036,17 @@ Comandos rápidos sugeridos:
 }
 
 app.post('/api/computer/terminal', async (req, res) => {
-  const { command } = req.body;
-  const result = await handleTerminalExecution(command);
-  return res.json(result);
+  return res.status(403).json({ error: 'Execução manual desativada: somente o pipeline interno do agente pode usar o terminal.', policy: 'agent_only_terminal' });
 });
 
 app.post('/api/terminal/exec', async (req, res) => {
-  const { command } = req.body;
-  const result = await handleTerminalExecution(command);
-  return res.json(result);
+  return res.status(403).json({ error: 'Execução manual desativada: somente o pipeline interno do agente pode usar o terminal.', policy: 'agent_only_terminal' });
 });
 
 // 3. Playwright Real Headless Browser Automation Manager
-const BROWSER_PAGE_READ_DELAY_MS = Math.max(1800, Number(process.env.BROWSER_PAGE_READ_DELAY_MS || 3500));
+const BROWSER_PAGE_READ_DELAY_MS = Math.max(5000, Number(process.env.BROWSER_PAGE_READ_DELAY_MS || 6500));
 const BROWSER_ACTION_SETTLE_DELAY_MS = Math.max(500, Number(process.env.BROWSER_ACTION_SETTLE_DELAY_MS || 900));
+const BROWSER_NAVIGATION_GAP_MS = Math.max(1500, Number(process.env.BROWSER_NAVIGATION_GAP_MS || 2500));
 
 class PlaywrightBrowserManager {
   private browser: Browser | null = null;
@@ -2062,6 +2055,7 @@ class PlaywrightBrowserManager {
   private challenge: BrowserChallenge | null = null;
   private progressListener: ((event: Record<string, any>) => void) | null = null;
   private lastMouse = { x: 640, y: 400 };
+  private lastNavigationFinishedAt = 0;
 
   setProgressListener(listener: ((event: Record<string, any>) => void) | null) {
     this.progressListener = listener;
@@ -2357,6 +2351,11 @@ class PlaywrightBrowserManager {
     const startTime = performance.now();
     try {
       const page = await this.ensurePage();
+      const remainingGap = BROWSER_NAVIGATION_GAP_MS - (Date.now() - this.lastNavigationFinishedAt);
+      if (this.lastNavigationFinishedAt > 0 && remainingGap > 0) {
+        await this.emitProgress(page, 'Intervalo entre páginas', `O agente concluiu a página anterior e aguardará ${Math.ceil(remainingGap / 1000)}s antes de abrir a próxima.`, true);
+        await page.waitForTimeout(remainingGap);
+      }
       const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
       await this.settleReadablePage(page);
       const viewport = page.viewportSize() || { width: 1280, height: 800 };
@@ -2375,6 +2374,7 @@ class PlaywrightBrowserManager {
       // Extract interactive elements from DOM
       const domData = await this.extractDomData(page);
       const challenge = await this.inspectChallenge(page, domData.bodyText);
+      this.lastNavigationFinishedAt = Date.now();
 
       return {
         url: page.url(),
@@ -2739,7 +2739,7 @@ async function runPlaywrightInstallPreflight(emit?: (event: string, data: any) =
     screenData: {
       command,
       terminalOutput: result.result?.stdout || result.result?.stderr || result.error || '',
-      actionDescription: result.actionDescription || `Terminal Bash executou: ${command} no diretório do projeto.`
+      actionDescription: result.actionDescription || `Comando concluído no sandbox Ubuntu: ${command}`
     }
   };
   emit?.('tool_finish', { toolCall: trace });
@@ -3047,7 +3047,7 @@ async function runRealTool(toolName: string, args: Record<string, any>, emit?: (
       screenData: {
         command,
         terminalOutput: execRes.output,
-        actionDescription: `Agente executando comando bash no container Ubuntu 24.04: ${command}`
+      actionDescription: `Comando em execução no sandbox Ubuntu 24.04: ${command}`
       }
     };
   }
@@ -3176,6 +3176,9 @@ app.post('/api/agent/tool/execute', async (req, res) => {
   const { toolName, arguments: args, intentMessage } = req.body;
   if (!toolName) {
     return res.status(400).json({ error: 'toolName é obrigatório' });
+  }
+  if (['bash_exec', 'python_exec', 'shell.exec', 'terminal.exec', 'computer.shell', 'terminal'].includes(String(toolName))) {
+    return res.status(403).json({ error: 'Ferramentas de terminal só podem ser acionadas pelo pipeline interno do agente.', policy: 'agent_only_terminal' });
   }
   if (!intentMessage || !isToolAllowed(classifyAgentIntent(String(intentMessage)), String(toolName))) {
     return res.status(403).json({ error: 'A chamada foi bloqueada: forneça uma intenção explícita compatível com a ferramenta solicitada.' });
@@ -4056,6 +4059,22 @@ async function runDeterministicExecutionCycle(message: string, intent: AgentInte
   emit('status', { text: `Ciclo de execução validado para o modo ${intent.mode}; iniciando somente ações autorizadas.` });
 }
 
+async function runVisibleReasoningGate(intent: AgentIntent, emit: (event: string, data: any) => void) {
+  const gates = [
+    ['Objetivo e contexto', 'Separando o resultado pedido, o contexto do usuário e o que precisa ser observado.'],
+    ['Plano de execução', 'Definindo a sequência de ferramentas e o ponto de parada de cada etapa.'],
+    ['Crítica e riscos', 'Verificando ambiguidades, bloqueios, CAPTCHAs, falhas parciais e riscos de avançar cedo demais.'],
+    ['Critério de evidência', 'Definindo quais URL, conteúdo, screenshot, arquivo ou teste provarão cada resultado.'],
+    ['Liberação controlada', `A execução será liberada por etapas no modo ${intent.mode}; nenhuma etapa será pulada sem evidência.`]
+  ];
+  for (const [label, text] of gates) {
+    const stage = label.toLowerCase().replace(/[^a-z]+/g, '_');
+    emit('deliberation', { stage, label, text, live: true });
+    await new Promise(resolve => setTimeout(resolve, 1200));
+    emit('deliberation', { stage, label, text: `${text} Gate validado.`, complete: true, live: true, durationMs: 1200 });
+  }
+}
+
 async function runDeepDeliberation(
   message: string,
   history: any[] | undefined,
@@ -4186,6 +4205,9 @@ app.post('/api/agent/chat/stream', async (req, res) => {
       label: 'Entendimento do pedido',
       text: `Estou analisando sua mensagem e aplicando as regras do modo ${intent.mode} antes de responder.`
     });
+    if (intent.mode !== 'conversation') {
+      await runVisibleReasoningGate(intent, sendEvent);
+    }
 
     // Check if context questionnaire is needed before anything else
     if (checkNeedsContextQuestionnaire(message)) {
@@ -4256,7 +4278,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
               contents: chatContents,
               config: {
                 systemInstruction: CORE_SPARK_SYSTEM_INSTRUCTION + APP_CREATION_EXECUTION_CONTRACT + buildIntentInstruction(intent) + buildSkillsSystemInstruction() + '\n\nDIRETIVA DE RESPOSTA SEM CÓDIGO NO CHAT: NUNCA responda com blocos de código grandes ou listagens de código-fonte no chat. Só produza códigos se a intenção APP_CREATION estiver ativa.',
-                ...(process.env.GEMINI_THINKING_BUDGET ? { thinkingConfig: { thinkingBudget: Number(process.env.GEMINI_THINKING_BUDGET) } } : {}),
+                thinkingConfig: { thinkingBudget: DEFAULT_THINKING_BUDGET },
                 tools: intent.allowedTools.length ? [{ functionDeclarations: filterToolDeclarations(intent, AGENT_TOOL_DECLARATIONS) as any }] : undefined
               }
             });

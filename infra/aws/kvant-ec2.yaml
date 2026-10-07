@@ -19,7 +19,14 @@ Parameters:
     Default: main
   InstanceType:
     Type: String
-    Default: t3.medium
+    Default: t3.small
+  SandboxMode:
+    Type: String
+    Default: local
+    AllowedValues:
+      - local
+      - ssm
+    Description: local executa no workspace isolado desta VM; ssm executa via AWS Systems Manager nesta VM
   RootVolumeSize:
     Type: Number
     Default: 30
@@ -61,6 +68,16 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: kvant-agent-sandbox-ssm
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:SendCommand
+                  - ssm:GetCommandInvocation
+                Resource: '*'
       Tags:
         - Key: Name
           Value: kvant-agent-ec2-role
@@ -103,7 +120,7 @@ Resources:
           curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
           apt-get install -y nodejs
           useradd --system --create-home --shell /usr/sbin/nologin kvant || true
-          mkdir -p /opt/kvant /etc/kvant
+          mkdir -p /opt/kvant /opt/kvant/workspace /etc/kvant
           git clone --depth 1 --branch ${Branch} ${Repository} /opt/kvant
           chown -R kvant:kvant /opt/kvant
           cd /opt/kvant
@@ -115,6 +132,10 @@ Resources:
           PORT=3000
           RUNTIME_DISTRIBUTION=Ubuntu 24.04
           CLOUD_PROVIDER=aws-ec2
+          AWS_SANDBOX_MODE=${SandboxMode}
+          AWS_REGION=${AWS::Region}
+          AWS_SSM_INSTANCE_ID=${AgentInstance}
+          AWS_SANDBOX_WORKSPACE=/opt/kvant/workspace
           EOF
           chmod 600 /etc/kvant/kvant.env
           cat >/etc/systemd/system/kvant.service <<'EOF'

@@ -7,6 +7,7 @@ import { jobsManager, AgentJob, JobApprovalRequest } from './jobs-manager.js';
 import { subagentOrchestrator } from './subagent-orchestrator.js';
 import { challengeMessage } from './browser-challenge.js';
 import { agentIsolatedRuntime } from './agent-isolated-runtime.js';
+import { executeSandboxCommand } from './sandbox-executor.js';
 
 const execAsync = util.promisify(exec);
 
@@ -514,76 +515,16 @@ export class AgentToolExecutor {
           }
 
           const timeoutMs = Math.min(180000, Math.max(1000, (Number(args.timeoutSeconds) || 15) * 1000));
-          const startTime = performance.now();
-
-          let stdout = '';
-          let stderr = '';
-          let exitCode = 0;
-          let timedOut = false;
-
-          await new Promise<void>((resolve) => {
-            const child = spawn(command, {
-              cwd: SANDBOX_WORKSPACE_ROOT,
-              shell: '/bin/bash',
-              env: {
-                ...process.env,
-                PATH: process.env.PATH,
-                HOME: SANDBOX_WORKSPACE_ROOT,
-                WORKSPACE: SANDBOX_WORKSPACE_ROOT
-              }
-            });
-            let settled = false;
-            const finish = () => {
-              if (settled) return;
-              settled = true;
-              resolve();
-            };
-            const timer = setTimeout(() => {
-              timedOut = true;
-              exitCode = 124;
-              child.kill('SIGTERM');
-              onProgress?.({ stream: 'stderr', chunk: `\n[timeout] Comando interrompido após ${Math.round(timeoutMs / 1000)}s.\n`, done: false });
-              setTimeout(() => child.kill('SIGKILL'), 250);
-            }, timeoutMs);
-            child.stdout.on('data', (chunk: Buffer) => {
-              const text = chunk.toString();
-              stdout += text;
-              onProgress?.({ stream: 'stdout', chunk: redactSecrets(text), done: false });
-            });
-            child.stderr.on('data', (chunk: Buffer) => {
-              const text = chunk.toString();
-              stderr += text;
-              onProgress?.({ stream: 'stderr', chunk: redactSecrets(text), done: false });
-            });
-            child.on('error', (err) => {
-              stderr += err.message;
-              exitCode = 1;
-              onProgress?.({ stream: 'stderr', chunk: redactSecrets(err.message), done: false });
-              clearTimeout(timer);
-              finish();
-            });
-            child.on('close', (code) => {
-              clearTimeout(timer);
-              if (!timedOut) exitCode = code ?? 0;
-              onProgress?.({ stream: exitCode === 0 ? 'stdout' : 'stderr', chunk: '', exitCode, done: true });
-              finish();
-            });
+          const result = await executeSandboxCommand(command, timeoutMs, (progress) => {
+            onProgress?.(progress);
           });
 
-          const durationMs = Math.round(performance.now() - startTime);
-
           return {
-            success: exitCode === 0,
+            success: result.exitCode === 0,
             result: {
-              command,
-              exitCode,
-              timedOut,
-              durationMs,
-              stdout: redactSecrets(stdout.slice(0, 16000)),
-              stderr: redactSecrets(stderr.slice(0, 8000)),
-              workingDir: 'workspace/'
+              ...result
             },
-            actionDescription: `Execução no Sandbox: \`${command.slice(0, 50)}\` (Exit: ${exitCode}, ${durationMs}ms)`
+            actionDescription: `Execução no sandbox ${result.backend}: \`${command.slice(0, 50)}\` (Exit: ${result.exitCode}, ${result.durationMs}ms)`
           };
         }
 

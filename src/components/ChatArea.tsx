@@ -946,10 +946,11 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
       }
 
       // Format a verified rich technical report, guaranteeing no generic fallback text
+      const finalToolCalls = Array.isArray(payload.toolCalls) && payload.toolCalls.length > 0 ? payload.toolCalls : liveToolCalls;
       const rawText = payload.explanation || payload.response || '';
       const assistantContent = ensureDetailedAgentMessage(
         rawText,
-        payload.toolCalls || liveToolCalls,
+        finalToolCalls,
         generatedFilesList,
         userPrompt
       );
@@ -1017,11 +1018,11 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
             type: 'command',
             content: isBg 
               ? 'Agente esperando uma resposta com os parâmetros do usuário'
-              : `${(payload.toolCalls || liveToolCalls).length} ferramentas reais executadas no computador da nuvem`,
+              : `${finalToolCalls.length} ferramentas reais executadas no computador da nuvem`,
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
           }
         ],
-        toolCalls: payload.toolCalls || liveToolCalls,
+        toolCalls: finalToolCalls,
         content: assistantContent,
         suggestions: payload.suggestions || [
           "Definir preferências no questionário",
@@ -1075,6 +1076,13 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
         }
       } else {
         setIsAgentInBackground(false);
+        onAgentStateChange?.({
+          isWorking: false,
+          statusText: payload.approval ? 'Execução pausada aguardando autorização.' : 'Execução concluída.',
+          contextText: payload.approval ? 'O computador permanece disponível, mas nenhuma nova ação será executada até a autorização.' : 'O ciclo terminou; o computador está pronto para a próxima instrução.',
+          toolCalls: finalToolCalls,
+          browserStatus: 'interactive'
+        });
       }
 
       // Trigger reactive sync with Workspace
@@ -1505,24 +1513,7 @@ function MessageItem({
     };
   });
 
-  if (finalToolSteps.length === 0 && message.executionSteps && message.executionSteps.length > 0) {
-    finalToolSteps = message.executionSteps.map((es) => {
-      let icon = "think";
-      const l = es.label.toLowerCase();
-      if (l.includes("escrev") || l.includes("write") || l.includes("edit") || l.includes("cri") || l.includes("file")) icon = "write";
-      else if (l.includes("execut") || l.includes("run") || l.includes("cmd") || l.includes("terminal") || l.includes("build") || l.includes("npm")) icon = "run";
-      else if (l.includes("leit") || l.includes("read") || l.includes("view")) icon = "read";
-
-      return {
-        icon,
-        label: es.label,
-        chip: es.detail || "Concluído",
-        mono: icon === "write" || icon === "run",
-        detailMono: true,
-        detail: es.detail ? [{ text: es.detail }] : []
-      };
-    });
-  } else if (finalToolSteps.length === 0 && message.logs && message.logs.length > 0) {
+  if (finalToolSteps.length === 0 && message.logs && message.logs.length > 0) {
     finalToolSteps = message.logs.map((log) => {
       return {
         icon: log.type === 'command' ? 'run' : log.type === 'error' ? 'lint' : 'think',

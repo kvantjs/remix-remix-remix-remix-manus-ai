@@ -331,8 +331,22 @@ export function KvantComputer({
   useEffect(() => {
     if (externalBrowserStatus) {
       setBrowserStatus(externalBrowserStatus);
+      if (externalBrowserStatus !== 'loading') {
+        setIsLoading(false);
+        setBootSecondsRemaining(0);
+        setIsComputerActive(true);
+      }
     }
   }, [externalBrowserStatus]);
+
+  // A finalização do stream também encerra o boot visual caso o último evento não carregue browserStatus.
+  useEffect(() => {
+    if (!isWorking && isComputerActive) {
+      setIsLoading(false);
+      setBootSecondsRemaining(0);
+      setBrowserStatus(current => current === 'loading' ? 'interactive' : current);
+    }
+  }, [isWorking, isComputerActive]);
 
   // History stack for navigation & scrubber
   const [navHistory, setNavHistory] = useState<NavHistoryItem[]>([

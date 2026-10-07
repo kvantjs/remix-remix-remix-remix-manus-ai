@@ -1,3 +1,1 @@
-export default {
-  logoUrl: "https://imgdb.io/i/civJWXo.png"
-};
+export default { logoUrl: "https://www.google.com/favicon.ico" };
