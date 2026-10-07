@@ -198,6 +198,8 @@ function ensureDetailedAgentMessage(
 ): string {
   const trimmed = (rawContent || '').trim();
   const lower = trimmed.toLowerCase();
+  const noExecutionReported = /não executei|nenhuma ferramenta foi executada|nenhuma ação foi executada|não foi executad|sem chave|sem credenciais|cota (?:foi )?(?:excedida|esgotada)/i.test(trimmed);
+  if (noExecutionReported && toolCalls.length === 0 && files.length === 0) return trimmed;
   
   const isGeneric = 
     !trimmed ||
@@ -262,18 +264,17 @@ function ensureDetailedAgentMessage(
   }
 
   const promptTitle = promptText ? ` para **"${promptText.slice(0, 80)}"**` : '';
-  const header = `## Relatório de Ações do Agente\nProcessei e executei as tarefas solicitadas no ambiente${promptTitle}:\n\n`;
-  const footer = `\n\n*Todos os recursos foram sincronizados e estão disponíveis para inspeção e testes no Workspace e no Computador do Agente.*`;
+  const header = `## Evidências da execução${promptTitle}\n\n`;
+  const failedCount = toolCalls.filter(tool => tool.status === 'error').length;
+  const footer = `\n\n*Registros exibidos conforme as ferramentas retornaram; chamadas com falha: ${failedCount}. Confira cada status antes de considerar a tarefa concluída.*`;
 
   if (sections.length > 0) {
     return header + sections.join('\n\n') + footer;
   }
 
-  if (trimmed && !lower.includes('com sucesso') && !lower.includes('ação executada') && !lower.includes('tarefa executada')) {
-    return `${header}${trimmed}${footer}`;
-  }
+  if (trimmed && !isGeneric && trimmed.length >= 80) return trimmed;
 
-  return `${header}Analisei a solicitação técnica, executei as instruções e sincronizei o ambiente de desenvolvimento. O workspace está pronto com todas as dependências e arquivos disponíveis.${footer}`;
+  return '## Nenhuma ação executada\nNão há chamadas de ferramenta nem arquivos registrados para esta solicitação. Não posso confirmar execução de comandos, pesquisa web ou alterações no workspace.';
 }
 
 export function ChatArea({ 
@@ -288,36 +289,19 @@ export function ChatArea({
     {
       id: '1',
       role: 'assistant',
-      status: 'completed',
       isStreaming: false,
-      time: '15:43',
-      workingTime: '12s',
-      thought: 'Constituição de Design Ativa: O agente opera sob regras rigorosas de design de produção inspiradas em Linear, Stripe, Apple, Vercel e Airbnb para criar sites e aplicações do zero com identidade visual própria, cores exclusivas e alta interatividade dinâmica.',
-      logs: [
-        { id: 1, type: 'command', content: 'Diretrizes de Design de Produção carregadas e verificadas', time: '15:42' },
-        { id: 2, type: 'info', content: 'Regras de paleta exclusiva, hierarquia tipográfica e interatividade real ativas', time: '15:43' }
-      ],
-      content: `Olá! Sou o **Agente Autônomo de Engenharia de Software e Design** do Kvant.
+      content: `Olá! Sou o **Kopilot**, agente de engenharia e design do Kvant.
 
-Estou conectado a um **Runtime Próprio e Isolado em Nuvem Ubuntu 24.04 100% operacional**, onde opero via **MCP (Model Context Protocol)** e **Habilidades (SKILLs)** de ponta:
+Esta aplicação está sendo executada localmente neste ambiente. Posso receber pedidos para inspecionar o runtime, pesquisar na web, trabalhar com arquivos do workspace e criar interfaces; cada resultado deve ser confirmado pelo registro de execução.
 
-### Ferramentas MCP Integradas:
-1. **Computer MCP**: Abro o navegador real para navegar em URLs, pesquisar no Google, rolar páginas e interagir com sites ao vivo.
-2. **WebDev MCP**: Acesso total ao workspace para criar, editar e excluir arquivos, gerenciar pacotes, e sincronizar com o preview em tempo real.
-3. **Terminal Bash MCP**: Execução de comandos shell complexos, diagnósticos de rede e automação de scripts no container Ubuntu.
+**IA:** defina OLLAMA_MODEL como qwen3:4b para inferência gratuita local pelo Ollama, ou use GEMINI_API_KEY/GOOGLE_API_KEY. O modo local não envia prompts a um provedor externo. Recursos de persistência dependem de um banco configurado.
 
-### Habilidades de Engenharia e Design:
-- **Design-to-Code**: Tradução perfeita de referências visuais para UI de alta fidelidade.
-- **Arquitetura Autônoma**: Planejamento de sistemas SaaS e Fintech do zero.
-- **Depuração Recursiva**: Auto-correção de erros no runtime e terminal.
-- **Contexto Profundo**: Processamento de requisitos via questionários inteligentes.
-
-Assista às minhas ações em tempo real na aba **Computador do Agente** enquanto eu construo seu projeto!`,
+Você pode enviar ações separadas ou pedir uma tarefa coordenada, indicando escopo e critérios de sucesso.`,
       suggestions: [
-        'Pesquisar na web e inspecionar a API do GitHub no navegador do agente',
-        'Executar diagnósticos de rede com curl e checar o terminal bash',
-        'Criar uma plataforma de investimentos com simulador dinâmico de juros',
-        'Pesquisar especificações de design de ponta e criar um dashboard'
+        'Verifique o runtime local com comandos somente de leitura e mostre as evidências.',
+        'Pesquise na web documentação atual do React e resuma com fontes.',
+        'Crie uma landing page em React com layout responsivo e estados interativos.',
+        'Divida a revisão deste projeto em tarefas paralelas de UX, backend e testes.'
       ]
     }
   ]);
@@ -1237,7 +1221,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
         />
         
         <p className="mt-2 text-center text-[10px] text-[#dcdcdc]/30">
-          Kopilot ativo: digite @ para fontes & arquivos, / para comandos rápidos e selecione o modelo de IA.
+          IA local Qwen3:4b ativa · envie instruções em português; ações e resultados aparecerão nesta conversa.
         </p>
       </div>
 

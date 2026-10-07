@@ -109,11 +109,7 @@ export const COMMANDS = [
 ];
 
 export const MODELS = [
-  { key: "sprinkles-5", name: "Sprinkles 5", tag: "Flagship" },
-  { key: "sonnet-37", name: "Claude 3.7 Sonnet", tag: "Flagship" },
-  { key: "gemini-25", name: "Gemini 2.5 Flash", tag: "Ultra-fast" },
-  { key: "vanilla-1", name: "Vanilla 1", tag: "Basic" },
-  { key: "freezer-burn", name: "Freezer Burn 0.4", tag: "Stale" },
+  { key: "qwen3-local", name: "Qwen3:4b · local", tag: "Sem custo" },
 ];
 
 const FILES = ["flavor-chart.png", "summer-menu.pdf", "pos-export.csv", "workspace-config.json", "architecture-diagram.svg"];
@@ -129,7 +125,7 @@ const AUTO_STEPS: {
   model?: string;
   hold: number;
 }[] = [
-  { draft: "", connect: false, model: "vanilla-1", hold: 1100 },
+  { draft: "", connect: false, model: "qwen3-local", hold: 1100 },
   { draft: "@", active: 0, hold: 900 },
   { draft: "@", active: 1, hold: 620 },
   { draft: "@", active: 4, hold: 620 },
@@ -140,9 +136,9 @@ const AUTO_STEPS: {
   { draft: "/", active: 1, hold: 620 },
   { draft: "/", active: 3, hold: 1000 },
   { draft: "", hold: 800 },
-  // open the model picker and upgrade to the flagship → rainbow sweep
+  // open the model picker and highlight the installed local model
   { draft: "", modelOpen: true, hold: 1200 },
-  { draft: "", model: "sprinkles-5", hold: 2400 },
+  { draft: "", model: "qwen3-local", hold: 2400 },
   { draft: "", hold: 900 },
 ];
 
@@ -333,7 +329,7 @@ export default function PromptBar({
   const selectModel = (next: (typeof MODELS)[number]) => {
     setModel(next);
     setModelOpen(false);
-    if (next.key === "sprinkles-5" || next.key === "sonnet-37") celebrate();
+    if (next.key === "qwen3-local") celebrate();
   };
 
   /* autoplay: apply the current step, then advance after its hold */
@@ -707,7 +703,7 @@ export default function PromptBar({
               wide
                 ? "grid-cols-[28px_auto_minmax(0,1fr)_28px_28px]"
                 : "grid-cols-[28px_minmax(0,1fr)_auto_28px_28px]"
-            }`}
+            } max-sm:grid-cols-[28px_auto_minmax(0,1fr)_28px_28px]`}
           >
             <button
               type="button"
@@ -720,7 +716,7 @@ export default function PromptBar({
               }}
               className={`flex size-7 shrink-0 items-center justify-center justify-self-start text-ink-3 transition-[background-color,color,transform] duration-150 hover:bg-hover hover:text-ink active:scale-[0.94] cursor-pointer ${
                 pill ? "rounded-full" : "rounded-[8px]"
-              } ${plusOpen ? "bg-hover text-ink" : ""} ${wide ? "col-start-1 row-start-2" : "col-start-1 row-start-1"}`}
+              } ${plusOpen ? "bg-hover text-ink" : ""} ${wide ? "col-start-1 row-start-2" : "col-start-1 row-start-1"} max-sm:col-start-1 max-sm:row-start-2`}
             >
               <Icon size={16} strokeWidth={2}><path d="M12 5v14M5 12h14" /></Icon>
             </button>
@@ -762,7 +758,7 @@ export default function PromptBar({
               aria-label="Prompt"
               className={`${tall ? "min-h-[68px] px-2 py-2 text-[14px] leading-5" : "min-h-7 px-1.5 py-[5px] text-[13px] leading-[18px]"} min-w-0 w-full resize-none bg-transparent text-ink outline-none [overflow-wrap:anywhere] placeholder:text-ink-3 ${
                 wide ? "col-span-full col-start-1 row-start-1" : "col-start-2 row-start-1"
-              }`}
+              } max-sm:col-span-full max-sm:col-start-1 max-sm:row-start-1`}
             />
 
             {/* model picker */}
@@ -777,7 +773,7 @@ export default function PromptBar({
               }}
               className={`flex h-7 shrink-0 items-center gap-1.5 px-2 text-[12px] font-medium text-ink-2 bg-field/60 border border-line/60 transition-all duration-150 hover:bg-hover hover:text-ink active:scale-[0.97] cursor-pointer ${
                 pill ? "rounded-full" : "rounded-[8px]"
-              } ${wide ? "col-start-2 row-start-2 justify-self-start" : "col-start-3 row-start-1"}`}
+              } ${wide ? "col-start-2 row-start-2 justify-self-start" : "col-start-3 row-start-1"} max-sm:col-start-2 max-sm:row-start-2`}
             >
               <span>{model.name}</span>
               <span className="text-ink-3">
@@ -793,7 +789,7 @@ export default function PromptBar({
               onClick={() => setListening((current) => !current)}
               className={`flex size-7 shrink-0 items-center justify-center transition-[background-color,color,transform] duration-150 active:scale-[0.94] cursor-pointer ${
                 pill ? "rounded-full" : "rounded-[8px]"
-              } ${listening ? "bg-accent-tint text-accent-ink" : "text-ink-3 hover:bg-hover hover:text-ink"} ${wide ? "col-start-4 row-start-2" : "col-start-4 row-start-1"}`}
+                } ${listening ? "bg-accent-tint text-accent-ink" : "text-ink-3 hover:bg-hover hover:text-ink"} ${wide ? "col-start-4 row-start-2" : "col-start-4 row-start-1"} max-sm:col-start-4 max-sm:row-start-2`}
             >
               {listening ? (
                 <span className="flex h-3.5 items-center gap-[2.5px]">
@@ -818,7 +814,7 @@ export default function PromptBar({
                 onClick={onStop}
                 className={`flex size-7 shrink-0 items-center justify-center bg-red-500/20 text-red-400 border border-red-500/30 transition-all duration-150 hover:bg-red-500/30 active:scale-[0.94] cursor-pointer ${
                   pill ? "rounded-full" : "rounded-[8px]"
-                } ${wide ? "col-start-5 row-start-2" : "col-start-5 row-start-1"}`}
+                } ${wide ? "col-start-5 row-start-2" : "col-start-5 row-start-1"} max-sm:col-start-5 max-sm:row-start-2`}
                 title="Interromper agente"
               >
                 <Icon size={14} strokeWidth={2.4}>
@@ -833,7 +829,7 @@ export default function PromptBar({
                 onClick={send}
                 className={`flex size-7 shrink-0 items-center justify-center transition-[background-color,color,transform,opacity] duration-200 enabled:active:scale-[0.94] cursor-pointer ${
                   pill ? "rounded-full" : "rounded-[8px]"
-                } ${wide ? "col-start-5 row-start-2" : "col-start-5 row-start-1"} ${
+                } ${wide ? "col-start-5 row-start-2" : "col-start-5 row-start-1"} max-sm:col-start-5 max-sm:row-start-2 ${
                   canSend ? "bg-white text-black hover:bg-white/90 shadow-xs" : "bg-line text-ink-3/40 cursor-not-allowed opacity-50"
                 }`}
                 title="Enviar comando (Enter)"

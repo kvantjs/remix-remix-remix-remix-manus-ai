@@ -3,7 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
-import { randomUUID } from 'crypto';
+import { randomUUID, timingSafeEqual } from 'crypto';
 import os from 'os';
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
@@ -28,6 +28,7 @@ import { executeSandboxCommand, getSandboxBackend } from './src/server/sandbox-e
 import { buildExecutableSkillsInstruction, executeSkill, listExecutableSkills, materializeSkillArtifacts } from './src/server/skill-runtime.js';
 import { buildCognitiveSystemInstruction, COGNITIVE_DELIBERATION_STAGES } from './src/server/agent-cognition.js';
 import { synthesizeBespokeInterface } from './src/server/bespoke-ui-synthesizer.js';
+import { generateContentWithProvider } from './src/server/llm-provider.js';
 
 const execAsync = promisify(exec);
 
@@ -40,6 +41,42 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
 app.use(express.json({ limit: '10mb' }));
+
+// Optional shared-link protection for local instances exposed through a temporary URL.
+const LOCAL_ACCESS_COOKIE = 'kvant_local_access';
+const LOCAL_ACCESS_TOKEN = process.env.KOPILOT_LOCAL_ACCESS_TOKEN || '';
+function matchesLocalAccessToken(candidate: string, expected: string): boolean {
+  const candidateBytes = Buffer.from(candidate);
+  const expectedBytes = Buffer.from(expected);
+  return candidateBytes.length === expectedBytes.length && timingSafeEqual(candidateBytes, expectedBytes);
+}
+
+app.get('/_local/access', (req, res) => {
+  if (!LOCAL_ACCESS_TOKEN) return res.status(404).send('A proteção por link não está configurada.');
+  const providedToken = String(req.query.token || '');
+  if (!matchesLocalAccessToken(providedToken, LOCAL_ACCESS_TOKEN)) {
+    return res.status(403).send('Link de acesso inválido ou expirado.');
+  }
+  const forwardedProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim().toLowerCase();
+  res.cookie(LOCAL_ACCESS_COOKIE, LOCAL_ACCESS_TOKEN, {
+    httpOnly: true,
+    sameSite: 'strict',
+    secure: forwardedProto === 'https' || req.secure,
+    path: '/',
+    maxAge: 7 * 24 * 60 * 60 * 1000
+  });
+  res.setHeader('Cache-Control', 'no-store');
+  return res.redirect(303, '/');
+});
+
+app.use('/api', (req, res, next) => {
+  if (!LOCAL_ACCESS_TOKEN) return next();
+  const cookieHeader = String(req.headers.cookie || '');
+  const cookie = cookieHeader.split(';').map(part => part.trim()).find(part => part.startsWith(`${LOCAL_ACCESS_COOKIE}=`));
+  const cookieValue = cookie ? cookie.slice(LOCAL_ACCESS_COOKIE.length + 1) : '';
+  if (cookieValue && matchesLocalAccessToken(cookieValue, LOCAL_ACCESS_TOKEN)) return next();
+  return res.status(401).json({ error: 'Acesso local protegido. Abra a URL de sessão autorizada.' });
+});
 
 app.get('/health', (_req, res) => {
   res.status(200).json({ ok: true, service: 'remix-kopilot-ai' });
@@ -392,15 +429,20 @@ app.post('/api/scheduled/agent', async (req, res) => {
 });
 
 // Initialize Google GenAI with environment API Key
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY });
+const configuredGeminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
+const configuredOllamaModel = String(process.env.OLLAMA_MODEL || '').trim();
+const hasConfiguredAiProvider = Boolean(configuredGeminiApiKey || configuredOllamaModel);
+const ai = configuredGeminiApiKey ? new GoogleGenAI({ apiKey: configuredGeminiApiKey }) : null;
 
 // A cadeia pode ser ajustada sem novo deploy. O fallback mantém os IDs recomendados
 // para compatibilidade com instalações existentes, enquanto GEMINI_MODELS
 // permite selecionar modelos de maior capacidade na conta do operador.
-const MODEL_CANDIDATES = (process.env.GEMINI_MODELS || 'gemini-3.8-flash,gemini-flash-latest,gemini-3.1-flash-lite')
-  .split(',')
-  .map(model => model.trim())
-  .filter(Boolean);
+const MODEL_CANDIDATES = configuredOllamaModel
+  ? [configuredOllamaModel]
+  : (process.env.GEMINI_MODELS || 'gemini-3.8-flash,gemini-flash-latest,gemini-3.1-flash-lite')
+      .split(',')
+      .map(model => model.trim())
+      .filter(Boolean);
 
 function isQuotaOrRateLimitError(err: any): boolean {
   if (!err) return false;
@@ -4052,11 +4094,13 @@ function generateComprehensiveAgentReport(
     sections.push(`### 4. Operações de Sistema de Arquivos\n${fsItems}`);
   }
 
-  const header = `## Relatório de Ações do Agente\nAtendendo à sua solicitação (**"${userMessage}"**), executei diretamente as seguintes tarefas técnicas no ambiente:\n\n`;
-  const footer = `\n\n### Status da Execução\nTodas as ações foram concluídas no ambiente isolado. O código e os recursos estão sincronizados e disponíveis para inspeção no **Workspace** e no **Computador do Agente**.`;
+  const succeededCount = executedToolCalls.filter(tool => tool.status === 'success').length;
+  const failedCount = executedToolCalls.filter(tool => tool.status === 'error').length;
+  const header = `## Evidências de execução\nAtendendo à sua solicitação (**"${userMessage}"**), estes são os registros retornados pelas ferramentas:\n\n`;
+  const footer = `\n\n### Status da Execução\nChamadas registradas: **${succeededCount} concluídas**, **${failedCount} com falha**. Arquivos reportados: **${generatedFiles.length}**. Confira o status e os detalhes de cada item acima.`;
 
   if (sections.length === 0) {
-    return `${header}Analisei a solicitação técnica e estruturei o ambiente de desenvolvimento. O workspace e as dependências foram validados com sucesso, prontos para a continuidade da demanda.${footer}`;
+    return `## Nenhuma ação executada\nNão há chamadas de ferramenta nem arquivos registrados para esta solicitação. Portanto, não posso afirmar que um comando foi executado, que uma página foi pesquisada ou que o workspace foi alterado. Configure um provedor de IA válido e tente novamente para habilitar ações do agente.`;
   }
 
   return header + sections.join('\n\n') + footer;
@@ -4152,7 +4196,7 @@ async function runDeepDeliberation(
     const started = Date.now();
     emit?.('deliberation', { stage, label, text: `${label}: avaliando critérios e dependências reais...` });
     try {
-      const response = await ai.models.generateContent({
+      const response = await generateContentWithProvider(ai, {
         model,
         contents: [{ role: 'user', parts: [{ text: `${base}\n\n${instruction}` }] }],
         config: {
@@ -4256,6 +4300,22 @@ app.post('/api/agent/chat/stream', async (req, res) => {
   playwrightBrowser.setProgressListener((progress) => sendEvent('browser_progress', progress));
 
   try {
+    if (!hasConfiguredAiProvider && intent.mode !== 'conversation') {
+      const unavailable = 'Não executei nenhuma ferramenta porque não há OLLAMA_MODEL nem chave GEMINI_API_KEY/GOOGLE_API_KEY configurada. Nenhum comando foi executado, nenhuma página foi pesquisada e nenhum arquivo foi alterado. Configure um provedor e reinicie o servidor para habilitar ações do agente.';
+      sendEvent('status', { text: 'Ação não iniciada: nenhum provedor de IA configurado.' });
+      sendEvent('complete', {
+        thought: 'Nenhuma ferramenta foi executada porque o provedor de IA não está configurado.',
+        explanation: unavailable,
+        response: unavailable,
+        files: [],
+        sources: [],
+        toolCalls: [],
+        intent,
+        status: 'provider_unconfigured'
+      });
+      playwrightBrowser.setProgressListener(null);
+      return res.end();
+    }
     if (intent.mode === 'cloud_computer') {
       sendEvent('computer_starting', {
         durationMs: 5000,
@@ -4310,7 +4370,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
     let pendingApproval: any = null;
 
     // 1. Gemini AI Agent handles reasoning, tool calls, search result analysis and synthesis
-    if (process.env.GEMINI_API_KEY) {
+    if (hasConfiguredAiProvider) {
       const chatContents: any[] = [];
       if (Array.isArray(history)) {
         for (const h of history) {
@@ -4344,7 +4404,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
           try {
             sendEvent('status', { text: `Consultando modelo ${modelCandidate} (Ciclo ${iterationCount})...` });
             const isFlashLite = modelCandidate.includes('flash-lite');
-            const responsePromise = ai.models.generateContent({
+            const responsePromise = generateContentWithProvider(ai, {
               model: modelCandidate,
               contents: chatContents,
               config: {
@@ -4354,7 +4414,9 @@ app.post('/api/agent/chat/stream', async (req, res) => {
               }
             });
 
-            const timeoutMs = isFlashLite ? 35000 : 45000;
+            const timeoutMs = configuredOllamaModel
+              ? Math.max(10000, Number(process.env.OLLAMA_TIMEOUT_MS) || 300000)
+              : isFlashLite ? 35000 : 45000;
             const timeoutPromise = new Promise<never>((_, reject) =>
               setTimeout(() => reject(new Error(`Timeout no modelo ${modelCandidate}`)), timeoutMs)
             );
@@ -4372,6 +4434,22 @@ app.post('/api/agent/chat/stream', async (req, res) => {
         }
 
         if (!modelResponse) {
+          if (configuredOllamaModel && !modelTextResponse && executedToolCalls.length === 0) {
+            const unavailable = 'Não executei nenhuma ferramenta porque o modelo Ollama local não respondeu. Verifique se o serviço Ollama está ativo e se o modelo configurado foi baixado; nenhum comando ou alteração de arquivo foi feito.';
+            sendEvent('status', { text: 'Ação interrompida: modelo Ollama local indisponível.' });
+            sendEvent('complete', {
+              thought: 'Nenhuma ferramenta foi executada porque o provedor local não respondeu.',
+              explanation: unavailable,
+              response: unavailable,
+              files: [],
+              sources: [],
+              toolCalls: [],
+              intent,
+              status: 'local_provider_unavailable'
+            });
+            playwrightBrowser.setProgressListener(null);
+            return res.end();
+          }
           if (!modelTextResponse && executedToolCalls.length === 0) {
             console.warn('[Kopilot Engine] Activating autonomous engine with realistic cognitive execution steps.');
             
@@ -4567,7 +4645,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
         if (successfulModel) {
           try {
             sendEvent('status', { text: 'Agente sintetizando relatório detalhado...' });
-            const summaryResponse = await ai.models.generateContent({
+            const summaryResponse = await generateContentWithProvider(ai, {
               model: successfulModel,
               contents: chatContents,
               config: {
@@ -4800,6 +4878,19 @@ app.post('/api/agent/chat', async (req, res) => {
   }
   const intent = classifyAgentIntent(message, Array.isArray(history) ? history : []);
 
+  if (!hasConfiguredAiProvider && intent.mode !== 'conversation') {
+    const unavailable = 'Não executei nenhuma ferramenta nesta solicitação porque não há uma chave GEMINI_API_KEY ou GOOGLE_API_KEY configurada neste processo. Nenhum comando foi executado, nenhuma página foi pesquisada e nenhum arquivo foi alterado. Configure a chave localmente e reinicie o servidor para habilitar ações com o agente.';
+    return res.json({
+      thought: 'Nenhuma ferramenta foi executada porque o provedor de IA não está configurado.',
+      response: unavailable,
+      files: [],
+      sources: [],
+      toolCalls: [],
+      intent,
+      status: 'provider_unconfigured'
+    });
+  }
+
   if (checkNeedsContextQuestionnaire(message)) {
     const fallback = generateAutonomousRuleEnforcedFallback(message, history, currentFiles);
     return res.json({
@@ -4823,7 +4914,7 @@ app.post('/api/agent/chat', async (req, res) => {
   let pendingApproval: any = null;
 
   // 1. Try real multi-turn Function Calling with Gemini SDK
-  if (process.env.GEMINI_API_KEY) {
+  if (hasConfiguredAiProvider) {
     const chatContents: any[] = [];
     if (Array.isArray(history)) {
       for (const h of history) {
@@ -4863,7 +4954,7 @@ app.post('/api/agent/chat', async (req, res) => {
 
         while (iteration < 5) {
           iteration++;
-          const responsePromise = ai.models.generateContent({
+          const responsePromise = generateContentWithProvider(ai, {
             model: modelCandidate,
             contents: chatContents,
             config: {
@@ -4873,7 +4964,9 @@ app.post('/api/agent/chat', async (req, res) => {
             }
           });
 
-          const timeoutMs = isFlashLite ? 35000 : 45000;
+          const timeoutMs = configuredOllamaModel
+            ? Math.max(10000, Number(process.env.OLLAMA_TIMEOUT_MS) || 300000)
+            : isFlashLite ? 35000 : 45000;
           const timeoutPromise = new Promise<never>((_, reject) => 
             setTimeout(() => reject(new Error(`Model timeout after ${timeoutMs/1000}s on ${modelCandidate}`)), timeoutMs)
           );

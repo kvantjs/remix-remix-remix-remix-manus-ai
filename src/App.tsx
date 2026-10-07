@@ -29,7 +29,9 @@ export default function App() {
     });
   }, []);
 
-  const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(true);
+  const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches
+  );
   const [customFiles, setCustomFiles] = useState<Record<string, string>>({});
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
 
@@ -117,8 +119,11 @@ export default function App() {
 
   return (
     <div className={`${theme} flex h-screen w-full bg-[#1a1a1a] text-text-content-primary overflow-hidden font-sans selection:bg-blue-500/20`}>
-      <Sidebar theme={theme} toggleTheme={toggleTheme} />
-      <main className="flex-1 flex overflow-hidden relative bg-[#1a1a1a]">
+      <div className="hidden h-full shrink-0 lg:flex">
+        <Sidebar theme={theme} toggleTheme={toggleTheme} />
+      </div>
+      <main className="flex-1 min-w-0 flex overflow-hidden relative bg-[#1a1a1a]">
+        <div className={`min-w-0 flex-1 overflow-hidden flex-col ${isWorkspaceOpen ? 'hidden lg:flex' : 'flex'}`}>
         <ChatArea 
           onFileUpdate={handleFileUpdate} 
           externalPrompt={pendingPrompt}
@@ -127,6 +132,7 @@ export default function App() {
           onAgentStateChange={handleAgentStateChange}
           onInspectInComputer={handleInspectInComputer}
         />
+        </div>
         {isWorkspaceOpen && (
           <Workspace 
             onClose={handleCloseWorkspace} 

@@ -33,16 +33,15 @@ import {
   Sparkle,
   LinuxLogo
 } from '@phosphor-icons/react';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useMemo } from 'react';
 import { RuntimePreview } from './RuntimePreview';
 import { TerminalView } from './TerminalView';
 import { detectLanguage } from './SyntaxCodeView';
-import CodeMirror from '@uiw/react-codemirror';
-import { javascript } from '@codemirror/lang-javascript';
-import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { KvantComputer } from './KvantComputer';
 import { ToolCallTrace } from '../types/project';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+
+const CodeMirrorSurface = lazy(() => import('./CodeMirrorSurface'));
 import { cn } from "cn";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -144,7 +143,7 @@ export function Workspace({
   };
 
   return (
-    <div className={`${isMaximized ? 'w-full absolute inset-0 z-30' : 'w-[56%] min-w-[460px]'} border-l border-border-divider-subtle bg-bg-surface-panel flex flex-col h-full animate-in duration-200 select-none`}>
+    <div className={`${isMaximized ? 'w-full absolute inset-0 z-30' : 'w-full min-w-0 shrink-0 lg:w-[56%] lg:min-w-[460px]'} border-l border-border-divider-subtle bg-bg-surface-panel flex flex-col h-full animate-in duration-200 select-none`}>
       
       {/* Top Application Tab Bar */}
       <div className="h-11 flex items-center px-3 bg-bg-canvas-main/60 border-b border-border-divider-subtle shrink-0 relative select-none">
@@ -939,15 +938,12 @@ function InteractiveCodeEditor({ activeFile, onFileChange, customFiles, onFileUp
 
         {/* Real Code Editor CodeMirror Surface (Apenas Leitura do Usuário) */}
         <div className="flex-1 overflow-auto relative bg-[#191919] h-full flex flex-col font-mono text-xs select-text" style={{ backgroundColor: '#191919' }}>
-          <CodeMirror
-            value={editorContent}
-            height="100%"
-            theme={vscodeDark}
-            extensions={[javascript({ jsx: true, typescript: true })]}
-            readOnly={true}
-            editable={false}
-            className="flex-1 w-full text-xs font-mono select-text"
-          />
+          <Suspense fallback={<div className="flex-1 p-4 font-mono text-xs text-slate-400">Carregando editor de código…</div>}>
+            <CodeMirrorSurface
+              value={editorContent}
+              className="flex-1 w-full text-xs font-mono select-text"
+            />
+          </Suspense>
         </div>
 
         {/* Editor Bottom Status Bar */}
