@@ -2257,54 +2257,85 @@ class PlaywrightBrowserManager {
     const cleanQuery = (query || '').trim();
     if (!cleanQuery) throw new Error('Consulta de navegação vazia.');
 
-    let targetUrl = '';
-
-    // 1. Check if cleanQuery is already a URL or domain (e.g. "api.github.com", "github.com", "https://...")
-    if (/^https?:\/\//i.test(cleanQuery)) {
-      targetUrl = cleanQuery;
-    } else if (/^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:\/.*)?$/i.test(cleanQuery)) {
-      targetUrl = 'https://' + cleanQuery;
-    } else {
-      // 2. Check known brand map
-      const lower = cleanQuery.toLowerCase();
-      for (const [brand, bUrl] of Object.entries(KNOWN_WEB_PORTALS)) {
-        if (lower === brand || lower === `do ${brand}` || lower === `da ${brand}` || lower.includes(brand)) {
-          targetUrl = bUrl;
-          break;
-        }
-      }
-
-      // Default fallback to direct tech portal
-      if (!targetUrl) {
-        targetUrl = 'https://news.ycombinator.com';
-      }
+    // Consultas textuais sempre passam pela interface real do Google: o agente
+    // abre o site, posiciona o mouse, preenche o campo, pressiona Enter e só
+    // então lê os resultados renderizados no DOM.
+    const isUrl = /^https?:\/\//i.test(cleanQuery) || /^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:\/.*)?$/i.test(cleanQuery);
+    if (isUrl) {
+      const directUrl = /^https?:\/\//i.test(cleanQuery) ? cleanQuery : `https://${cleanQuery}`;
+      const navRes = await this.navigate(directUrl);
+      return {
+        query: cleanQuery,
+        searchEngineUrl: navRes.url,
+        url: navRes.url,
+        title: navRes.title,
+        status: navRes.status || 200,
+        results: [{ title: navRes.title, url: navRes.url, snippet: navRes.textContent.slice(0, 400) }],
+        textContent: navRes.textContent,
+        interactiveElements: navRes.interactiveElements as any,
+        links: navRes.links,
+        screenshot: navRes.screenshot,
+        challenge: navRes.challenge || null,
+        requiresUserAction: Boolean(navRes.challenge),
+        steps: [
+          { label: 'Navegação direta autorizada', detail: `Acessou "${navRes.url}"` },
+          { label: 'Leitura da página', detail: `Extraiu ${navRes.textContent.length} caracteres do conteúdo renderizado` }
+        ]
+      };
     }
 
-    // 3. Direct Playwright Chromium browser navigation
-    const navRes = await this.navigate(targetUrl);
+    const googleUrl = 'https://www.google.com/?hl=pt-BR';
+    const googlePage = await this.navigate(googleUrl);
+    if (googlePage.challenge) {
+      return {
+        query: cleanQuery, searchEngineUrl: googlePage.url, url: googlePage.url,
+        title: googlePage.title, status: googlePage.status || 200, results: [],
+        textContent: googlePage.textContent, interactiveElements: googlePage.interactiveElements,
+        links: googlePage.links, screenshot: googlePage.screenshot,
+        challenge: googlePage.challenge, requiresUserAction: true,
+        steps: [{ label: 'Google aberto', detail: 'A pesquisa foi pausada por um desafio de segurança.' }]
+      };
+    }
 
+    const typed: any = await this.fill('textarea[name="q"], input[name="q"]', cleanQuery, true);
+    if (!typed.success) throw new Error(`Não foi possível pesquisar no Google pela interface real: ${typed.error || 'campo de pesquisa indisponível'}`);
+
+    const page = await this.ensurePage();
+    await page.waitForTimeout(900);
+    await this.emitProgress(page, 'Resultados do Google carregados; lendo resultados', 'O agente pressionou Enter e está lendo os resultados renderizados do Google.', true);
+    const domData = await this.extractDomData(page);
+    const resultItems: Array<{ title: string; url: string; snippet: string }> = [];
+    const resultAnchors = await page.locator('a:has(h3)').all().catch(() => [] as any[]);
+    for (const anchor of resultAnchors.slice(0, maxResults)) {
+      const heading = anchor.locator('h3').first();
+      const title = (await heading.innerText().catch(() => '')).trim();
+      const rawHref = (await anchor.getAttribute('href').catch(() => null)) || '';
+      const url = normaliseGoogleResultUrl(rawHref, page.url());
+      if (!title || !/^https?:\/\//.test(url)) continue;
+      try { if (new URL(url).hostname.endsWith('google.com')) continue; } catch { continue; }
+      resultItems.push({ title, url, snippet: `${title} — resultado orgânico observado no Google` });
+    }
+
+    const screenshotBuf = await page.screenshot({ type: 'jpeg', quality: 75 }).catch(() => null);
+    const screenshot = screenshotBuf ? `data:image/jpeg;base64,${screenshotBuf.toString('base64')}` : typed.result?.screenshot;
     return {
       query: cleanQuery,
-      searchEngineUrl: navRes.url,
-      url: navRes.url,
-      title: navRes.title,
-      status: navRes.status || 200,
-      results: [
-        {
-          title: navRes.title,
-          url: navRes.url,
-          snippet: navRes.textContent.slice(0, 400)
-        }
-      ],
-      textContent: `[PÁGINA CARREGADA NO NAVEGADOR DEDICADO DO AGENTE: ${navRes.title} (${navRes.url})]\n\n` + navRes.textContent,
-      interactiveElements: navRes.interactiveElements as any,
-      links: navRes.links,
-      screenshot: navRes.screenshot,
-      challenge: navRes.challenge || null,
-      requiresUserAction: Boolean(navRes.challenge),
+      searchEngineUrl: page.url(),
+      url: page.url(),
+      title: await page.title(),
+      status: 200,
+      results: resultItems,
+      textContent: `[RESULTADOS REAIS DO GOOGLE PARA: ${cleanQuery}]\n\n${domData.bodyText}`,
+      interactiveElements: domData.interactive,
+      links: resultItems.map(item => ({ text: item.title, href: item.url })),
+      screenshot,
+      challenge: null,
+      requiresUserAction: false,
       steps: [
-        { label: 'Navegador Próprio e Dedicado Ativo (Playwright Chromium)', detail: `Acessou diretamente "${navRes.url}"` },
-        { label: 'Inspeção de DOM e Conteúdo', detail: `Extraiu ${navRes.textContent.length} caracteres e ${navRes.interactiveElements.length} elementos interativos` }
+        { label: 'Google aberto no navegador do agente', detail: googleUrl },
+        { label: 'Pesquisa digitada pelo agente', detail: `Preencheu o campo de busca com "${cleanQuery}"` },
+        { label: 'Enter pressionado', detail: 'Aguardou a navegação e o carregamento dos resultados.' },
+        { label: 'Resultados analisados', detail: `Leu ${resultItems.length} resultado(s) orgânico(s) renderizado(s).` }
       ]
     };
   }
@@ -2990,57 +3021,10 @@ app.get('/api/browser/proxy', async (req, res) => {
           }, '*');
         } catch(e) {}
 
-        // Intercept link clicks so navigation stays inside the agent's cloud browser
-        document.addEventListener('click', function(e) {
-          var a = e.target.closest('a');
-          if (a && a.href && !a.href.startsWith('javascript:') && !a.href.startsWith('#')) {
-            e.preventDefault();
-            try {
-              window.parent.postMessage({
-                type: 'AGENT_BROWSER_NAVIGATE',
-                url: a.href,
-                title: a.innerText || document.title
-              }, '*');
-            } catch(e) {}
-            window.location.href = '/api/browser/proxy?url=' + encodeURIComponent(a.href);
-          }
-        }, true);
-
-        // Intercept form submissions
-        document.addEventListener('submit', function(e) {
-          var f = e.target;
-          if (f && f.action) {
-            e.preventDefault();
-            try {
-              var actionUrl = new URL(f.action, window.location.href).href;
-              var fd = new FormData(f);
-              var params = new URLSearchParams(fd).toString();
-              var target = actionUrl + (actionUrl.includes('?') ? '&' : '?') + params;
-              window.parent.postMessage({
-                type: 'AGENT_BROWSER_NAVIGATE',
-                url: target,
-                title: document.title
-              }, '*');
-              window.location.href = '/api/browser/proxy?url=' + encodeURIComponent(target);
-            } catch(err) {
-              f.submit();
-            }
-          }
-        }, true);
-
-        // Listen for agent automated actions from parent
-        window.addEventListener('message', function(ev) {
-          if (!ev.data) return;
-          if (ev.data.type === 'AGENT_EXEC_SCROLL') {
-            window.scrollBy({ top: ev.data.deltaY || 300, behavior: 'smooth' });
-          } else if (ev.data.type === 'AGENT_EXEC_CLICK') {
-            var el = document.querySelector(ev.data.selector) || document.querySelector('a, button, input');
-            if (el) {
-              el.focus();
-              el.click();
-            }
-          }
-        });
+        // No manual link, form, click, keyboard, or scroll forwarding is installed here.
+        // The iframe is display-only; all browser actions happen in Playwright on behalf of the agent.
+        // The visual proxy intentionally does not execute postMessage actions.
+        // Real agent actions are executed by PlaywrightBrowserManager and arrive as screenshots/progress.
       })();
     </script>
   `;
@@ -3158,64 +3142,23 @@ app.get('/api/browser/live-page', async (req, res) => {
   return res.redirect(`/api/browser/proxy?url=${encodeURIComponent(finalUrl)}`);
 });
 
-app.post('/api/computer/browser/navigate', async (req, res) => {
-  const { url } = req.body;
-  if (!url) return res.status(400).json({ error: 'URL é obrigatória' });
-  const result = await playwrightBrowser.navigate(url);
-  return res.json(result);
-});
-
 app.get('/api/computer/browser/challenge', (_req, res) => {
-  return res.json({ challenge: playwrightBrowser.getChallenge(), policy: 'stop_and_request_handoff' });
+  return res.json({ challenge: playwrightBrowser.getChallenge(), policy: 'agent_only_browser_control' });
 });
 
-app.post('/api/computer/browser/resume-after-human', (req, res) => {
-  if (req.body?.humanConfirmed !== true) return res.status(400).json({ error: 'humanConfirmed=true é obrigatório após a intervenção autorizada.' });
-  playwrightBrowser.clearChallenge();
-  return res.json({ resumed: true, note: 'O bloqueio local foi limpo. O agente não contorna o desafio; uma nova navegação poderá detectá-lo novamente.' });
+const browserUserActionBlocked = (_req: any, res: any) => res.status(403).json({
+  error: 'Controle manual desativado: somente o agente pode operar o navegador.',
+  policy: 'agent_only_browser_control'
 });
 
-app.post('/api/computer/browser/click', async (req, res) => {
-  const { selector, text } = req.body;
-  const target = selector || text;
-  if (!target) return res.status(400).json({ error: 'selector ou text é obrigatório' });
-  const result = await playwrightBrowser.click(target);
-  return res.json(result);
-});
-
-app.post('/api/computer/browser/click-coords', async (req, res) => {
-  const { x, y } = req.body;
-  if (typeof x !== 'number' || typeof y !== 'number') {
-    return res.status(400).json({ error: 'x e y numéricos são obrigatórios' });
-  }
-  const result = await playwrightBrowser.clickCoordinates(x, y);
-  return res.json(result);
-});
-
-app.post('/api/computer/browser/scroll', async (req, res) => {
-  const { deltaY } = req.body;
-  const result = await playwrightBrowser.scroll(typeof deltaY === 'number' ? deltaY : 300);
-  return res.json(result);
-});
-
-app.post('/api/computer/browser/type', async (req, res) => {
-  const { selector, text, pressEnter } = req.body;
-  if (!selector) return res.status(400).json({ error: 'selector é obrigatório' });
-  const result = await playwrightBrowser.fill(selector, text || '', !!pressEnter);
-  return res.json(result);
-});
-
-app.post('/api/computer/browser/screenshot', async (_req, res) => {
-  const screenshot = await playwrightBrowser.captureScreenshot();
-  return res.json({ screenshot });
-});
-
-app.post('/api/computer/browser/search', async (req, res) => {
-  const { query } = req.body;
-  if (!query) return res.status(400).json({ error: 'Termo de busca é obrigatório' });
-  const result = await playwrightBrowser.searchGoogle(String(query), 8);
-  return res.json(result);
-});
+app.post('/api/computer/browser/navigate', browserUserActionBlocked);
+app.post('/api/computer/browser/resume-after-human', browserUserActionBlocked);
+app.post('/api/computer/browser/click', browserUserActionBlocked);
+app.post('/api/computer/browser/click-coords', browserUserActionBlocked);
+app.post('/api/computer/browser/scroll', browserUserActionBlocked);
+app.post('/api/computer/browser/type', browserUserActionBlocked);
+app.post('/api/computer/browser/screenshot', browserUserActionBlocked);
+app.post('/api/computer/browser/search', browserUserActionBlocked);
 
 // Filesystem Endpoints
 app.get('/api/computer/fs/tree', async (_req, res) => {
@@ -3507,7 +3450,12 @@ function extractUserDestinationUrl(message: string): { targetUrl: string | null;
   const searchMatch = cleanMsg.match(/(?:pesquis(?:e|ar)|busqu(?:e|ar)|procur(?:e|ar)|search for|search|procure na web por|pesquise por)\s+["']?([^"'\n\r]+)["']?/i);
   const lower = cleanMsg.toLowerCase();
   if (searchMatch && !lower.includes('endereço') && !lower.includes('endereco') && !lower.includes('acesse') && !lower.includes('abra o site') && !lower.includes('crie') && !lower.includes('criar') && !lower.includes('desenvolva')) {
-    const rawQuery = searchMatch[1].trim().replace(/^(?:sobre|por)\s+/i, '').trim();
+    const rawQuery = searchMatch[1]
+      .trim()
+      .replace(/^(?:no|na|em)\s+google\s+/i, '')
+      .replace(/\s+e\s+(?:abra|abrir|acesse|acessar|leia|ler|role|rolar).*/i, '')
+      .replace(/^(?:sobre|por)\s+/i, '')
+      .trim();
     return { targetUrl: null, isExplicitSearch: true, searchQuery: rawQuery };
   }
 
@@ -3613,7 +3561,22 @@ function planRealAgentActions(message: string): Array<{ toolName: string; args: 
     plan.push({
       toolName: 'browser.search',
       args: { query: destination.searchQuery },
-      reason: `Pesquisando "${destination.searchQuery}" no mecanismo autônomo`
+      reason: `Abrindo o Google e pesquisando "${destination.searchQuery}" pela interface real`
+    });
+    plan.push({
+      toolName: 'browser.open_result',
+      args: {},
+      reason: 'Analisando os resultados do Google e abrindo o primeiro resultado orgânico relevante'
+    });
+    plan.push({
+      toolName: 'browser.scroll',
+      args: { deltaY: 520 },
+      reason: 'Rolando a página aberta em incrementos para ler o conteúdo'
+    });
+    plan.push({
+      toolName: 'browser.inspect',
+      args: {},
+      reason: 'Lendo o DOM, texto e elementos interativos da página aberta'
     });
   } else if (destination.targetUrl) {
     plan.push({

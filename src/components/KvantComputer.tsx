@@ -322,8 +322,9 @@ export function KvantComputer({
   const [typedKeys, setTypedKeys] = useState<string[]>([]);
   const [activeTypingBanner, setActiveTypingBanner] = useState<string | null>(null);
 
-  const [userControlMode, setUserControlMode] = useState<boolean>(false);
-  const [forceLiveIframe, setForceLiveIframe] = useState<boolean>(false);
+  // O navegador é exclusivamente controlado pelo agente; não existe modo manual.
+  const userControlMode = false;
+  const forceLiveIframe = false;
   const prevIsWorkingRef = useRef(isWorking);
   const lastLiveMouseRef = useRef<{ x: number; y: number; viewportWidth: number; viewportHeight: number } | null>(null);
 
@@ -584,34 +585,7 @@ export function KvantComputer({
     }
   }, [isWorking, isComputerActive]);
 
-  // Listen to chat prompt / context to navigate
-  useEffect(() => {
-    if (isBooting) return;
-    if (contextText && contextText !== lastContextTextRef.current) {
-      lastContextTextRef.current = contextText;
-      const isExplicitNavigation = /https?:\/\/|www\.|(?:acesse|acessar|abra|abrir|navegue|navegar|visite|visitar|pesquis(?:e|ar)|busqu(?:e|ar)|procure|search|open|go\s+to)\b/i.test(contextText);
-      const dest = isExplicitNavigation ? resolveWebUrl(contextText) : currentUrl;
-
-      if (!isComputerActive) {
-        handleTurnOnComputer(isExplicitNavigation ? dest : undefined);
-      } else if (isExplicitNavigation) {
-        setCurrentUrl(dest);
-        setIsExternalWeb(true);
-        runAgentLiveActionAnimation('navigate', dest);
-
-        const newHistory = [...navHistory.slice(0, historyIndex + 1), {
-          url: dest,
-          title: dest,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          action: 'Instrução do Usuário'
-        }];
-        setNavHistory(newHistory);
-        setHistoryIndex(newHistory.length - 1);
-        setScrubberValue(100);
-        setIsLive(true);
-      }
-    }
-  }, [contextText, customCode, isComputerActive, isBooting]);
+  // Navegação é acionada exclusivamente por toolCalls reais emitidos pelo agente.
 
   // Synchronize when Agent runs tool calls in Chat
   useEffect(() => {
@@ -744,20 +718,6 @@ export function KvantComputer({
     }
   };
 
-  const toggleUserControl = () => {
-    setUserControlMode((current) => {
-      const next = !current;
-      setLiveScreenshot(null);
-      setIframeLoaded(false);
-      setAgentCursor((cursor) => ({
-        ...cursor,
-        visible: !next,
-        status: next ? 'Controle do usuário' : 'Agente no controle'
-      }));
-      return next;
-    });
-  };
-
   const proxySrc = `/api/browser/proxy?url=${encodeURIComponent(currentUrl)}`;
 
   return (
@@ -844,7 +804,7 @@ export function KvantComputer({
           </div>
         ) : (
           <div 
-            className={`relative flex-1 bg-white overflow-hidden flex flex-col min-h-0 ${userControlMode || isCaptchaOrChallenge || forceLiveIframe ? 'cursor-default select-auto' : 'cursor-not-allowed select-none'}`}
+            className={`relative flex-1 bg-white overflow-hidden flex flex-col min-h-0 cursor-not-allowed select-none`}
             style={{ colorScheme: 'light', backgroundColor: '#ffffff' }}
           >
             {/* Floating CAPTCHA / Security Challenge Alert Banner */}
@@ -852,16 +812,7 @@ export function KvantComputer({
               <div className="absolute top-3 left-1/2 -translate-x-1/2 z-40 bg-amber-500/95 text-slate-950 font-medium text-xs px-4 py-2 rounded-xl shadow-2xl border border-amber-300 flex items-center gap-3 backdrop-blur-md animate-in slide-in-from-top-4 duration-300">
                 <ShieldWarning size={16} className="text-slate-950 shrink-0 animate-bounce" />
                 <span><strong>CAPTCHA / Desafio de Segurança Detectado!</strong> O navegador ao vivo está liberado para interagir.</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUserControlMode(true);
-                    setForceLiveIframe(true);
-                  }}
-                  className="bg-slate-950 text-amber-300 hover:bg-slate-900 px-3 py-1 rounded-lg text-[11px] font-bold transition-all shrink-0 cursor-pointer shadow-sm"
-                >
-                  Resolver no Navegador Ao Vivo ➔
-                </button>
+                <span className="text-slate-950/70 text-[11px] font-semibold shrink-0">O agente pausou a automação.</span>
               </div>
             )}
 
@@ -900,15 +851,7 @@ export function KvantComputer({
                               <h4 className="text-sm font-bold text-slate-900">Erro de Conectividade</h4>
                               <p className="text-[11px] text-slate-500 leading-relaxed">Não foi possível carregar a página solicitada. O site pode estar inacessível ou bloqueando o acesso automatizado.</p>
                             </div>
-                            <button 
-                              onClick={() => {
-                                setBrowserStatus('loading');
-                                runAgentLiveActionAnimation('navigate', currentUrl);
-                              }}
-                              className="bg-slate-900 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-800 transition-colors"
-                            >
-                              Tentar Novamente
-                            </button>
+                            <p className="text-[10px] text-slate-400">A próxima tentativa será iniciada exclusivamente pelo agente.</p>
                           </div>
                         </div>
                       )}
@@ -919,7 +862,7 @@ export function KvantComputer({
                         ref={iframeRef}
                         src={proxySrc}
                         title="Computador na Nuvem"
-                        className={`w-full h-full border-0 absolute inset-0 bg-white ${userControlMode || isCaptchaOrChallenge || forceLiveIframe ? 'pointer-events-auto' : 'pointer-events-none'}`}
+                        className={`w-full h-full border-0 absolute inset-0 bg-white pointer-events-none`}
                         style={{ colorScheme: 'light', backgroundColor: '#ffffff' }}
                         sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
                         onLoad={() => {
@@ -946,7 +889,7 @@ export function KvantComputer({
                 </div>
               </div>
             ) : (
-              <div className={`w-full h-full flex-1 relative overflow-hidden bg-white text-slate-900 ${userControlMode ? 'pointer-events-auto' : 'pointer-events-none'}`} style={{ colorScheme: 'light', backgroundColor: '#ffffff' }}>
+              <div className={`w-full h-full flex-1 relative overflow-hidden bg-white text-slate-900 pointer-events-none`} style={{ colorScheme: 'light', backgroundColor: '#ffffff' }}>
                 <div 
                   className="origin-top-left transition-transform duration-200 overflow-auto w-full h-full bg-white" 
                   style={{ transform: 'scale(0.70)', width: '142.86%', height: '142.86%', colorScheme: 'light', backgroundColor: '#ffffff' }}

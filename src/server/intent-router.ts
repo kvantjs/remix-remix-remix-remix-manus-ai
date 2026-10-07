@@ -83,7 +83,16 @@ const APP_TOOLS = ['file_list', 'file_read', 'file_write', 'file_create_director
 const PROJECT_TOOLS = ['file_list', 'file_read', 'file_write', 'file_create_directory', 'file_delete', 'webdev_secret_set', 'webdev_secret_get', 'webdev_snapshot', 'webdev_rollback', 'bash_exec', 'job_create', 'job_status', 'job_cancel'];
 
 function hasAny(text: string, terms: string[]) {
-  return terms.some((term) => text.includes(term));
+  return terms.some((term) => {
+    const normalized = term.toLocaleLowerCase('pt-BR').trim();
+    // Short tokens such as "ui", "ux" and "app" must not match inside
+    // unrelated words (e.g. "inteligência" contains the letters "ui").
+    if (normalized.length <= 3) {
+      const escaped = normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return new RegExp(`(?:^|[^\p{L}\p{N}_])${escaped}(?:$|[^\p{L}\p{N}_])`, 'iu').test(text);
+    }
+    return text.includes(normalized);
+  });
 }
 
 function extractExplicitTools(text: string) {
@@ -121,6 +130,7 @@ export function classifyAgentIntent(message: string, history: Array<{ role?: str
   const isExistingProjectEdit = hasAny(lower, editTerms) && (hasAppCreation || history.some(item => /site|aplicação|aplicacao|app|projeto|código|codigo/i.test(String(item.content || ''))));
   const hasSequentialCreationThenComputer = hasAppCreation && /(?:depois|após|apos|quando terminar|em seguida).*(?:computador|navegador|terminal)/i.test(lower);
   const isExplicitWebResearchOnly = (lower.includes('pesquise na web') || lower.includes('pesquisar na web') || lower.includes('busque na internet') || lower.includes('procure na web')) && !hasAppCreation;
+  const isExplicitNewAppRequest = /(?:crie|criar|cria|faça|fazer|desenvolva|desenvolver|construa|construir|implemente|implementar|programe|programar)\s+(?:um|uma|o|a)?\s*(?:site|aplica(?:ção|cao)|app|aplicativo|dashboard|interface|sistema|plataforma|componente|landing|loja)/i.test(lower);
 
   const research = hasAny(lower, [
     'pesquise', 'pesquisar', 'busque', 'buscar', 'procure', 'pesquisa na web', 'informação atual',
@@ -143,7 +153,7 @@ export function classifyAgentIntent(message: string, history: Array<{ role?: str
     if (cloudComputer && !hasSequentialCreationThenComputer) {
       return { mode: 'cloud_computer', confidence: 'high', reason: 'Pedido autoriza uma operação no computador ou navegador da nuvem; criação e edição permanecem separadas deste turno.', allowedTools: COMPUTER_TOOLS, taskMode: 'computer_action' };
     }
-    if (research && !hasAppCreation) {
+    if (research && !isExplicitNewAppRequest) {
       return { mode: 'web_research', confidence: 'high', reason: 'Pedido solicita informação externa, atual ou verificável na web (Prioridade Total - Proibido WebDev).', allowedTools: WEB_TOOLS, taskMode: 'research' };
     }
   }
