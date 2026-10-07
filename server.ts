@@ -2595,6 +2595,54 @@ class PlaywrightBrowserManager {
 
 const playwrightBrowser = new PlaywrightBrowserManager();
 const agentToolExecutor = new AgentToolExecutor(playwrightBrowser);
+
+const COMPUTER_MCP_TOOLS = new Set([
+  'web_search', 'web_fetch', 'browser_navigate', 'browser_inspect', 'browser_click',
+  'browser_type', 'browser_scroll', 'browser_open_result', 'browser.search',
+  'browser.navigate', 'browser.inspect', 'browser.click', 'browser.type',
+  'browser.scroll', 'browser.open_result', 'computer.browser', 'computer.search'
+]);
+
+function isComputerMcpTool(toolName: string) {
+  const normalized = String(toolName || '').toLowerCase();
+  return COMPUTER_MCP_TOOLS.has(normalized)
+    || normalized.startsWith('computer.browser_')
+    || normalized.startsWith('computer.browser.')
+    || normalized.startsWith('web.');
+}
+
+async function runPlaywrightInstallPreflight(emit?: (event: string, data: any) => void) {
+  const command = 'npx playwright install';
+  const executionCommand = `cd ${JSON.stringify(__dirname)} && ${command}`;
+  emit?.('stage_note', {
+    label: 'Preparação do Computer MCP',
+    text: 'Antes de acessar o navegador, o agente está preparando o Playwright pelo Terminal Bash MCP.'
+  });
+  emit?.('tool_start', {
+    toolName: 'bash_exec',
+    arguments: { command, timeoutSeconds: 180 },
+    reason: 'Preflight obrigatório antes de cada chamada do Computer MCP.'
+  });
+  const result = await agentToolExecutor.executeTool('bash_exec', { command: executionCommand, timeoutSeconds: 180 });
+  const trace = {
+    id: `playwright_install_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    toolName: 'bash_exec',
+    server: 'bash_sandbox',
+    arguments: { command, timeoutSeconds: 180 },
+    result: result.success ? JSON.stringify(result.result) : `Erro: ${result.error || 'falha no preflight'}`,
+    timestamp: new Date().toLocaleTimeString(),
+    status: result.success ? 'success' : 'warning',
+    actionType: 'terminal',
+    screenData: {
+      command,
+      terminalOutput: result.result?.stdout || result.result?.stderr || result.error || '',
+      actionDescription: result.actionDescription || `Terminal Bash executou: ${command} no diretório do projeto.`
+    }
+  };
+  emit?.('tool_finish', { toolCall: trace });
+  return trace;
+}
+
 ensureSandboxDir().catch(err => console.error('Failed to init sandbox dir:', err));
 
 // Fallback HTTP fetch navigation
@@ -3021,8 +3069,12 @@ app.post('/api/agent/tool/execute', async (req, res) => {
   if (!intentMessage || !isToolAllowed(classifyAgentIntent(String(intentMessage)), String(toolName))) {
     return res.status(403).json({ error: 'A chamada foi bloqueada: forneça uma intenção explícita compatível com a ferramenta solicitada.' });
   }
+  let preflightTrace;
+  if (isComputerMcpTool(String(toolName))) {
+    preflightTrace = await runPlaywrightInstallPreflight();
+  }
   const trace = await runRealTool(toolName, args || {});
-  return res.json({ toolCall: trace });
+  return res.json({ toolCall: trace, preflight: preflightTrace || null });
 });
 
 // Browser HTTP Endpoints (Powered by Real Playwright Chromium Automation & Live Web Proxy)
@@ -4143,6 +4195,10 @@ app.post('/api/agent/chat/stream', async (req, res) => {
             continue;
           }
 
+          if (isComputerMcpTool(toolName)) {
+            const preflightTrace = await runPlaywrightInstallPreflight(sendEvent);
+            executedToolCalls.push(preflightTrace);
+          }
           await waitForExecutionPhase();
           sendEvent('tool_start', {
             toolName,
@@ -4331,6 +4387,10 @@ app.post('/api/agent/chat/stream', async (req, res) => {
           await new Promise(r => setTimeout(r, 500));
         }
         continue;
+      }
+      if (isComputerMcpTool(action.toolName)) {
+        const preflightTrace = await runPlaywrightInstallPreflight(sendEvent);
+        executedToolCalls.push(preflightTrace);
       }
       await waitForExecutionPhase();
       sendEvent('tool_start', {

@@ -481,7 +481,7 @@ export class AgentToolExecutor {
             throw new Error('Comando bloqueado por política de segurança da sandbox.');
           }
 
-          const timeoutMs = Math.min(30000, Math.max(1000, (Number(args.timeoutSeconds) || 15) * 1000));
+          const timeoutMs = Math.min(180000, Math.max(1000, (Number(args.timeoutSeconds) || 15) * 1000));
           const startTime = performance.now();
 
           let stdout = '';
