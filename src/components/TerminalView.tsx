@@ -170,7 +170,7 @@ export function TerminalView({ activeCode }: { activeCode?: string }) {
       <div className="h-9 border-b border-white/5 bg-[#1a1a1a] px-3 flex items-center justify-between shrink-0 select-none">
         <div className="flex items-center gap-2 text-white/50 text-[11px] font-sans">
           <TerminalIcon size={13} className="text-green-400" />
-          <span className="font-semibold text-white/80">bash (Manus@sandbox)</span>
+          <span className="font-semibold text-white/80">bash (Ubuntu 24.04 · Manus@sandbox)</span>
           <span className="text-[10px] bg-green-500/10 text-green-400 border border-green-500/20 px-1.5 py-0.5 rounded">
             Interativo Real
           </span>

@@ -242,7 +242,7 @@ export function Workspace({
               <Desktop size={15} className="text-slate-400" />
               <div>
                 <div className="font-medium text-text-content-primary">Computador na Nuvem</div>
-                <div className="text-[10px] text-text-content-secondary/60">Navegador Playwright e shell Linux</div>
+                <div className="text-[10px] text-text-content-secondary/60">Ubuntu 24.04 · Playwright e shell Bash</div>
               </div>
             </button>
 

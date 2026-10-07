@@ -23,6 +23,8 @@ export type PlatformConfig = {
   runtime: {
     port: number;
     healthPath: string;
+    distribution: string;
+    cloudProvider: string;
   };
   routes: Array<{ path: string; title?: string }>;
   updatedAt: string;
@@ -49,7 +51,9 @@ const defaultConfig: PlatformConfig = {
   },
   runtime: {
     port: Number(process.env.PORT) || 3000,
-    healthPath: '/health'
+    healthPath: '/health',
+    distribution: process.env.RUNTIME_DISTRIBUTION || 'Ubuntu 24.04',
+    cloudProvider: process.env.CLOUD_PROVIDER || 'container'
   },
   routes: [{ path: '/', title: 'Remix Manus AI' }],
   updatedAt: new Date().toISOString()
@@ -110,6 +114,13 @@ export async function savePlatformConfig(input: Partial<PlatformConfig>): Promis
 export async function getPlatformOverview() {
   const config = await loadPlatformConfig();
   const memory = process.memoryUsage();
+  let osRelease = 'unknown';
+  try {
+    const release = await fs.readFile('/etc/os-release', 'utf8');
+    osRelease = release.match(/^PRETTY_NAME="?([^"\n]+)"?/m)?.[1] || osRelease;
+  } catch {
+    // O endpoint continua funcional em runtimes sem /etc/os-release.
+  }
   return {
     config,
     runtime: {
@@ -117,6 +128,9 @@ export async function getPlatformOverview() {
       hostname: os.hostname(),
       platform: process.platform,
       arch: process.arch,
+      distribution: config.runtime.distribution,
+      osRelease,
+      cloudProvider: config.runtime.cloudProvider,
       nodeVersion: process.version,
       uptimeSeconds: Math.round(process.uptime()),
       memory: {

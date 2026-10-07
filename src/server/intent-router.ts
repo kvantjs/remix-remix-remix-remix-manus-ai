@@ -73,14 +73,15 @@ const TOOL_ALIASES: Record<string, string> = {
   'computer.browser_open_result': 'browser_open_result',
   job_create: 'job_create',
   job_status: 'job_status',
-  job_cancel: 'job_cancel'
+  job_cancel: 'job_cancel',
+  subagent_parallel: 'subagent_parallel'
 };
 
 const ALL_TOOLS = Object.values(TOOL_ALIASES).filter((name, index, list) => list.indexOf(name) === index);
 const WEB_TOOLS = ['web_search', 'web_fetch', 'browser_navigate', 'browser_inspect', 'browser_click', 'browser_scroll', 'browser_open_result'];
-const COMPUTER_TOOLS = [...WEB_TOOLS, 'browser_type', 'bash_exec', 'python_exec', 'job_create', 'job_status', 'job_cancel'];
-const APP_TOOLS = ['file_list', 'file_read', 'file_write', 'file_create_directory', 'webdev_secret_set', 'webdev_secret_get', 'webdev_snapshot', 'webdev_rollback', 'bash_exec', 'python_exec', 'job_create', 'job_status', 'job_cancel'];
-const PROJECT_TOOLS = ['file_list', 'file_read', 'file_write', 'file_create_directory', 'file_delete', 'webdev_secret_set', 'webdev_secret_get', 'webdev_snapshot', 'webdev_rollback', 'bash_exec', 'job_create', 'job_status', 'job_cancel'];
+const COMPUTER_TOOLS = [...WEB_TOOLS, 'browser_type', 'bash_exec', 'python_exec', 'job_create', 'job_status', 'job_cancel', 'subagent_parallel'];
+const APP_TOOLS = ['file_list', 'file_read', 'file_write', 'file_create_directory', 'webdev_secret_set', 'webdev_secret_get', 'webdev_snapshot', 'webdev_rollback', 'bash_exec', 'python_exec', 'job_create', 'job_status', 'job_cancel', 'subagent_parallel'];
+const PROJECT_TOOLS = ['file_list', 'file_read', 'file_write', 'file_create_directory', 'file_delete', 'webdev_secret_set', 'webdev_secret_get', 'webdev_snapshot', 'webdev_rollback', 'bash_exec', 'job_create', 'job_status', 'job_cancel', 'subagent_parallel'];
 
 function hasAny(text: string, terms: string[]) {
   return terms.some((term) => {

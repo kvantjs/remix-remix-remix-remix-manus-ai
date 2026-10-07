@@ -41,7 +41,7 @@ export default function App() {
   const [workingTime, setWorkingTime] = useState('0s');
   const [statusText, setStatusText] = useState('Computador do Agente 100% Operacional');
   const [contextText, setContextText] = useState(
-    'Instância Linux x86_64 ativa. Agente autônomo com navegador headless, shell bash e tool calling em tempo real.'
+    'Instância Ubuntu 24.04 x86_64 ativa. Agente autônomo com navegador headless, shell bash e tool calling em tempo real.'
   );
   const [agentIntent, setAgentIntent] = useState<any>(null);
   const [browserStatus, setBrowserStatus] = useState<'loading' | 'interactive' | 'error' | 'blocked'>('interactive');

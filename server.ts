@@ -12,6 +12,7 @@ import { existsSync, createReadStream } from 'fs';
 import { chromium, type Browser, type Page } from 'playwright';
 import { AGENT_TOOL_DECLARATIONS, AgentToolExecutor, ensureSandboxDir } from './src/server/agent-tools.js';
 import { jobsManager } from './src/server/jobs-manager.js';
+import { subagentOrchestrator } from './src/server/subagent-orchestrator.js';
 import { resolveSafeSandboxPath, redactSecrets, isSafeUrl, SANDBOX_WORKSPACE_ROOT } from './src/server/security.js';
 import { getPlatformOverview, loadPlatformConfig, savePlatformConfig } from './src/server/platform-state.js';
 import { databaseAvailable, ensureDatabaseSchema, query } from './src/server/database.js';
@@ -481,7 +482,7 @@ AS 7 LEIS INVIOLÁVEIS DO AGENTE DE CRIAÇÃO:
 - DEFINIÇÃO OBRIGATÓRIA DE ÍCONES NO TOPO: Todo ícone utilizado no código JSX DEVE ser explicitamente importado no topo do arquivo. Se for usar ícone de crescimento/tendência, importe obrigatoriamente "TrendUp, TrendUp as TrendingUp" de '@phosphor-icons/react' ou "TrendingUp" de 'lucide-react'. NUNCA deixe o TrendingUp indefinido no código!
 
 9. ACESSO REAL AO COMPUTADOR NA NUVEM 100% OPERACIONAL (SUPERUSER CLOUD ACCESS)
-- Você possui ACESSO TOTAL, irrestrito e superuser a um Computador na Nuvem Linux x86_64, Node.js 22, Bash, Sistema de Arquivos e Navegador Web.
+- Você possui ACESSO TOTAL, irrestrito e superuser a um Computador na Nuvem Ubuntu 24.04 x86_64, Node.js 22, Bash, Sistema de Arquivos e Navegador Web.
 - Você pode orquestrar e acionar ferramentas do computador na nuvem:
   * "computer.shell" / "bash.exec": Executa comandos de terminal reais no container.
   * "computer.browser" / "web.navigate": Navega e lê qualquer site ou informação na web.
@@ -834,7 +835,7 @@ export default function GitHubApiInspectorApp() {
 Sintetizei todo o contexto coletado ao vivo das múltiplas páginas visitadas para estruturar um relatório técnico completo e acionável.`,
       workingTime: "34s",
       logs: [
-        { id: 1, type: "command", content: "Navegador Playwright Chromium dedicado inicializado no container Linux (viewport 1280x800)", time: nowTime },
+        { id: 1, type: "command", content: "Navegador Playwright Chromium dedicado inicializado no container Ubuntu 24.04 (viewport 1280x800)", time: nowTime },
         { id: 2, type: "tool", content: "browser.navigate: Acessou https://api.github.com e extraiu catálogo de endpoints REST e headers", time: nowTime },
         { id: 3, type: "tool", content: "browser.navigate: Acessou https://docs.github.com/en/rest e inspecionou guias oficiais de autenticação", time: nowTime },
         { id: 4, type: "tool", content: "browser.navigate: Acessou https://docs.github.com/en/rest/repos/repos e mapeou endpoints de repositórios", time: nowTime },
@@ -1090,7 +1091,7 @@ export default function PlaywrightCloudBrowserApp() {
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                Navegador real em container Linux x86_64 com automação autônoma, renderização de DOM e interação ao vivo.
+                Navegador real em container Ubuntu 24.04 x86_64 com automação autônoma, renderização de DOM e interação ao vivo.
               </p>
             </div>
           </div>
@@ -1320,7 +1321,7 @@ export default function PlaywrightCloudBrowserApp() {
       thought: `O usuário solicitou acesso real à web utilizando o motor Playwright e um navegador com Chromium real no computador de nuvem Linux, onde o agente navega e interage por si mesmo (clicar, preencher, extrair dados e capturar tela). Conectei a instância nativa do Playwright Chromium, executei navegação real para https://news.ycombinator.com, capturei print visual e interagi com os links da página.`,
       workingTime: "28s",
       logs: [
-        { id: 1, type: "command", content: "Playwright Chromium headless lançado no container Linux (viewport 1280x800)", time: nowTime },
+        { id: 1, type: "command", content: "Playwright Chromium headless lançado no container Ubuntu 24.04 (viewport 1280x800)", time: nowTime },
         { id: 2, type: "tool", content: "browser.navigate: Navegou para https://news.ycombinator.com com captura visual em JPEG", time: nowTime },
         { id: 3, type: "tool", content: "browser.click: Interagiu de forma autônoma no DOM com .titleline a", time: nowTime },
         { id: 4, type: "tool", content: "shell.exec: Validou execução do script Playwright Chromium no Node.js", time: nowTime },
@@ -1592,7 +1593,7 @@ export default function CloudControlDashboard() {
           status: "success"
         }
       ],
-      response: `Acesso real ao **Computador na Nuvem 100% funcional** concedido com sucesso!\n\n### O que está ativo e liberado agora:\n- **Terminal Bash & Shell Linux**: Execução real de comandos no container, scripts e compilação na aba **Computador > Terminal**.\n- **Navegador Web Real**: Navegação por URLs reais, scraping e busca na web com extração automática na aba **Computador > Navegador**.\n- **Sistema de Arquivos Completo**: Leitura e gravação de arquivos com persistência no workspace.\n- **APIs Externas & Conectividade**: Capacidade de fazer requisições HTTP para qualquer serviço da web (GitHub, Weather, REST APIs, etc.).\n- **Superuser Mode**: Permissões irrestritas ativadas para o agente fazer tudo o que você solicitar.`,
+      response: `Acesso real ao **Computador na Nuvem 100% funcional** concedido com sucesso!\n\n### O que está ativo e liberado agora:\n- **Terminal Bash & Shell Bash no Ubuntu 24.04**: Execução real de comandos no container, scripts e compilação na aba **Computador > Terminal**.\n- **Navegador Web Real**: Navegação por URLs reais, scraping e busca na web com extração automática na aba **Computador > Navegador**.\n- **Sistema de Arquivos Completo**: Leitura e gravação de arquivos com persistência no workspace.\n- **APIs Externas & Conectividade**: Capacidade de fazer requisições HTTP para qualquer serviço da web (GitHub, Weather, REST APIs, etc.).\n- **Superuser Mode**: Permissões irrestritas ativadas para o agente fazer tudo o que você solicitar.`,
       clarifications: [],
       suggestions: [
         "Abrir a aba Computador e testar o Terminal ao vivo",
@@ -2345,153 +2346,59 @@ class PlaywrightBrowserManager {
     return this.searchDedicatedEngine(query, maxResults);
   }
 
-  async searchDedicatedEngine(query: string, maxResults = 8) {
-    const cleanQuery = (query || '').trim();
-    if (!cleanQuery) throw new Error('Consulta de navegação vazia.');
+  async searchDedicatedEngine(query: string, _maxResults = 1) {
+    const input = (query || '').trim();
+    if (!input) throw new Error('Informe uma URL ou domínio para navegação direta.');
 
-    // Consultas textuais sempre passam pela interface real do Google: o agente
-    // abre o site, posiciona o mouse, preenche o campo, pressiona Enter e só
-    // então lê os resultados renderizados no DOM.
-    const isUrl = /^https?:\/\//i.test(cleanQuery) || /^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:\/.*)?$/i.test(cleanQuery);
-    if (isUrl) {
-      const directUrl = /^https?:\/\//i.test(cleanQuery) ? cleanQuery : `https://${cleanQuery}`;
-      const navRes = await this.navigate(directUrl);
-      return {
-        query: cleanQuery,
-        searchEngineUrl: navRes.url,
-        url: navRes.url,
-        title: navRes.title,
-        status: navRes.status || 200,
-        results: [{ title: navRes.title, url: navRes.url, snippet: navRes.textContent.slice(0, 400) }],
-        textContent: navRes.textContent,
-        interactiveElements: navRes.interactiveElements as any,
-        links: navRes.links,
-        screenshot: navRes.screenshot,
-        challenge: navRes.challenge || null,
-        requiresUserAction: Boolean(navRes.challenge),
-        steps: [
-          { label: 'Navegação direta autorizada', detail: `Acessou "${navRes.url}"` },
-          { label: 'Leitura da página', detail: `Extraiu ${navRes.textContent.length} caracteres do conteúdo renderizado` }
-        ]
-      };
+    const directUrl = /^https?:\/\//i.test(input) ? input : `https://${input}`;
+    const safety = isSafeUrl(directUrl);
+    if (!safety.isSafe) {
+      throw new Error(`URL recusada: ${safety.reason || 'endereço não permitido'}.`);
     }
 
-    const googleUrl = 'https://www.google.com/?hl=pt-BR';
-    const googlePage = await this.navigate(googleUrl);
-    if (googlePage.challenge) {
-      return {
-        query: cleanQuery, searchEngineUrl: googlePage.url, url: googlePage.url,
-        title: googlePage.title, status: googlePage.status || 200, results: [],
-        textContent: googlePage.textContent, interactiveElements: googlePage.interactiveElements,
-        links: googlePage.links, screenshot: googlePage.screenshot,
-        challenge: googlePage.challenge, requiresUserAction: true,
-        steps: [{ label: 'Google aberto', detail: 'A pesquisa foi pausada por um desafio de segurança.' }]
-      };
+    let parsed: URL;
+    try {
+      parsed = new URL(directUrl);
+    } catch {
+      throw new Error(`Endereço inválido: "${input}". Informe uma URL HTTP ou HTTPS.`);
+    }
+    if (!parsed.hostname || !parsed.hostname.includes('.')) {
+      throw new Error('Informe um domínio completo, por exemplo: https://exemplo.com.');
     }
 
-    const page = await this.ensurePage();
-    const searchInput = page.locator('textarea[name="q"], input[name="q"]').first();
-    const searchBox = await searchInput.boundingBox().catch(() => null);
-    if (searchBox) {
-      await this.moveMouse(page, searchBox.x + searchBox.width / 2, searchBox.y + searchBox.height / 2, 'Google aberto; cursor posicionado no campo de pesquisa', 'O agente posicionou o cursor no campo de pesquisa da página inicial do Google.', true);
-    } else {
-      await this.emitProgress(page, 'Google aberto; procurando campo de pesquisa', 'O agente está localizando o campo de pesquisa visível do Google.', true);
-    }
-
-    const typed: any = await this.fill('textarea[name="q"], input[name="q"]', cleanQuery, true);
-    if (!typed.success) throw new Error(`Não foi possível pesquisar no Google pela interface real: ${typed.error || 'campo de pesquisa indisponível'}`);
-
-    await page.waitForTimeout(900);
-    await this.emitProgress(page, 'Resultados do Google carregados; lendo resultados', 'O agente pressionou Enter e está lendo os resultados renderizados do Google.', true);
-    const domData = await this.extractDomData(page);
-    const resultItems: Array<{ title: string; url: string; snippet: string }> = [];
-    const resultAnchors = await page.locator('a:has(h3)').all().catch(() => [] as any[]);
-    for (const anchor of resultAnchors.slice(0, maxResults)) {
-      const heading = anchor.locator('h3').first();
-      const title = (await heading.innerText().catch(() => '')).trim();
-      const rawHref = (await anchor.getAttribute('href').catch(() => null)) || '';
-      const url = normaliseGoogleResultUrl(rawHref, page.url());
-      if (!title || !/^https?:\/\//.test(url)) continue;
-      try { if (new URL(url).hostname.endsWith('google.com')) continue; } catch { continue; }
-      resultItems.push({ title, url, snippet: `${title} — resultado orgânico observado no Google` });
-    }
-
-    const screenshotBuf = await page.screenshot({ type: 'jpeg', quality: 75 }).catch(() => null);
-    const screenshot = screenshotBuf ? `data:image/jpeg;base64,${screenshotBuf.toString('base64')}` : typed.result?.screenshot;
+    const navRes = await this.navigate(parsed.toString());
+    const challenge = navRes.challenge || null;
     return {
-      query: cleanQuery,
-      searchEngineUrl: page.url(),
-      url: page.url(),
-      title: await page.title(),
-      status: 200,
-      results: resultItems,
-      textContent: `[RESULTADOS REAIS DO GOOGLE PARA: ${cleanQuery}]\n\n${domData.bodyText}`,
-      interactiveElements: domData.interactive,
-      links: resultItems.map(item => ({ text: item.title, href: item.url })),
-      screenshot,
-      challenge: null,
-      requiresUserAction: false,
+      query: input,
+      searchEngineUrl: navRes.url,
+      url: navRes.url,
+      title: navRes.title,
+      status: navRes.status || 200,
+      results: challenge ? [] : [{
+        title: navRes.title,
+        url: navRes.url,
+        snippet: navRes.textContent.slice(0, 400)
+      }],
+      textContent: navRes.textContent,
+      interactiveElements: navRes.interactiveElements as any,
+      links: navRes.links,
+      screenshot: navRes.screenshot,
+      challenge,
+      requiresUserAction: Boolean(challenge),
       steps: [
-        { label: 'Google aberto no navegador do agente', detail: googleUrl },
-        { label: 'Pesquisa digitada pelo agente', detail: `Preencheu o campo de busca com "${cleanQuery}"` },
-        { label: 'Enter pressionado', detail: 'Aguardou a navegação e o carregamento dos resultados.' },
-        { label: 'Resultados analisados', detail: `Leu ${resultItems.length} resultado(s) orgânico(s) renderizado(s).` }
+        { label: 'Navegação direta autorizada', detail: `Acessou "${navRes.url}" sem usar um mecanismo de busca.` },
+        { label: challenge ? 'Desafio detectado' : 'Conteúdo lido', detail: challenge
+          ? 'A navegação foi pausada e requer ação humana autorizada.'
+          : `Extraiu ${navRes.textContent.length} caracteres do conteúdo renderizado.` }
       ]
     };
   }
-
   async openFirstSearchResult() {
-    try {
-      const page = await this.ensurePage();
-      let target: { url: string; title: string } | null = null;
-      const anchors = await page.locator('a').all();
-      for (const anchor of anchors) {
-        const heading = anchor.locator('h3').first();
-        if (await heading.count().catch(() => 0) === 0) continue;
-        const url = normaliseGoogleResultUrl((await anchor.getAttribute('href').catch(() => null)) || '', page.url());
-        if (!/^https?:\/\//.test(url)) continue;
-        try {
-          if (new URL(url).hostname.endsWith('google.com')) continue;
-        } catch { continue; }
-        target = { url, title: (await heading.innerText().catch(() => '')).trim() };
-        break;
-      }
-      if (!target?.url) return { success: false, error: 'Nenhum resultado orgânico do Google foi encontrado para abrir.' };
-      const targetAnchor = page.locator('a').filter({ has: page.locator('h3') }).filter({ hasText: target.title }).first();
-      const targetBox = await targetAnchor.boundingBox().catch(() => null);
-      if (targetBox) {
-        await this.moveMouse(page, targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, 'Resultado encontrado; abrindo página', `O cursor percorreu os resultados e está abrindo "${target.title.slice(0, 90)}".`, true);
-      } else {
-        await this.emitProgress(page, 'Resultado encontrado; abrindo página', `Abrindo "${target.title.slice(0, 90)}" a partir dos resultados do Google.`, true);
-      }
-      const response = await page.goto(target.url, { waitUntil: 'domcontentloaded', timeout: 20000 });
-      await page.waitForTimeout(600);
-      await this.settleReadablePage(page);
-      await this.emitProgress(page, 'Página aberta; iniciando leitura', 'O resultado foi aberto; o agente está lendo o conteúdo renderizado da página.', true);
-      const viewport = page.viewportSize() || { width: 1280, height: 800 };
-      await this.moveMouse(page, Math.round(viewport.width * 0.52), Math.round(viewport.height * 0.28), 'Lendo página aberta', 'O cursor acompanha a área de conteúdo enquanto o agente lê a página.', true);
-      const domData = await this.extractDomData(page);
-      const challenge = await this.inspectChallenge(page, domData.bodyText);
-      const screenshotBuf = await page.screenshot({ type: 'jpeg', quality: 75 }).catch(() => null);
-      return {
-        success: !challenge,
-        url: page.url(),
-        title: await page.title(),
-        status: response?.status() || 200,
-        browserStatus: (response?.status() || 200) >= 400 ? 'error' : 'interactive',
-        textContent: domData.bodyText,
-        interactiveElements: domData.interactive,
-        links: domData.interactive.filter((item: any) => item.type === 'link').map((item: any) => ({ text: item.text, href: item.href })),
-        screenshot: screenshotBuf ? 'data:image/jpeg;base64,' + screenshotBuf.toString('base64') : undefined,
-        challenge,
-        requiresUserAction: Boolean(challenge),
-        openedResult: target
-      };
-    } catch (error: any) {
-      return { success: false, error: error.message, browserStatus: 'error' };
-    }
+    return {
+      success: false,
+      error: 'O modo de navegação direta não possui resultados de busca. Informe a URL desejada em browser.navigate ou browser.search.'
+    };
   }
-
   async click(selectorOrText: string) {
     try {
       const page = await this.ensurePage();
@@ -2962,9 +2869,9 @@ async function runRealTool(toolName: string, args: Record<string, any>): Promise
     };
   }
 
-  // Browser Search through Google and real Playwright navigation
+  // Browser Search: navegação direta por URL
   if (toolName === 'browser.search' || toolName === 'web.search' || toolName === 'search' || toolName === 'computer.search') {
-    const query = String(args.query || args.q || 'pesquisa web').trim();
+    const query = String(args.query || args.q || '').trim();
     const searchRes = await playwrightBrowser.searchGoogle(query, 8);
     const topSnippets = searchRes.results.map((item: any) => `• ${item.title}\n  URL: ${item.url}\n  ${item.snippet}`).join('\n\n');
     return {
@@ -2972,7 +2879,7 @@ async function runRealTool(toolName: string, args: Record<string, any>): Promise
       toolName: 'browser.search',
       server: 'playwright_chromium',
       arguments: { query, searchEngineUrl: searchRes.searchEngineUrl },
-      result: `Pesquisa real no Google concluída em etapas.\n\n${topSnippets || 'Nenhum resultado orgânico foi encontrado na página observada.'}`,
+      result: `Navegação direta concluída.\n\n${topSnippets || 'Nenhum conteúdo foi extraído da página informada.'}`,
       timestamp: now,
       status: searchRes.challenge ? 'warning' : 'success',
       actionType: 'browser',
@@ -2985,7 +2892,7 @@ async function runRealTool(toolName: string, args: Record<string, any>): Promise
         interactiveElements: searchRes.interactiveElements,
         challenge: searchRes.challenge,
         requiresUserAction: searchRes.requiresUserAction,
-        actionDescription: `Agente pesquisou no Google por "${query}" e inspecionou ${searchRes.results.length} resultados reais`,
+        actionDescription: `Agente acessou diretamente "${query}" e extraiu o conteúdo renderizado`,
         steps: searchRes.steps
       }
     };
@@ -3014,11 +2921,11 @@ async function runRealTool(toolName: string, args: Record<string, any>): Promise
       toolName: 'browser.open_result',
       server: 'playwright_chromium',
       arguments: {},
-      result: opened.success ? `Primeiro resultado orgânico aberto: ${opened.title} (${opened.url}).\n${opened.textContent?.slice(0, 1800) || ''}` : opened.error,
+      result: opened.error,
       timestamp: now,
       status: opened.success ? 'success' : 'error',
       actionType: 'browser',
-      screenData: { url: opened.url, title: opened.title, pageContent: opened.textContent, screenshot: opened.screenshot, interactiveElements: opened.interactiveElements, actionDescription: opened.success ? 'Agente abriu o primeiro resultado orgânico e obteve contexto da página real' : opened.error }
+      screenData: { actionDescription: opened.error }
     };
   }
 
@@ -3038,7 +2945,7 @@ async function runRealTool(toolName: string, args: Record<string, any>): Promise
       screenData: {
         command,
         terminalOutput: execRes.output,
-        actionDescription: `Agente executando comando bash no container Linux: ${command}`
+        actionDescription: `Agente executando comando bash no container Ubuntu 24.04: ${command}`
       }
     };
   }
@@ -3291,8 +3198,8 @@ app.get('/api/browser/proxy', async (req, res) => {
             <p>A página foi acessada na nuvem. Você pode interagir com sites abertos ou navegar para destinos compatíveis com proxy web ao vivo.</p>
             <div style="margin-top: 20px;">
               <a href="/api/browser/proxy?url=https://news.ycombinator.com" class="btn">Hacker News</a>
-              <a href="/api/browser/proxy?url=https://www.google.com/search?q=agent+ai&amp;hl=pt-BR" class="btn">Google: Agent AI</a>
-              <a href="/api/browser/proxy?url=https://www.google.com/search?q=intelig%C3%AAncia+artificial&amp;hl=pt-BR" class="btn">Google: IA</a>
+              <a href="/api/browser/proxy?url=https://developer.mozilla.org" class="btn">MDN Web Docs</a>
+              <a href="/api/browser/proxy?url=https://www.wikipedia.org" class="btn">Wikipedia</a>
             </div>
           </div>
           ${bridgeScript}
@@ -3464,6 +3371,32 @@ app.post('/api/jobs/:id/approve', (req, res) => {
   const { approved } = req.body;
   const ok = jobsManager.handleApproval(req.params.id, Boolean(approved));
   return res.json({ success: ok, approved: Boolean(approved) });
+});
+
+// ==========================================
+// PARALLEL SUBAGENTS API
+// ==========================================
+
+app.post('/api/agent/subagents', (req, res) => {
+  try {
+    const run = subagentOrchestrator.createRun(req.body || {});
+    return res.status(202).json({ success: true, ...run, statusUrl: `/api/jobs/${run.jobId}` });
+  } catch (error: any) {
+    return res.status(400).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
+app.get('/api/agent/subagents/:jobId', (req, res) => {
+  const job = jobsManager.getJob(req.params.jobId);
+  if (!job || job.type !== 'parallel_subagents') return res.status(404).json({ error: 'Execução de subagentes não encontrada.' });
+  return res.json({ job });
+});
+
+app.post('/api/agent/subagents/:jobId/cancel', (req, res) => {
+  const job = jobsManager.getJob(req.params.jobId);
+  if (!job || job.type !== 'parallel_subagents') return res.status(404).json({ error: 'Execução de subagentes não encontrada.' });
+  const cancelled = jobsManager.cancelJob(req.params.jobId, String(req.body?.reason || 'Cancelado pelo usuário'));
+  return res.json({ success: cancelled, jobId: req.params.jobId });
 });
 
 app.get('/api/artifacts/:id/download', async (req, res) => {
@@ -3753,7 +3686,7 @@ function planRealAgentActions(message: string): Array<{ toolName: string; args: 
     plan.push({
       toolName: 'browser.open_result',
       args: {},
-      reason: 'Analisando os resultados do Google e abrindo o primeiro resultado orgânico relevante'
+      reason: 'Fluxo legado desativado: a navegação agora exige uma URL direta'
     });
     plan.push({
       toolName: 'browser.scroll',
@@ -3943,7 +3876,7 @@ function generateComprehensiveAgentReport(
       }
       return `- **Comando:** \`${cmd}\` (Status: ${t.status || 'sucesso'})${outputSnippet}`;
     }).join('\n');
-    sections.push(`### 3. Comandos Executados no Container Linux\n${bashItems}`);
+    sections.push(`### 3. Comandos Executados no Container Ubuntu 24.04\n${bashItems}`);
   }
 
   // 4. File system inspections and operations

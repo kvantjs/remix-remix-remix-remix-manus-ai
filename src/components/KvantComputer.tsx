@@ -804,7 +804,7 @@ export function KvantComputer({
                 Ambiente Computer MCP em inicialização
               </p>
               <p className="text-xs text-zinc-400 font-mono">
-                {bootSecondsRemaining}s restantes · Conectando ao container Linux
+                {bootSecondsRemaining}s restantes · Conectando ao container Ubuntu 24.04
               </p>
             </div>
           </div>

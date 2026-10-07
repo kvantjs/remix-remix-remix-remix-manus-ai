@@ -4,6 +4,7 @@ import { exec } from 'child_process';
 import util from 'util';
 import { resolveSafeSandboxPath, redactSecrets, isSafeUrl, SANDBOX_WORKSPACE_ROOT } from './security.js';
 import { jobsManager, AgentJob, JobApprovalRequest } from './jobs-manager.js';
+import { subagentOrchestrator } from './subagent-orchestrator.js';
 import { challengeMessage } from './browser-challenge.js';
 import { agentIsolatedRuntime } from './agent-isolated-runtime.js';
 
@@ -49,7 +50,7 @@ export const AGENT_TOOL_DECLARATIONS = [
   },
   {
     name: 'bash_exec',
-    description: 'Executa comandos shell Linux em uma área de trabalho isolada (sandbox) com limites de tempo e recursos, retornando exitCode, stdout e stderr.',
+    description: 'Executa comandos shell Bash no Ubuntu 24.04 em uma área de trabalho isolada (sandbox) com limites de tempo e recursos, retornando exitCode, stdout e stderr.',
     parameters: {
       type: 'OBJECT',
       properties: {
@@ -225,7 +226,7 @@ export const AGENT_TOOL_DECLARATIONS = [
   },
   {
     name: 'browser_open_result',
-    description: 'Abre o primeiro resultado orgânico encontrado na página de resultados do Google usando a sessão real do navegador.',
+    description: 'Compatibilidade legada: não há resultados de busca neste modo; navegue diretamente com browser.navigate ou browser.search informando uma URL.',
     parameters: {
       type: 'OBJECT',
       properties: {}
@@ -287,6 +288,37 @@ export const AGENT_TOOL_DECLARATIONS = [
         }
       },
       required: ['jobId']
+    }
+  },
+  {
+    name: 'subagent_parallel',
+    description: 'Cria subagentes independentes em paralelo para decompor uma tarefa. Cada subagente recebe um prompt isolado; o job agrega sucessos e falhas e pode ser cancelado pelo usuário.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        objective: {
+          type: 'STRING',
+          description: 'Objetivo comum que contextualiza todas as subtarefas.'
+        },
+        maxConcurrency: {
+          type: 'INTEGER',
+          description: 'Número máximo de subagentes simultâneos, entre 1 e 8. Padrão: 4.'
+        },
+        tasks: {
+          type: 'ARRAY',
+          description: 'Lista de subtarefas independentes, com id, title e prompt.',
+          items: {
+            type: 'OBJECT',
+            properties: {
+              id: { type: 'STRING' },
+              title: { type: 'STRING' },
+              prompt: { type: 'STRING' }
+            },
+            required: ['prompt']
+          }
+        }
+      },
+      required: ['tasks']
     }
   },
   {
@@ -806,7 +838,7 @@ export class AgentToolExecutor {
             success: result.success !== false && !result.challenge,
             result: { ...result, browserStatus: result.browserStatus || 'interactive' },
             error: result.error,
-            actionDescription: result.challenge ? `Abertura interrompida: ${result.challenge.reason}` : `Agente abriu o primeiro resultado orgânico e obteve o contexto da página real`,
+            actionDescription: result.challenge ? `Navegação direta interrompida: ${result.challenge.reason}` : `Abertura de resultado desativada no modo de navegação direta`,
             requiresApproval: Boolean(result.challenge),
             approvalDetails: result.challenge ? { actionName: 'browser_handoff', details: result.challenge, riskLevel: 'medium', reason: 'Intervenção humana autorizada necessária.', requestedAt: new Date().toISOString() } : undefined
           };
@@ -945,6 +977,15 @@ export class AgentToolExecutor {
               reason
             },
             actionDescription: `Cancelamento do job [${jobId}]`
+          };
+        }
+
+        case 'subagent_parallel': {
+          const run = subagentOrchestrator.createRun(args);
+          return {
+            success: true,
+            result: { ...run, statusUrl: `/api/jobs/${run.jobId}` },
+            actionDescription: `Execução paralela criada com ${run.taskCount} subagentes [${run.jobId}]`
           };
         }
 

@@ -299,12 +299,12 @@ export function ChatArea({
       ],
       content: `Olá! Sou o **Agente Autônomo de Engenharia de Software e Design** do Kvant.
 
-Estou conectado a um **Runtime Próprio e Isolado em Nuvem Linux 100% operacional**, onde opero via **MCP (Model Context Protocol)** e **Habilidades (SKILLs)** de ponta:
+Estou conectado a um **Runtime Próprio e Isolado em Nuvem Ubuntu 24.04 100% operacional**, onde opero via **MCP (Model Context Protocol)** e **Habilidades (SKILLs)** de ponta:
 
 ### Ferramentas MCP Integradas:
 1. **Computer MCP**: Abro o navegador real para navegar em URLs, pesquisar no Google, rolar páginas e interagir com sites ao vivo.
 2. **WebDev MCP**: Acesso total ao workspace para criar, editar e excluir arquivos, gerenciar pacotes, e sincronizar com o preview em tempo real.
-3. **Terminal Bash MCP**: Execução de comandos shell complexos, diagnósticos de rede e automação de scripts no container Linux.
+3. **Terminal Bash MCP**: Execução de comandos shell complexos, diagnósticos de rede e automação de scripts no container Ubuntu.
 
 ### Habilidades de Engenharia e Design:
 - **Design-to-Code**: Tradução perfeita de referências visuais para UI de alta fidelidade.
@@ -529,7 +529,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
       onAgentStateChangeRef.current?.({
         isWorking: false,
         statusText: 'Computador do Agente Ativo',
-        contextText: 'Instância Linux x86_64 ativa. Agente autônomo com navegador Chromium.',
+        contextText: 'Instância Ubuntu 24.04 x86_64 ativa. Agente autônomo com navegador Chromium.',
         toolCalls: allToolCalls
       });
     }
