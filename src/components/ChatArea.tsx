@@ -362,6 +362,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const browserProgressSequenceRef = useRef(0);
 
   const updateExecutionSteps = (updater: (steps: ExecutionStep[]) => ExecutionStep[]) => {
     setExecutionSteps((previous) => {
@@ -776,10 +777,11 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                       });
                     }
                   } else if (currentEvent === 'browser_progress') {
+                    browserProgressSequenceRef.current += 1;
                     activateExecutionAnimation();
                     updateProgressNote('Navegador ao vivo', data.actionDescription || data.status || 'Acompanhando mouse, rolagem e conteúdo da página.', 'running');
                     const progressTrace: ToolCallTrace = {
-                      id: `active_browser_${data.toolName || 'action'}`,
+                      id: `active_browser_${data.toolName || 'action'}_${browserProgressSequenceRef.current}`,
                       toolName: data.toolName || 'browser_action',
                       server: 'Computer MCP',
                       arguments: data.arguments || {},

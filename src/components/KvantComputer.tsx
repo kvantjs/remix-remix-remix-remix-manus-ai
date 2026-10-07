@@ -241,10 +241,10 @@ export function KvantComputer({
 
   const handleTurnOnComputer = (targetUrlAfterBoot?: string) => {
     setIsComputerActive(true);
-    setBootSecondsRemaining(10);
+    setBootSecondsRemaining(5);
     setIsLoading(true);
     setBrowserStatus('loading');
-    let remaining = 10;
+    let remaining = 5;
     const timer = window.setInterval(() => {
       remaining -= 1;
       setBootSecondsRemaining(Math.max(remaining, 0));
@@ -283,8 +283,8 @@ export function KvantComputer({
     setIsComputerActive(true);
     setBrowserStatus('loading');
     setIsLoading(true);
-    setBootSecondsRemaining(10);
-    let remaining = 10;
+    setBootSecondsRemaining(5);
+    let remaining = 5;
     const timer = window.setInterval(() => {
       remaining -= 1;
       setBootSecondsRemaining(Math.max(remaining, 0));
@@ -612,7 +612,6 @@ export function KvantComputer({
 
   // Synchronize when Agent runs tool calls in Chat
   useEffect(() => {
-    if (isBooting) return;
     if (toolCalls && toolCalls.length > 0) {
       if (!isComputerActive) {
         handleTurnOnComputer();
