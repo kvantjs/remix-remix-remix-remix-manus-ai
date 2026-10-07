@@ -1,0 +1,201 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Kvant agent on Ubuntu 24.04 EC2 with SSM, Nginx and systemd
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: Existing VPC for the instance
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Public subnet with route to an Internet Gateway
+  AmiId:
+    Type: AWS::EC2::Image::Id
+    Description: Ubuntu Server 24.04 LTS AMI
+  Repository:
+    Type: String
+    Default: https://github.com/kvantjs/remix-remix-remix-remix-manus-ai.git
+  Branch:
+    Type: String
+    Default: main
+  InstanceType:
+    Type: String
+    Default: t3.medium
+  RootVolumeSize:
+    Type: Number
+    Default: 30
+
+Resources:
+  AgentSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Public HTTP and HTTPS for Kvant agent; administration through SSM
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: Public HTTP
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: Public HTTPS
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: kvant-agent-sg
+
+  AgentRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub kvant-agent-ec2-role-${AWS::StackName}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Tags:
+        - Key: Name
+          Value: kvant-agent-ec2-role
+
+  AgentInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref AgentRole
+
+  AgentInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AmiId
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref AgentInstanceProfile
+      SubnetId: !Ref SubnetId
+      SecurityGroupIds:
+        - !Ref AgentSecurityGroup
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeType: gp3
+            VolumeSize: !Ref RootVolumeSize
+            Encrypted: true
+            DeleteOnTermination: true
+      Tags:
+        - Key: Name
+          Value: kvant-agent-ubuntu
+        - Key: Application
+          Value: kvant
+      UserData:
+        Fn::Base64: !Sub |
+          #!/usr/bin/env bash
+          set -euxo pipefail
+          exec > >(tee /var/log/kvant-bootstrap.log | logger -t kvant-bootstrap -s 2>/dev/console) 2>&1
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y ca-certificates curl git nginx unzip
+          curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+          apt-get install -y nodejs
+          useradd --system --create-home --shell /usr/sbin/nologin kvant || true
+          mkdir -p /opt/kvant /etc/kvant
+          git clone --depth 1 --branch ${Branch} ${Repository} /opt/kvant
+          chown -R kvant:kvant /opt/kvant
+          cd /opt/kvant
+          sudo -u kvant npm ci --ignore-scripts
+          sudo -u kvant npx playwright install --with-deps chromium
+          sudo -u kvant npm run build
+          cat >/etc/kvant/kvant.env <<'EOF'
+          NODE_ENV=production
+          PORT=3000
+          RUNTIME_DISTRIBUTION=Ubuntu 24.04
+          CLOUD_PROVIDER=aws-ec2
+          EOF
+          chmod 600 /etc/kvant/kvant.env
+          cat >/etc/systemd/system/kvant.service <<'EOF'
+          [Unit]
+          Description=Kvant autonomous agent
+          Wants=network-online.target
+          After=network-online.target
+
+          [Service]
+          Type=simple
+          User=kvant
+          Group=kvant
+          WorkingDirectory=/opt/kvant
+          EnvironmentFile=/etc/kvant/kvant.env
+          ExecStart=/usr/bin/npm run start
+          Restart=always
+          RestartSec=5
+          NoNewPrivileges=true
+          PrivateTmp=true
+          ProtectSystem=full
+          ReadWritePaths=/opt/kvant
+
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+          cat >/etc/nginx/sites-available/kvant <<'EOF'
+          server {
+              listen 80 default_server;
+              listen [::]:80 default_server;
+              server_name _;
+              location /api/agent/chat/stream {
+                  proxy_pass http://127.0.0.1:3000;
+                  proxy_http_version 1.1;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+                  proxy_set_header Connection "";
+                  proxy_buffering off;
+                  proxy_cache off;
+                  proxy_request_buffering off;
+                  proxy_read_timeout 3600s;
+                  add_header X-Accel-Buffering no always;
+              }
+              location / {
+                  proxy_pass http://127.0.0.1:3000;
+                  proxy_http_version 1.1;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+                  proxy_set_header Upgrade $http_upgrade;
+                  proxy_set_header Connection "upgrade";
+                  proxy_read_timeout 300s;
+              }
+          }
+          EOF
+          rm -f /etc/nginx/sites-enabled/default
+          ln -sf /etc/nginx/sites-available/kvant /etc/nginx/sites-enabled/kvant
+          nginx -t
+          systemctl daemon-reload
+          systemctl enable --now nginx
+          systemctl enable --now kvant
+
+  AgentElasticIp:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      InstanceId: !Ref AgentInstance
+      Tags:
+        - Key: Name
+          Value: kvant-agent-eip
+
+Outputs:
+  InstanceId:
+    Value: !Ref AgentInstance
+  PublicIp:
+    Value: !Ref AgentElasticIp
+  PublicUrl:
+    Value: !Sub http://${AgentElasticIp}
+  SecurityGroupId:
+    Value: !Ref AgentSecurityGroup
+  SsmTarget:
+    Value: !Sub https://${AWS::Region}.console.aws.amazon.com/systems-manager/managed-instances/${AgentInstance}/node-overview

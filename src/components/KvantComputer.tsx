@@ -13,6 +13,10 @@ import {
 } from '@phosphor-icons/react';
 import { ToolCallTrace } from '../types/project';
 import { DynamicRuntimeRunner } from './DynamicRuntimeRunner';
+import { TerminalView } from './TerminalView';
+import CodeMirror from '@uiw/react-codemirror';
+import { javascript } from '@codemirror/lang-javascript';
+import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { extractCleanDomain } from '@/lib/favicon';
 import { OrbBloop } from '@/components/orb/bloop/index';
 import { BloopState } from '@/components/orb/bloop/types';
@@ -30,6 +34,7 @@ interface KvantComputerProps {
   onRunTestTool?: (prompt: string) => void;
   agentIntent?: any;
   browserStatus?: 'loading' | 'interactive' | 'error' | 'blocked';
+  onFileUpdate?: (files: Array<{ path: string; code: string; lang?: string }>) => void;
 }
 
 // Comprehensive Brand & Portal Registry for instant, accurate address navigation
@@ -125,32 +130,19 @@ function inferCursorAnimation(status = '', isClicking = false): CursorAnimation 
   return 'idle';
 }
 
-function LiveAgentDock({ toolCalls = [], customFiles, isWorking }: { toolCalls?: ToolCallTrace[]; customFiles?: Record<string, string>; isWorking: boolean }) {
-  const latestTerminal = [...toolCalls].reverse().find(t => t.actionType === 'terminal' || t.toolName.includes('bash') || t.toolName.includes('python') || t.screenData?.terminalOutput);
-  const latestCode = [...toolCalls].reverse().find(t => t.screenData?.fileContent || t.arguments?.content || t.arguments?.code);
-  const [tab, setTab] = useState<'terminal' | 'code'>('terminal');
-  useEffect(() => {
-    if (latestCode && !latestTerminal) setTab('code');
-  }, [latestCode?.id, latestTerminal?.id]);
-  if (!isWorking && !latestTerminal && !latestCode) return null;
-  const code = String(latestCode?.screenData?.fileContent || latestCode?.arguments?.content || latestCode?.arguments?.code || customFiles?.['client/src/App.tsx'] || '');
-  const output = String(latestTerminal?.screenData?.terminalOutput || latestTerminal?.result || 'Aguardando saída incremental...');
+function AgentCodeSurface({ toolCalls = [], customFiles = {}, onFileUpdate }: { toolCalls?: ToolCallTrace[]; customFiles?: Record<string, string>; onFileUpdate?: KvantComputerProps['onFileUpdate'] }) {
+  const latest = [...toolCalls].reverse().find(t => t.actionType === 'editor' || t.screenData?.fileContent || t.arguments?.content || t.arguments?.code);
+  const filePath = latest?.screenData?.filePath || latest?.arguments?.filePath || latest?.arguments?.path || 'client/src/App.tsx';
+  const incoming = String(latest?.screenData?.fileContent || latest?.arguments?.content || latest?.arguments?.code || customFiles[filePath] || customFiles['client/src/App.tsx'] || '');
+  const [value, setValue] = useState(incoming);
+  useEffect(() => { if (incoming && incoming !== value) setValue(incoming); }, [incoming]);
   return (
-    <div className="absolute left-3 right-3 bottom-3 z-40 rounded-xl overflow-hidden border border-white/15 bg-[#111318]/95 shadow-2xl backdrop-blur-md text-white pointer-events-auto">
-      <div className="h-8 px-2 flex items-center justify-between border-b border-white/10 bg-white/5">
-        <div className="flex items-center gap-1">
-          <span className="text-[10px] uppercase tracking-widest text-cyan-300 font-semibold mr-2">Execução ao vivo</span>
-          <button onClick={() => setTab('terminal')} className={`px-2 py-1 rounded text-[10px] ${tab === 'terminal' ? 'bg-green-400/20 text-green-300' : 'text-white/50'}`}>Terminal</button>
-          <button onClick={() => setTab('code')} className={`px-2 py-1 rounded text-[10px] ${tab === 'code' ? 'bg-blue-400/20 text-blue-300' : 'text-white/50'}`}>Editor</button>
-        </div>
-        <span className="text-[9px] text-white/40">sincronização incremental</span>
+    <div className="flex-1 min-h-0 flex flex-col bg-[#1e1e1e] text-white">
+      <div className="h-9 shrink-0 flex items-center justify-between px-3 border-b border-white/10 bg-[#252526] font-mono text-[11px]">
+        <span className="text-blue-300">{filePath}</span><span className="text-white/40">CodeMirror · edição ao vivo</span>
       </div>
-      <div className="p-2 max-h-36 overflow-auto font-mono text-[10px] leading-relaxed">
-        {tab === 'terminal' ? (
-          <><div className="text-green-300 mb-1">$ {latestTerminal?.screenData?.command || latestTerminal?.arguments?.command || 'terminal aguardando comando'}</div><pre className="whitespace-pre-wrap text-white/75">{output.slice(-5000)}</pre></>
-        ) : (
-          <><div className="text-blue-300 mb-1">{latestCode?.screenData?.filePath || latestCode?.arguments?.filePath || latestCode?.arguments?.path || 'client/src/App.tsx'}</div><pre className="whitespace-pre-wrap text-white/75">{code.slice(-7000) || '// aguardando conteúdo do editor'}</pre></>
-        )}
+      <div className="flex-1 min-h-0 overflow-auto">
+        <CodeMirror value={value} height="100%" theme={vscodeDark} extensions={[javascript({ jsx: true, typescript: true })]} onChange={(code) => { setValue(code); onFileUpdate?.([{ path: filePath, code, lang: 'typescript' }]); }} basicSetup={{ lineNumbers: true, foldGutter: true, autocompletion: true }} />
       </div>
     </div>
   );
@@ -253,6 +245,7 @@ export function KvantComputer({
   statusText = 'Computador do Agente Ativo',
   contextText,
   customFiles,
+  onFileUpdate,
   agentIntent,
   browserStatus: externalBrowserStatus
 }: KvantComputerProps) {
@@ -269,6 +262,12 @@ export function KvantComputer({
   const [bootSecondsRemaining, setBootSecondsRemaining] = useState(0);
   const isBooting = bootSecondsRemaining > 0;
   const [iframeLoaded, setIframeLoaded] = useState<boolean>(false);
+  const latestSurfaceTrace = [...(toolCalls || [])].reverse().find(trace => trace.actionType || trace.screenData?.terminalOutput || trace.screenData?.fileContent);
+  const activeSurface: 'browser' | 'terminal' | 'editor' = latestSurfaceTrace?.actionType === 'terminal'
+    ? 'terminal'
+    : latestSurfaceTrace?.actionType === 'editor'
+      ? 'editor'
+      : 'browser';
 
   const handleTurnOnComputer = (targetUrlAfterBoot?: string) => {
     setIsComputerActive(true);
@@ -874,7 +873,10 @@ export function KvantComputer({
               </div>
             )}
 
+            {activeSurface === 'terminal' && <TerminalView activeCode={customCode} liveToolCalls={toolCalls} />}
+            {activeSurface === 'editor' && <AgentCodeSurface toolCalls={toolCalls} customFiles={customFiles} onFileUpdate={onFileUpdate} />}
             {/* Complete website rendered via proxy or dynamic runtime with decreased zoom (85% scale) in light mode */}
+            <div className={activeSurface === 'browser' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>
             {isExternalWeb || !customCode ? (
               <div className="relative w-full h-full flex-1 overflow-hidden bg-white" style={{ colorScheme: 'light', backgroundColor: '#ffffff' }}>
                 <div 
@@ -956,10 +958,10 @@ export function KvantComputer({
                 </div>
               </div>
             )}
+            </div>
           </div>
         )}
 
-        <LiveAgentDock toolCalls={toolCalls} customFiles={customFiles} isWorking={isWorking} />
 
         {/* AGENT MOUSE CURSOR: Positioned over the remote desktop */}
         {agentCursor.visible && isComputerActive && !isIdle && !isBooting && (liveScreenshot || iframeLoaded || customCode) && (isWorking || userControlMode || liveScreenshot || customCode) && (

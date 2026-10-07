@@ -8,6 +8,7 @@ import {
   CheckCircle 
 } from '@phosphor-icons/react';
 import { SyntaxCodeView, detectLanguage } from './SyntaxCodeView';
+import { ToolCallTrace } from '../types/project';
 
 function TerminalOutput({ content }: { content: string }) {
   const trimmed = content.trim();
@@ -51,7 +52,7 @@ interface TerminalLine {
   time: string;
 }
 
-export function TerminalView({ activeCode }: { activeCode?: string }) {
+export function TerminalView({ activeCode, liveToolCalls = [] }: { activeCode?: string; liveToolCalls?: ToolCallTrace[] }) {
   const [history, setHistory] = useState<TerminalLine[]>([
     {
       id: 'init-1',
@@ -231,6 +232,12 @@ export function TerminalView({ activeCode }: { activeCode?: string }) {
                 {line.content}
               </div>
             )}
+          </div>
+        ))}
+        {liveToolCalls.filter(t => t.actionType === 'terminal' || t.toolName.includes('bash') || t.toolName.includes('python') || t.screenData?.terminalOutput).slice(-30).map((trace) => (
+          <div key={`live-${trace.id}`} className="leading-relaxed border-l-2 border-emerald-400/40 pl-2">
+            <div className="text-emerald-300/80 text-[10px]">[agente ao vivo] {trace.screenData?.command || trace.arguments?.command || trace.toolName}</div>
+            <pre className="whitespace-pre-wrap text-white/75">{trace.screenData?.terminalOutput || trace.result}</pre>
           </div>
         ))}
 

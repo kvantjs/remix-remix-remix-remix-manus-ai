@@ -761,6 +761,11 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                       result: 'Executando no computador...',
                       timestamp: new Date().toLocaleTimeString(),
                       status: 'running',
+                      actionType: data.toolName.includes('file') || data.toolName.includes('write') || data.toolName.includes('edit')
+                        ? 'editor'
+                        : data.toolName.includes('bash') || data.toolName.includes('terminal') || data.toolName.includes('python')
+                          ? 'terminal'
+                          : 'browser',
                       screenData: {
                         url: data.arguments?.url || 'about:blank',
                         title: 'Acessando ao vivo...',
@@ -800,6 +805,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                       result: 'Ação do navegador em andamento...',
                       timestamp: new Date().toLocaleTimeString(),
                       status: 'running',
+                      actionType: 'browser',
                       screenData: {
                         url: data.url,
                         title: data.title,

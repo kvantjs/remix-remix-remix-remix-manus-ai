@@ -4139,12 +4139,27 @@ app.post('/api/agent/chat/stream', async (req, res) => {
   const intent = classifyAgentIntent(message, Array.isArray(history) ? history : []);
 
   res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.setHeader('Content-Encoding', 'identity');
   res.flushHeaders?.();
+  res.socket?.setNoDelay(true);
+  let streamClosed = false;
+  const heartbeat = setInterval(() => {
+    if (streamClosed || res.writableEnded) return;
+    res.write(`: heartbeat ${Date.now()}\n\n`);
+    (res as any).flush?.();
+  }, 8000);
+  res.on('close', () => {
+    streamClosed = true;
+    clearInterval(heartbeat);
+  });
 
   const sendEvent = (event: string, data: any) => {
+    if (streamClosed || res.writableEnded) return;
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    (res as any).flush?.();
   };
   const waitForExecutionPhase = async () => {
     sendEvent('execution_gate', { text: 'Pensamento concluído; preparando a próxima ação sem executar ferramentas ainda.' });

@@ -306,6 +306,7 @@ export function Workspace({
             statusText={statusText}
             contextText={contextText}
             customFiles={customFiles}
+            onFileUpdate={onFileUpdate}
             agentIntent={agentIntent}
             browserStatus={browserStatus}
             onRunTestTool={(prompt) => onSendPrompt && onSendPrompt(prompt)}
