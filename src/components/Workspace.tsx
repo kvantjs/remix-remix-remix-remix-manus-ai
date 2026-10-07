@@ -144,7 +144,7 @@ export function Workspace({
   };
 
   return (
-    <div className={`${isMaximized ? 'w-full absolute inset-0 z-30' : 'w-[56%] min-w-[460px]'} border-l border-border-divider-subtle bg-bg-surface-panel flex flex-col h-full animate-in duration-200 select-none`}>
+    <div className={`${isMaximized ? 'w-full absolute inset-0 z-30' : 'w-full lg:w-[56%] lg:min-w-[460px] min-w-0 h-[58%] min-h-[360px] lg:h-full shrink-0'} border-l-0 lg:border-l border-t lg:border-t-0 border-border-divider-subtle bg-bg-surface-panel flex flex-col animate-in duration-200 select-none`}>
       
       {/* Top Application Tab Bar */}
       <div className="h-11 flex items-center px-3 bg-bg-canvas-main/60 border-b border-border-divider-subtle shrink-0 relative select-none">

@@ -33,7 +33,7 @@ export default function App() {
   const [customFiles, setCustomFiles] = useState<Record<string, string>>({});
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
 
-  const [workspaceTab, setWorkspaceTab] = useState<'computer' | 'workspace' | 'code_tab' | 'preview_tab' | 'terminal_tab'>('workspace');
+  const [workspaceTab, setWorkspaceTab] = useState<'computer' | 'workspace' | 'code_tab' | 'preview_tab' | 'terminal_tab'>('computer');
 
   // Agent execution state for Computador do Kvant
   const [toolCalls, setToolCalls] = useState<ToolCallTrace[]>([]);
@@ -116,9 +116,10 @@ export default function App() {
   }, []);
 
   return (
-    <div className={`${theme} flex h-screen w-full bg-[#1a1a1a] text-text-content-primary overflow-hidden font-sans selection:bg-blue-500/20`}>
+    <div className={`${theme} flex h-screen w-full flex-col lg:flex-row bg-[#1a1a1a] text-text-content-primary overflow-hidden font-sans selection:bg-blue-500/20`}>
+      <h1 className="sr-only">Kvant — agente de desenvolvimento autônomo</h1>
       <Sidebar theme={theme} toggleTheme={toggleTheme} />
-      <main className="flex-1 flex overflow-hidden relative bg-[#1a1a1a]">
+      <main className="flex-1 min-h-0 min-w-0 flex flex-col lg:flex-row overflow-hidden relative bg-[#1a1a1a]">
         <ChatArea 
           onFileUpdate={handleFileUpdate} 
           externalPrompt={pendingPrompt}

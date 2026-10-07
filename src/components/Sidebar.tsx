@@ -19,7 +19,7 @@ import {
 
 export function Sidebar({ theme, toggleTheme }: { theme: 'light' | 'dark'; toggleTheme: () => void }) {
   return (
-    <aside className="w-[292px] bg-[#1f1f1f] border-r border-border-divider-subtle flex flex-col h-full shrink-0">
+    <aside className="hidden lg:flex w-[292px] bg-[#1f1f1f] border-r border-border-divider-subtle flex-col h-full shrink-0">
       {/* Header */}
       <div className="p-4 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
@@ -37,7 +37,7 @@ export function Sidebar({ theme, toggleTheme }: { theme: 'light' | 'dark'; toggl
       </div>
 
       {/* Main Nav */}
-      <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-1 custom-scrollbar">
+      <nav aria-label="Navegação principal" className="flex-1 overflow-y-auto px-3 py-2 space-y-1 custom-scrollbar">
         <button className="w-full flex items-center gap-3 px-3 py-2 text-sm text-text-content-primary/90 hover:bg-bg-action-hover rounded-lg transition-colors group">
           <Plus size={18} className="text-text-content-primary/40 group-hover:text-text-content-primary" />
           <span>Nova tarefa</span>

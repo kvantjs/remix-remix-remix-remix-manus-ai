@@ -5076,7 +5076,13 @@ async function startServer() {
     const vite = await createViteServer({
       // O Express é o dono do listener HTTP no AI Studio; sem um listener
       // HTTP anexado, o WebSocket HMR falha e impede a inicialização do preview.
-      server: { middlewareMode: true, hmr: false },
+      // O host público temporário é necessário para a inspeção do preview;
+      // mantemos uma allowlist explícita em vez de liberar qualquer host.
+      server: {
+        middlewareMode: true,
+        hmr: false,
+        allowedHosts: ['3000-i8duyrn4fdg37anqrw9v4-6043b547.us4.manus.computer'],
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);

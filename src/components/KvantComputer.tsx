@@ -251,10 +251,11 @@ export function KvantComputer({
 }: KvantComputerProps) {
   const [currentUrl, setCurrentUrl] = useState<string>('about:blank');
 
-  // Computer active / inactive state (Inactive by default per user request)
-  const [isComputerActive, setIsComputerActive] = useState<boolean>(false);
+  // O navegador deve estar visível ao abrir a aba; a automação continua sendo
+  // controlada exclusivamente pelos tool calls do agente.
+  const [isComputerActive, setIsComputerActive] = useState<boolean>(true);
   const [forceIdle, setForceIdle] = useState<boolean>(false);
-  const [pageTitle, setPageTitle] = useState<string>('Aguardando navegação do agente');
+  const [pageTitle, setPageTitle] = useState<string>('Navegador pronto');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isExternalWeb, setIsExternalWeb] = useState<boolean>(true);
   const [liveScreenshot, setLiveScreenshot] = useState<string | null>(null);
@@ -262,6 +263,8 @@ export function KvantComputer({
   const [bootSecondsRemaining, setBootSecondsRemaining] = useState(0);
   const isBooting = bootSecondsRemaining > 0;
   const [iframeLoaded, setIframeLoaded] = useState<boolean>(false);
+  const [iframeReloadKey, setIframeReloadKey] = useState(0);
+  const iframeLoadTimeoutRef = useRef<number | null>(null);
   const latestSurfaceTrace = [...(toolCalls || [])].reverse().find(trace => trace.actionType || trace.screenData?.terminalOutput || trace.screenData?.fileContent);
   const activeSurface: 'browser' | 'terminal' | 'editor' = latestSurfaceTrace?.actionType === 'terminal'
     ? 'terminal'
@@ -352,7 +355,7 @@ export function KvantComputer({
   const [navHistory, setNavHistory] = useState<NavHistoryItem[]>([
     {
       url: 'about:blank',
-      title: 'Aguardando navegação do agente',
+      title: 'Navegador pronto',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       action: 'Inicialização'
     }
@@ -413,7 +416,8 @@ export function KvantComputer({
 
   // Define if the computer is currently in an idle/finished state
   // CRITICAL: isIdle can NEVER be true while the agent is active or executing
-  const isIdle = isComputerActive && !isBooting && !isAgentActive && !userControlMode && (forceIdle || (!liveScreenshot && !customCode && !currentUrl));
+  const isBlankUrl = !currentUrl || currentUrl === 'about:blank';
+  const isIdle = isComputerActive && !isBooting && !isAgentActive && !userControlMode && (forceIdle || (!liveScreenshot && !customCode && isBlankUrl));
 
   // Reset forceIdle whenever the agent becomes active or starts a task
   useEffect(() => {
@@ -791,6 +795,22 @@ export function KvantComputer({
 
   const proxySrc = `/api/browser/proxy?url=${encodeURIComponent(currentUrl)}`;
 
+  useEffect(() => {
+    if (!isComputerActive || isBlankUrl || liveScreenshot) return;
+    setIframeLoaded(false);
+    setBrowserStatus('loading');
+    if (iframeLoadTimeoutRef.current) window.clearTimeout(iframeLoadTimeoutRef.current);
+    iframeLoadTimeoutRef.current = window.setTimeout(() => {
+      setIframeLoaded(current => {
+        if (!current) setBrowserStatus('error');
+        return current;
+      });
+    }, 8000);
+    return () => {
+      if (iframeLoadTimeoutRef.current) window.clearTimeout(iframeLoadTimeoutRef.current);
+    };
+  }, [currentUrl, isComputerActive, isBlankUrl, liveScreenshot, iframeReloadKey]);
+
   return (
     <div className="flex-1 flex flex-col h-full bg-bg-canvas-main text-text-content-primary select-none overflow-hidden font-sans">
       
@@ -866,11 +886,11 @@ export function KvantComputer({
               />
 
               <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight">
-                Processamento Concluído
+                Navegador pronto
               </h3>
 
               <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed max-w-sm">
-                Não há nada para ser mostrado no momento. O agente encerrou a navegação e o sistema está em modo de espera.
+                O computador está disponível e aguardando uma navegação real do agente. Nenhum site é aberto automaticamente.
               </p>
           </div>
         ) : (
@@ -933,6 +953,7 @@ export function KvantComputer({
                   ) : (
                     <div className="relative w-full h-full bg-white" style={{ colorScheme: 'light', backgroundColor: '#ffffff' }}>
                       <iframe
+                        key={iframeReloadKey}
                         ref={iframeRef}
                         src={proxySrc}
                         title="Computador na Nuvem"
@@ -940,11 +961,31 @@ export function KvantComputer({
                         style={{ colorScheme: 'light', backgroundColor: '#ffffff' }}
                         sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
                         onLoad={() => {
+                          if (iframeLoadTimeoutRef.current) window.clearTimeout(iframeLoadTimeoutRef.current);
                           setIframeLoaded(true);
                           setIsLoading(false);
+                          setBrowserStatus('interactive');
+                        }}
+                        onError={() => {
+                          if (iframeLoadTimeoutRef.current) window.clearTimeout(iframeLoadTimeoutRef.current);
+                          setIframeLoaded(false);
+                          setBrowserStatus('error');
                         }}
                       />
-                      {!iframeLoaded && (
+                      {browserStatus === 'error' ? (
+                        <div role="alert" className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#1a1a1a] p-6 text-center">
+                          <XCircle size={30} weight="fill" className="mb-3 text-red-400" />
+                          <p className="text-sm font-semibold text-white">O navegador do agente não respondeu</p>
+                          <p className="mt-1 max-w-xs text-xs leading-relaxed text-white/60">A página não pôde ser carregada no viewport visual. O agente pode tentar novamente sem perder a tarefa.</p>
+                          <button
+                            type="button"
+                            onClick={() => { setBrowserStatus('loading'); setIframeReloadKey(value => value + 1); }}
+                            className="mt-4 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-black transition hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                          >
+                            Tentar carregar novamente
+                          </button>
+                        </div>
+                      ) : !iframeLoaded && (
                         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#1a1a1a] p-6 animate-in fade-in duration-500">
                           <div className="flex flex-col items-center gap-6">
                             <div className="relative">
