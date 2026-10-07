@@ -266,11 +266,13 @@ export function KvantComputer({
   const [iframeReloadKey, setIframeReloadKey] = useState(0);
   const iframeLoadTimeoutRef = useRef<number | null>(null);
   const latestSurfaceTrace = [...(toolCalls || [])].reverse().find(trace => trace.actionType || trace.screenData?.terminalOutput || trace.screenData?.fileContent);
-  const activeSurface: 'browser' | 'terminal' | 'editor' = latestSurfaceTrace?.actionType === 'terminal'
-    ? 'terminal'
-    : latestSurfaceTrace?.actionType === 'editor'
-      ? 'editor'
-      : 'browser';
+  const activeSurface: 'browser' | 'terminal' | 'editor' = browserStatus === 'loading'
+    ? 'browser'
+    : latestSurfaceTrace?.actionType === 'terminal'
+      ? 'terminal'
+      : latestSurfaceTrace?.actionType === 'editor'
+        ? 'editor'
+        : 'browser';
 
   const handleTurnOnComputer = (targetUrlAfterBoot?: string) => {
     setIsComputerActive(true);
