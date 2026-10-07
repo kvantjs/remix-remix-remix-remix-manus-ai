@@ -25,6 +25,7 @@ import { challengeMessage, detectBrowserChallenge, type BrowserChallenge } from 
 import { AGENT_SKILLS, buildSkillsSystemInstruction } from './src/server/agent-skills.js';
 import { agentIsolatedRuntime } from './src/server/agent-isolated-runtime.js';
 import { executeSandboxCommand, getSandboxBackend } from './src/server/sandbox-executor.js';
+import { buildExecutableSkillsInstruction, executeSkill, listExecutableSkills, materializeSkillArtifacts } from './src/server/skill-runtime.js';
 import { synthesizeBespokeInterface } from './src/server/bespoke-ui-synthesizer.js';
 
 const execAsync = promisify(exec);
@@ -1930,12 +1931,38 @@ app.get('/api/agent/mcps', (_req, res) => {
 
 // 1.1 List all 10 Agent Skills & training details
 app.get('/api/agent/skills', (_req, res) => {
+  const executableSkills = listExecutableSkills();
+  const registeredSkills = [
+    ...AGENT_SKILLS.map(skill => ({ ...skill, executable: false })),
+    ...executableSkills.map(skill => ({
+      id: `skill-${skill.id}`,
+      name: skill.name,
+      category: 'automation',
+      version: skill.version,
+      mcpServers: ['WebDev', 'Terminal Bash'],
+      description: skill.purpose,
+      capabilities: skill.inputContract,
+      systemInstruction: `Executável via skill_execute com evidências e artefatos.`,
+      executable: true
+    }))
+  ];
   return res.json({
-    totalSkills: AGENT_SKILLS.length,
-    skills: AGENT_SKILLS
+    totalSkills: registeredSkills.length,
+    executableSkills,
+    skills: registeredSkills
   });
 });
-
+app.post('/api/agent/skills/execute', async (req, res) => {
+  const { skillId, request, answers, files, options } = req.body || {};
+  if (!skillId) return res.status(400).json({ error: 'skillId é obrigatório.' });
+  try {
+    const execution = await executeSkill(String(skillId), { request, answers, files, options });
+    const materialized = await materializeSkillArtifacts(execution);
+    return res.status(materialized.status === 'failed' ? 422 : 200).json({ ok: materialized.status !== 'failed', execution: materialized });
+  } catch (error: any) {
+    return res.status(400).json({ error: redactSecrets(error?.message || String(error)) });
+  }
+});
 // 1.2 Dedicated Isolated Runtime status & telemetry
 app.get('/api/agent/runtime/status', (_req, res) => {
   return res.json({ ...agentIsolatedRuntime.getMetrics(), sandbox: getSandboxBackend() });
@@ -4277,7 +4304,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
               model: modelCandidate,
               contents: chatContents,
               config: {
-                systemInstruction: CORE_SPARK_SYSTEM_INSTRUCTION + APP_CREATION_EXECUTION_CONTRACT + buildIntentInstruction(intent) + buildSkillsSystemInstruction() + '\n\nDIRETIVA DE RESPOSTA SEM CÓDIGO NO CHAT: NUNCA responda com blocos de código grandes ou listagens de código-fonte no chat. Só produza códigos se a intenção APP_CREATION estiver ativa.',
+                systemInstruction: CORE_SPARK_SYSTEM_INSTRUCTION + APP_CREATION_EXECUTION_CONTRACT + buildIntentInstruction(intent) + buildSkillsSystemInstruction() + buildExecutableSkillsInstruction() + '\n\nDIRETIVA DE RESPOSTA SEM CÓDIGO NO CHAT: NUNCA responda com blocos de código grandes ou listagens de código-fonte no chat. Só produza códigos se a intenção APP_CREATION estiver ativa.',
                 thinkingConfig: { thinkingBudget: DEFAULT_THINKING_BUDGET },
                 tools: intent.allowedTools.length ? [{ functionDeclarations: filterToolDeclarations(intent, AGENT_TOOL_DECLARATIONS) as any }] : undefined
               }
@@ -4784,7 +4811,7 @@ app.post('/api/agent/chat', async (req, res) => {
             model: modelCandidate,
             contents: chatContents,
             config: {
-              systemInstruction: CORE_SPARK_SYSTEM_INSTRUCTION + APP_CREATION_EXECUTION_CONTRACT + buildIntentInstruction(intent) + buildSkillsSystemInstruction() + '\n\nDIRETIVA DE RESPOSTA SEM CÓDIGO NO CHAT: NUNCA responda com blocos de código grandes ou listagens de código-fonte no chat. Só produza códigos se a intenção APP_CREATION estiver ativa.',
+                systemInstruction: CORE_SPARK_SYSTEM_INSTRUCTION + APP_CREATION_EXECUTION_CONTRACT + buildIntentInstruction(intent) + buildSkillsSystemInstruction() + buildExecutableSkillsInstruction() + '\n\nDIRETIVA DE RESPOSTA SEM CÓDIGO NO CHAT: NUNCA responda com blocos de código grandes ou listagens de código-fonte no chat. Só produza códigos se a intenção APP_CREATION estiver ativa.',
               tools: intent.allowedTools.length ? [{ functionDeclarations: filterToolDeclarations(intent, AGENT_TOOL_DECLARATIONS) as any }] : undefined
             }
           });

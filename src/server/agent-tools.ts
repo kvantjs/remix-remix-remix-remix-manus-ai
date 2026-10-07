@@ -8,6 +8,7 @@ import { subagentOrchestrator } from './subagent-orchestrator.js';
 import { challengeMessage } from './browser-challenge.js';
 import { agentIsolatedRuntime } from './agent-isolated-runtime.js';
 import { executeSandboxCommand } from './sandbox-executor.js';
+import { executeSkill, materializeSkillArtifacts } from './skill-runtime.js';
 
 const execAsync = util.promisify(exec);
 
@@ -381,6 +382,24 @@ export const AGENT_TOOL_DECLARATIONS = [
       },
       required: ['snapshotId']
     }
+  },
+  {
+    name: 'skill_execute',
+    description: 'Executa uma das dez Skills avançadas reais do agente, produzindo achados, evidências, artefatos e próximos passos verificáveis.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        skillId: {
+          type: 'STRING',
+          description: 'ID: autonomous-architecture-design, design-to-code-mastery, recursive-debugging, context-synthesis, real-time-collaboration, performance-optimization, security-hardening, multi-agent-coordination, environment-management ou heuristic-ux-audit.'
+        },
+        request: { type: 'STRING', description: 'Objetivo ou pedido que contextualiza a Skill.' },
+        answers: { type: 'OBJECT', description: 'Respostas estruturadas para context-synthesis.' },
+        files: { type: 'OBJECT', description: 'Mapa opcional de arquivos e conteúdo para auditorias.' },
+        options: { type: 'OBJECT', description: 'Opções específicas da Skill, como command, tasks, sessionId ou buildCommand.' }
+      },
+      required: ['skillId']
+    }
   }
 ];
 
@@ -406,6 +425,23 @@ export class AgentToolExecutor {
 
     try {
       switch (name) {
+        case 'skill_execute': {
+          const skillId = String(args.skillId || '').trim();
+          if (!skillId) throw new Error('skillId é obrigatório.');
+          const execution = await executeSkill(skillId, {
+            request: args.request ? String(args.request) : undefined,
+            answers: args.answers && typeof args.answers === 'object' ? args.answers : undefined,
+            files: args.files && typeof args.files === 'object' ? args.files : undefined,
+            options: args.options && typeof args.options === 'object' ? args.options : undefined
+          });
+          const materialized = await materializeSkillArtifacts(execution);
+          onProgress?.({ stream: materialized.status === 'failed' ? 'stderr' : 'stdout', chunk: `Skill ${materialized.name}: ${materialized.summary}\n`, done: true, exitCode: materialized.status === 'failed' ? 1 : 0 });
+          return {
+            success: materialized.status !== 'failed',
+            result: materialized,
+            actionDescription: `Skill executada: ${materialized.name} (${materialized.status})`
+          };
+        }
         case 'web_search': {
           const queryText = String(args.query || '').trim();
           if (!queryText) throw new Error('Parâmetro query é obrigatório.');

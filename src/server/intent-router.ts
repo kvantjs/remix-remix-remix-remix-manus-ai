@@ -74,14 +74,18 @@ const TOOL_ALIASES: Record<string, string> = {
   job_create: 'job_create',
   job_status: 'job_status',
   job_cancel: 'job_cancel',
-  subagent_parallel: 'subagent_parallel'
+  subagent_parallel: 'subagent_parallel',
+  skill_execute: 'skill_execute',
+  'agent.skill_execute': 'skill_execute',
+  'skill.execute': 'skill_execute'
 };
 
 const ALL_TOOLS = Object.values(TOOL_ALIASES).filter((name, index, list) => list.indexOf(name) === index);
-const WEB_TOOLS = ['web_search', 'web_fetch', 'browser_navigate', 'browser_inspect', 'browser_click', 'browser_scroll', 'browser_open_result'];
+const SKILL_TOOLS = ['skill_execute'];
+const WEB_TOOLS = ['web_search', 'web_fetch', 'browser_navigate', 'browser_inspect', 'browser_click', 'browser_scroll', 'browser_open_result', ...SKILL_TOOLS];
 const COMPUTER_TOOLS = [...WEB_TOOLS, 'browser_type', 'bash_exec', 'python_exec', 'job_create', 'job_status', 'job_cancel', 'subagent_parallel'];
-const APP_TOOLS = ['file_list', 'file_read', 'file_write', 'file_create_directory', 'webdev_secret_set', 'webdev_secret_get', 'webdev_snapshot', 'webdev_rollback', 'bash_exec', 'python_exec', 'job_create', 'job_status', 'job_cancel', 'subagent_parallel'];
-const PROJECT_TOOLS = ['file_list', 'file_read', 'file_write', 'file_create_directory', 'file_delete', 'webdev_secret_set', 'webdev_secret_get', 'webdev_snapshot', 'webdev_rollback', 'bash_exec', 'job_create', 'job_status', 'job_cancel', 'subagent_parallel'];
+const APP_TOOLS = ['file_list', 'file_read', 'file_write', 'file_create_directory', 'webdev_secret_set', 'webdev_secret_get', 'webdev_snapshot', 'webdev_rollback', 'bash_exec', 'python_exec', 'job_create', 'job_status', 'job_cancel', 'subagent_parallel', ...SKILL_TOOLS];
+const PROJECT_TOOLS = ['file_list', 'file_read', 'file_write', 'file_create_directory', 'file_delete', 'webdev_secret_set', 'webdev_secret_get', 'webdev_snapshot', 'webdev_rollback', 'bash_exec', 'job_create', 'job_status', 'job_cancel', 'subagent_parallel', ...SKILL_TOOLS];
 
 function hasAny(text: string, terms: string[]) {
   return terms.some((term) => {
