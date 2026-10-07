@@ -1,6 +1,16 @@
-import React, { useState, useEffect, useRef, Component, ErrorInfo, ReactNode } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, useContext, useReducer, useId, useLayoutEffect, Component, ErrorInfo, ReactNode } from 'react';
 import * as Babel from '@babel/standalone';
 import * as PhosphorIcons from '@phosphor-icons/react';
+
+const safeUseState = useState || React.useState;
+const safeUseEffect = useEffect || React.useEffect;
+const safeUseContext = useContext || React.useContext;
+const safeUseReducer = useReducer || React.useReducer;
+const safeUseCallback = useCallback || React.useCallback;
+const safeUseMemo = useMemo || React.useMemo;
+const safeUseRef = useRef || React.useRef;
+const safeUseId = useId || React.useId;
+const safeUseLayoutEffect = useLayoutEffect || React.useLayoutEffect;
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -157,8 +167,10 @@ function sanitizeSourceCode(rawCode: string): { code: string; mainComponentName:
   code = code.replace(/import\s+type\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '');
   code = code.replace(/import\s+['"][^'"]+\.(?:css|scss|less|sass)['"];?/g, '');
   code = code.replace(/import\s+['"][^'"]+\.(?:png|jpg|jpeg|svg|webp|gif|ico)['"];?/g, '');
-  code = code.replace(/import\s+(?:(?:\*\s+as\s+[\w$]+)|(?:\{[\s\S]*?\})|(?:[\w$,\s{}*]+))\s+from\s+['"][^'"]+['"];?/g, '');
-  code = code.replace(/import\s+['"][^'"]+['"];?/g, '');
+  code = code.replace(/import\s+(?!(?:React))\s+(?:(?:\*\s+as\s+[\w$]+)|(?:\{[\s\S]*?\})|(?:[\w$,\s{}*]+))\s+from\s+['"][^'"]+['"];?/g, '');
+  code = code.replace(/import\s+(?!(?:React))\s+['"][^'"]+['"];?/g, '');
+  code = code.replace(/import\s+(?!(?:React))[\s\S]*?from\s+['"][^'"]+['"];?/g, '');
+  code = code.replace(/import\s*\([\s\S]*?\);?/g, '');
 
   // 3. Detect main component name
   let mainComponentName = 'App';
@@ -294,21 +306,30 @@ export function DynamicRuntimeRunner({ code, customFiles = {} }: DynamicRuntimeR
           if (subCompiled) {
             const subScope: Record<string, any> = {
               React,
-              useState: React.useState,
-              useEffect: React.useEffect,
-              useContext: React.useContext,
-              useReducer: React.useReducer,
-              useCallback: React.useCallback,
-              useMemo: React.useMemo,
-              useRef: React.useRef,
-              useId: React.useId,
-              useLayoutEffect: React.useLayoutEffect,
+              useState: React.useState.bind(React),
+              useEffect: React.useEffect.bind(React),
+              useContext: React.useContext.bind(React),
+              useReducer: React.useReducer.bind(React),
+              useCallback: React.useCallback.bind(React),
+              useMemo: React.useMemo.bind(React),
+              useRef: React.useRef.bind(React),
+              useId: React.useId.bind(React),
+              useLayoutEffect: React.useLayoutEffect.bind(React),
               Fragment: React.Fragment,
               createElement: React.createElement,
               cloneElement: React.cloneElement,
               Children: React.Children,
               memo: React.memo,
               forwardRef: React.forwardRef,
+              require: (modName: string) => {
+                if (modName === 'react' || modName === 'react/jsx-runtime' || modName === 'react-dom') return React;
+                if (modName === '@phosphor-icons/react' || modName === 'lucide-react') return SafePhosphorIcons;
+                if (modName === 'framer-motion') return { motion: SafeMotion, AnimatePresence };
+                if (modName in subComponents) return subComponents[modName];
+                return SafePhosphorIcons;
+              },
+              module: { exports: {} },
+              exports: {},
               ...SafePhosphorIcons,
               Lucide: SafePhosphorIcons,
               icons: SafePhosphorIcons,
@@ -393,21 +414,30 @@ export function DynamicRuntimeRunner({ code, customFiles = {} }: DynamicRuntimeR
       // 4. Assemble execution scope with all subcomponents and helpers
       const scope: Record<string, any> = {
         React,
-        useState: React.useState,
-        useEffect: React.useEffect,
-        useContext: React.useContext,
-        useReducer: React.useReducer,
-        useCallback: React.useCallback,
-        useMemo: React.useMemo,
-        useRef: React.useRef,
-        useId: React.useId,
-        useLayoutEffect: React.useLayoutEffect,
+        useState: React.useState.bind(React),
+        useEffect: React.useEffect.bind(React),
+        useContext: React.useContext.bind(React),
+        useReducer: React.useReducer.bind(React),
+        useCallback: React.useCallback.bind(React),
+        useMemo: React.useMemo.bind(React),
+        useRef: React.useRef.bind(React),
+        useId: React.useId.bind(React),
+        useLayoutEffect: React.useLayoutEffect.bind(React),
         Fragment: React.Fragment,
         createElement: React.createElement,
         cloneElement: React.cloneElement,
         Children: React.Children,
         memo: React.memo,
         forwardRef: React.forwardRef,
+        require: (modName: string) => {
+          if (modName === 'react' || modName === 'react/jsx-runtime' || modName === 'react-dom') return React;
+          if (modName === '@phosphor-icons/react' || modName === 'lucide-react') return SafePhosphorIcons;
+          if (modName === 'framer-motion') return { motion: SafeMotion, AnimatePresence };
+          if (modName in subComponents) return subComponents[modName];
+          return SafePhosphorIcons;
+        },
+        module: { exports: {} },
+        exports: {},
         // Lucide Icons (Safe with Fallback)
         ...SafePhosphorIcons,
         Lucide: SafePhosphorIcons,

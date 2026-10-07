@@ -147,7 +147,9 @@ export default function AuraFintechApp() {
                 <div className="size-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400">
                   <ArrowUpRight size={16} weight="bold" />
                 </div>
-                <span className="text-[11px] font-medium text-emerald-200">Transferir</span>
+                <span style={{ borderColor: '#555555' }}>
+                  <span style={{ borderColor: '#555555' }} className="text-[11px] font-medium text-emerald-200">Transferir</span>
+                </span>
               </button>
 
               <button onClick={() => setBalance(prev => prev + 1000)} className="p-3 rounded-2xl bg-[#0F241C] hover:bg-[#153327] border border-emerald-800/40 text-center transition-all flex flex-col items-center gap-1.5">

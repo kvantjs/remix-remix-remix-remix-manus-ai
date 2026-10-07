@@ -100,7 +100,7 @@ export function Workspace({
   const [workspaceSubTab, setWorkspaceSubTab] = useState<WorkspaceSubTab>('preview');
   const [activeFile, setActiveFile] = useState('client/src/App.tsx');
 
-  // Resolve active code content for preview / editor
+  // Resolve active code content for editor
   const activeCodeContent = useMemo(() => {
     if (customFiles[activeFile]) return customFiles[activeFile];
     if (customFiles['client/src/App.tsx']) return customFiles['client/src/App.tsx'];
@@ -109,6 +109,11 @@ export function Workspace({
     if (keys.length > 0) return customFiles[keys[0]];
     return DEFAULT_INITIAL_APP_CODE;
   }, [customFiles, activeFile]);
+
+  // Resolve code content for runtime preview (always App component code)
+  const runtimeAppCode = useMemo(() => {
+    return customFiles['client/src/App.tsx'] || customFiles['App.tsx'] || customFiles['client/src/DynamicApp.tsx'] || DEFAULT_INITIAL_APP_CODE;
+  }, [customFiles]);
 
   const handleCloseTab = (tabId: TopLevelTab, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -317,9 +322,10 @@ export function Workspace({
       {activeTopTab === 'preview_tab' && (
         <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg-surface-panel">
           <RuntimePreview 
-            activeCode={activeCodeContent} 
+            activeCode={runtimeAppCode} 
             customFiles={customFiles}
             onSendPrompt={onSendPrompt}
+            isWorking={isWorking}
           />
         </div>
       )}
@@ -336,7 +342,7 @@ export function Workspace({
         <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg-surface-panel">
           {/* Internal Navigation Bar for Workspace */}
           <div className="h-11 flex items-center justify-between px-3 border-b border-border-divider-subtle shrink-0 bg-bg-surface-panel">
-            <div className="flex items-center gap-1 p-0.5 border border-border-divider-subtle rounded-lg bg-bg-canvas-main/80 overflow-x-auto">
+            <div style={{ backgroundColor: '#1a1a1a', borderWidth: '0px', borderRadius: '9px', borderColor: '#1a1a1a' }} className="flex items-center gap-1 p-0.5 border border-border-divider-subtle rounded-lg bg-bg-canvas-main/80 overflow-x-auto">
               <NavButton 
                 active={workspaceSubTab === 'preview'} 
                 onClick={() => setWorkspaceSubTab('preview')}
@@ -392,9 +398,10 @@ export function Workspace({
           <div className="flex-1 overflow-hidden relative">
             {workspaceSubTab === 'preview' && (
               <RuntimePreview 
-                activeCode={activeCodeContent} 
+                activeCode={runtimeAppCode} 
                 customFiles={customFiles}
                 onSendPrompt={onSendPrompt}
+                isWorking={isWorking}
               />
             )}
             {workspaceSubTab === 'code' && (
@@ -433,38 +440,7 @@ function NavButton({ active, icon, label, onClick }: any) {
   );
 }
 
-const DEFAULT_INITIAL_APP_CODE = `import React, { useState } from 'react';
-import { Sparkle, ArrowRight, ShieldCheck, CreditCard, Wallet, TrendUp, TrendUp as TrendingUp } from '@phosphor-icons/react';
-
-export default function App() {
-  const [activeTab, setActiveTab] = useState('overview');
-
-  return (
-    <div className="min-h-screen bg-[#080A0F] text-slate-100 font-sans p-6 sm:p-8 selection:bg-white/10">
-      <div className="max-w-5xl mx-auto space-y-6">
-        <header className="flex items-center justify-between pb-6 border-b border-white/10">
-          <div className="flex items-center gap-3">
-            <div className="size-10 rounded-xl bg-white/5 border border-white/10 text-white flex items-center justify-center">
-              <Sparkle size={20} weight="fill" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-white tracking-tight">Kvant WebDev Workspace</h1>
-              <p className="text-xs text-slate-400 font-mono">Ambiente de Criação Reativa em Tempo Real</p>
-            </div>
-          </div>
-        </header>
-
-        <main className="p-8 rounded-2xl bg-[#0F111A] border border-white/10 space-y-4 text-center">
-          <h2 className="text-2xl font-extrabold text-white">Aplicação Pronta para Criação</h2>
-          <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-            Peça ao agente para criar qualquer site, dashboard, e-commerce ou fintech no chat.
-          </p>
-        </main>
-      </div>
-    </div>
-  );
-}
-`;
+const DEFAULT_INITIAL_APP_CODE = ``;
 
 // Helper to build a file tree structure from list of path strings
 interface TreeNode {
