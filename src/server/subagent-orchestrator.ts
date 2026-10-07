@@ -1,7 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { jobsManager } from './jobs-manager.js';
 import { redactSecrets } from './security.js';
-import { generateContentWithProvider } from './llm-provider.js';
 
 export interface SubagentTask {
   id: string;
@@ -25,7 +24,7 @@ export interface SubagentRunInput {
   model?: string;
 }
 
-const defaultModel = () => process.env.SUBAGENT_MODEL || process.env.OLLAMA_MODEL || 'gemini-3.8-flash';
+const DEFAULT_MODEL = process.env.SUBAGENT_MODEL || 'gemini-3.8-flash';
 const MAX_TASKS = 20;
 const MAX_CONCURRENCY = 8;
 
@@ -54,18 +53,17 @@ export function normalizeSubagentInput(input: any): SubagentRunInput {
     tasks,
     objective: String(input?.objective || '').trim().slice(0, 4000) || undefined,
     maxConcurrency: Math.min(MAX_CONCURRENCY, Math.max(1, Number(input?.maxConcurrency) || 4)),
-    model: String(process.env.OLLAMA_MODEL || input?.model || defaultModel()).trim().slice(0, 100) || defaultModel()
+    model: String(input?.model || DEFAULT_MODEL).trim().slice(0, 100) || DEFAULT_MODEL
   };
 }
 
 export class SubagentOrchestrator {
   private ai: GoogleGenAI | null = null;
 
-  private getClient(): GoogleGenAI | null {
-    if (process.env.OLLAMA_MODEL) return null;
+  private getClient() {
     if (this.ai) return this.ai;
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-    if (!apiKey) return null;
+    if (!apiKey) throw new Error('GEMINI_API_KEY ou GOOGLE_API_KEY não configurada.');
     this.ai = new GoogleGenAI({ apiKey });
     return this.ai;
   }
@@ -98,8 +96,8 @@ export class SubagentOrchestrator {
         }
         jobsManager.updateProgress(jobId, Math.round((results.length / input.tasks.length) * 100), `Executando ${task.title}`, `Subagente ${task.id} iniciado.`);
         try {
-          const response = await generateContentWithProvider(this.getClient(), {
-            model: input.model || defaultModel(),
+          const response = await this.getClient().models.generateContent({
+            model: input.model || DEFAULT_MODEL,
             contents: [{
               role: 'user',
               parts: [{ text: [
@@ -133,21 +131,14 @@ export class SubagentOrchestrator {
       if (finalJob?.status === 'cancelled') return;
       const ordered = input.tasks.map(task => results.find(result => result.id === task.id)).filter(Boolean);
       const failed = ordered.filter(result => result?.status === 'failed').length;
-      const succeeded = ordered.filter(result => result?.status === 'succeeded').length;
-      const summary = {
+      jobsManager.completeJob(jobId, {
         objective: input.objective,
         model: input.model,
         total: ordered.length,
-        succeeded,
+        succeeded: ordered.filter(result => result?.status === 'succeeded').length,
         failed,
         results: ordered
-      };
-      if (failed > 0 && succeeded === 0) {
-        jobsManager.failJob(jobId, `Todos os ${failed} subagentes falharam. Consulte os resultados individuais do job.`, summary);
-      } else {
-        jobsManager.completeJob(jobId, summary);
-        if (failed > 0) jobsManager.addLog(jobId, `${failed} subagente(s) falharam; resultados parciais preservados.`, 'warn');
-      }
+      });
     } catch (error: any) {
       jobsManager.failJob(jobId, redactSecrets(error?.message || String(error)));
     }

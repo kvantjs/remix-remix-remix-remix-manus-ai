@@ -243,14 +243,13 @@ class JobsManager {
     this.persist();
   }
 
-  failJob(id: string, error: string, result?: any) {
+  failJob(id: string, error: string) {
     const job = this.jobs.get(id);
     if (!job || job.status === 'cancelled') return;
 
     job.status = 'failed';
     job.finishedAt = new Date().toISOString();
     job.error = redactSecrets(error);
-    if (result !== undefined) job.result = result;
     job.currentStep = `Falha: ${job.error}`;
     this.addLog(id, `Erro na execução: ${job.error}`, 'error');
     this.persist();
