@@ -369,7 +369,7 @@ export function KvantComputer({
     y: 190,
     visible: true,
     isClicking: false,
-    label: 'Manus',
+    label: 'Kopilot',
     status: 'Agente no controle',
     animation: 'idle',
     viewportWidth: 1280,
@@ -501,7 +501,7 @@ export function KvantComputer({
         y: 45,
         visible: true,
         isClicking: false,
-        label: 'Manus',
+        label: 'Kopilot',
         status: `Acessando ${displayHostname}...`,
         animation: 'loading'
       });
@@ -538,7 +538,7 @@ export function KvantComputer({
           y: 200,
           visible: true,
           isClicking: false,
-          label: 'Manus',
+          label: 'Kopilot',
           status: `Interagindo em ${displayHostname}`,
           animation: 'moving'
         });
@@ -577,7 +577,7 @@ export function KvantComputer({
         y: 240,
         visible: true,
         isClicking: false,
-        label: 'Manus',
+        label: 'Kopilot',
         status: `Clicando em "${targetVal}"...`,
         animation: 'moving'
       });
@@ -601,7 +601,7 @@ export function KvantComputer({
         y: 260,
         visible: true,
         isClicking: false,
-        label: 'Manus',
+        label: 'Kopilot',
         status: 'Rolando a página...',
         animation: 'scrolling'
       });
@@ -627,7 +627,7 @@ export function KvantComputer({
         y: 160,
         visible: true,
         isClicking: true,
-        label: 'Manus',
+        label: 'Kopilot',
         status: `Digitando: "${targetVal}"`,
         animation: 'typing'
       });
@@ -799,7 +799,7 @@ export function KvantComputer({
         <div className="h-8 px-4 bg-bg-surface-panel border-b border-border-divider-subtle flex items-center justify-between text-xs shrink-0 select-none">
           <div className="flex items-center gap-2 overflow-hidden truncate">
             <span className="text-text-content-secondary font-normal text-[11.5px] tracking-tight">
-              {!isLive ? 'Histórico de Execução do Agente' : (isBooting ? 'Computador está iniciando...' : (isLoading ? 'Manus está interagindo...' : 'Manus está usando o Navegador'))}
+              {!isLive ? 'Histórico de Execução do Agente' : (isBooting ? 'Computador está iniciando...' : (isLoading ? 'Kopilot está interagindo...' : 'Kopilot está usando o Navegador'))}
             </span>
             <span className="text-border-divider-subtle text-xs">|</span>
             <span className="text-text-content-secondary/80 font-mono text-[11px] truncate tracking-tight">
@@ -829,7 +829,7 @@ export function KvantComputer({
 
               {/* Title text */}
               <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight">
-                Computador Manus v1.0.1
+                Computador Kopilot v1.0.1
               </h3>
 
               {/* Subtext */}

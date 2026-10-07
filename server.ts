@@ -42,7 +42,7 @@ const PORT = Number(process.env.PORT) || 3000;
 app.use(express.json({ limit: '10mb' }));
 
 app.get('/health', (_req, res) => {
-  res.status(200).json({ ok: true, service: 'remix-manus-ai' });
+  res.status(200).json({ ok: true, service: 'remix-kopilot-ai' });
 });
 
 app.get('/api/platform/config', async (_req, res) => {
@@ -72,7 +72,7 @@ app.get('/api/platform/infra/overview', async (_req, res) => {
 
 app.get('/api/platform/routes', async (_req, res) => {
   try {
-    const routes = await fs.readFile(path.resolve(process.cwd(), 'public/manus-routes.json'), 'utf8');
+    const routes = await fs.readFile(path.resolve(process.cwd(), 'public/kopilot-routes.json'), 'utf8');
     res.type('application/json').send(routes);
   } catch (error: any) {
     res.status(404).json({ error: redactSecrets(error?.message || String(error)) });
@@ -101,7 +101,7 @@ app.get('/api/projects', async (_req, res) => {
 
 app.post('/api/projects', async (req, res) => {
   const user = await getAuthenticatedUser(req);
-  if (process.env.MANUS_JWT_SECRET && !user) return res.status(401).json({ error: 'Autenticação necessária para criar projetos.' });
+  if (process.env.KOPILOT_JWT_SECRET && !user) return res.status(401).json({ error: 'Autenticação necessária para criar projetos.' });
   try {
     const name = String(req.body?.name || '').trim();
     if (!name) return res.status(400).json({ error: 'name é obrigatório.' });
@@ -374,7 +374,7 @@ app.post('/api/scheduled/agent', async (req, res) => {
   if (!databaseAvailable()) return res.status(503).json({ error: 'Banco gerenciado indisponível para idempotência do scheduler.' });
   try {
     const identity = await resolveScheduledIdentity(jwt);
-    const runKey = String(req.body?.runKey || req.header('x-manus-run-uid') || `${identity.taskUid}:${new Date().toISOString().slice(0, 16)}`);
+    const runKey = String(req.body?.runKey || req.header('x-kopilot-run-uid') || `${identity.taskUid}:${new Date().toISOString().slice(0, 16)}`);
     const runId = randomUUID();
     try {
       await query(`INSERT INTO scheduled_runs (run_id, task_uid, run_key, status) VALUES (?, ?, ?, 'accepted')`, [runId, identity.taskUid, runKey]);
@@ -422,7 +422,7 @@ CONTRATO DE RACIOCÍNIO AVANÇADO — EXECUÇÃO CONTROLADA:
 const DEFAULT_THINKING_BUDGET = Math.min(32768, Math.max(8192, Number(process.env.GEMINI_THINKING_BUDGET || 16384)));
 
 // System prompt strictly enforcing bespoke branding, production design rules, and high interactivity:
-const CORE_SPARK_SYSTEM_INSTRUCTION = `Você é o CoreSpark (Versão de Produção), o Agente Autônomo de Engenharia de Software e Design Director do Kvant.
+const KOPILOT_SYSTEM_INSTRUCTION = `Você é o Kopilot (Versão de Produção), o Agente Autônomo de Engenharia de Software e Design Director do Kvant.
 
 DIRETIVA PERMANENTE DE AUDIÊNCIA E OBJETIVIDADE:
 - Fale com o usuário final da aplicação. Não trate essa pessoa como dono, administrador ou operador interno sem declaração explícita.
@@ -921,7 +921,7 @@ Sintetizei todo o contexto coletado ao vivo das múltiplas páginas visitadas pa
           toolName: "browser.navigate",
           server: "playwright_chromium",
           arguments: { url: "https://api.github.com/rate_limit" },
-          result: JSON.stringify({ status: 200, rateLimit: { core: { limit: 60, remaining: 60, reset: Math.floor(Date.now() / 1000) + 3600 } } }),
+          result: JSON.stringify({ status: 200, rateLimit: { kopilot: { limit: 60, remaining: 60, reset: Math.floor(Date.now() / 1000) + 3600 } } }),
           timestamp: nowTime,
           status: "success",
           screenData: {
@@ -1659,7 +1659,7 @@ export default function CloudControlDashboard() {
     } else if (lower.includes('adicion') || lower.includes('novo') || lower.includes('criar') || lower.includes('botão') || lower.includes('botao')) {
       actionDescription = 'Novos elementos e funcionalidades interativas adicionados';
     } else if (lower.includes('cor') || lower.includes('estil') || lower.includes('dark') || lower.includes('tema') || lower.includes('design')) {
-      actionDescription = 'Paleta de cores e refinamento de design atualizados';
+      actionDescription = 'Paleta de kopilots e refinamento de design atualizados';
     } else {
       actionDescription = `Ajustes solicitados ("${message}") aplicados com preservação de estados`;
     }
@@ -1814,7 +1814,7 @@ app.get('/api/public/data', (_req, res) => {
   const memUsage = process.memoryUsage();
   return res.json({
     status: 'operational',
-    service: 'CoreSpark Autonomous Engine',
+    service: 'Kopilot Autonomous Engine',
     timestamp: new Date().toISOString(),
     system: {
       memory: `${Math.round(memUsage.heapUsed / 1024 / 1024)}MB / ${Math.round(memUsage.heapTotal / 1024 / 1024)}MB`,
@@ -1857,7 +1857,7 @@ app.get('/api/computer/status', (_req, res) => {
     release: os.release(),
     arch: os.arch(),
     cpus: cpus.length || 2,
-    cpuModel: cpus[0]?.model || 'Cloud vCPU Core',
+    cpuModel: cpus[0]?.model || 'Cloud vCPU Kopilot',
     loadAverage: loadAvg,
     memory: {
       totalMb: Math.round(totalMem / 1024 / 1024),
@@ -2797,7 +2797,7 @@ async function executeHttpNavigate(rawUrl: string) {
   try {
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 CoreSpark/1.0',
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 Kopilot/1.0',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.7',
         'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'
       },
@@ -3265,7 +3265,7 @@ app.get('/api/browser/proxy', async (req, res) => {
   try {
     const response = await fetch(finalUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 CoreSparkAgentBrowser/1.0',
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 KopilotAgentBrowser/1.0',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
         'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'
       },
@@ -4305,7 +4305,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
               model: modelCandidate,
               contents: chatContents,
               config: {
-                systemInstruction: CORE_SPARK_SYSTEM_INSTRUCTION + buildCognitiveSystemInstruction() + APP_CREATION_EXECUTION_CONTRACT + buildIntentInstruction(intent) + buildSkillsSystemInstruction() + buildExecutableSkillsInstruction() + '\n\nDIRETIVA DE RESPOSTA SEM CÓDIGO NO CHAT: NUNCA responda com blocos de código grandes ou listagens de código-fonte no chat. Só produza códigos se a intenção APP_CREATION estiver ativa.',
+                systemInstruction: KOPILOT_SYSTEM_INSTRUCTION + buildCognitiveSystemInstruction() + APP_CREATION_EXECUTION_CONTRACT + buildIntentInstruction(intent) + buildSkillsSystemInstruction() + buildExecutableSkillsInstruction() + '\n\nDIRETIVA DE RESPOSTA SEM CÓDIGO NO CHAT: NUNCA responda com blocos de código grandes ou listagens de código-fonte no chat. Só produza códigos se a intenção APP_CREATION estiver ativa.',
                 thinkingConfig: { thinkingBudget: DEFAULT_THINKING_BUDGET },
                 tools: intent.allowedTools.length ? [{ functionDeclarations: filterToolDeclarations(intent, AGENT_TOOL_DECLARATIONS) as any }] : undefined
               }
@@ -4318,13 +4318,13 @@ app.post('/api/agent/chat/stream', async (req, res) => {
             modelResponse = await Promise.race([responsePromise, timeoutPromise]);
             break;
           } catch (err: any) {
-            console.log(`[CoreSpark] Candidate ${modelCandidate} transition: proceeding to next candidate`);
+            console.log(`[Kopilot] Candidate ${modelCandidate} transition: proceeding to next candidate`);
           }
         }
 
         if (!modelResponse) {
           if (!modelTextResponse && executedToolCalls.length === 0) {
-            console.warn('[CoreSpark Engine] Activating autonomous engine with realistic cognitive execution steps.');
+            console.warn('[Kopilot Engine] Activating autonomous engine with realistic cognitive execution steps.');
             
             sendEvent('status', { text: 'Etapa 1: Análise de Intenção e Decomposição de Requisitos...' });
             sendEvent('step', { text: 'Modo local: aplicando plano determinístico e validações disponíveis...', toolName: 'agent.plan' });
@@ -4509,7 +4509,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
             model: MODEL_CANDIDATES[0],
             contents: chatContents,
             config: {
-              systemInstruction: CORE_SPARK_SYSTEM_INSTRUCTION + buildCognitiveSystemInstruction() + '\n\nRELATÓRIO FINAL OBRIGATÓRIO: Você deve fornecer um relatório técnico completo e humanizado de todas as suas ações. Se pesquisou na web, liste as informações específicas (preços, dados, links, fatos). Se criou código, explique o que cada parte faz. NUNCA use frases genéricas como "Operação concluída" ou "Ação executada com sucesso". Seja direto, informativo e detalhado.',
+              systemInstruction: KOPILOT_SYSTEM_INSTRUCTION + buildCognitiveSystemInstruction() + '\n\nRELATÓRIO FINAL OBRIGATÓRIO: Você deve fornecer um relatório técnico completo e humanizado de todas as suas ações. Se pesquisou na web, liste as informações específicas (preços, dados, links, fatos). Se criou código, explique o que cada parte faz. NUNCA use frases genéricas como "Operação concluída" ou "Ação executada com sucesso". Seja direto, informativo e detalhado.',
             }
           });
           const summaryText = summaryResponse.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -4517,7 +4517,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
             modelTextResponse = summaryText;
           }
         } catch (err) {
-          console.error('[CoreSpark] Final synthesis error:', err);
+          console.error('[Kopilot] Final synthesis error:', err);
         }
       }
 
@@ -4802,7 +4802,7 @@ app.post('/api/agent/chat', async (req, res) => {
 
     for (const modelCandidate of MODEL_CANDIDATES) {
       try {
-        console.log(`[CoreSpark Engine] Calling ${modelCandidate} with Real Tools...`);
+        console.log(`[Kopilot Engine] Calling ${modelCandidate} with Real Tools...`);
         let iteration = 0;
         let finalModelText = '';
 
@@ -4812,7 +4812,7 @@ app.post('/api/agent/chat', async (req, res) => {
             model: modelCandidate,
             contents: chatContents,
             config: {
-              systemInstruction: CORE_SPARK_SYSTEM_INSTRUCTION + buildCognitiveSystemInstruction() + APP_CREATION_EXECUTION_CONTRACT + buildIntentInstruction(intent) + buildSkillsSystemInstruction() + buildExecutableSkillsInstruction() + '\n\nDIRETIVA DE RESPOSTA SEM CÓDIGO NO CHAT: NUNCA responda com blocos de código grandes ou listagens de código-fonte no chat. Só produza códigos se a intenção APP_CREATION estiver ativa.',
+              systemInstruction: KOPILOT_SYSTEM_INSTRUCTION + buildCognitiveSystemInstruction() + APP_CREATION_EXECUTION_CONTRACT + buildIntentInstruction(intent) + buildSkillsSystemInstruction() + buildExecutableSkillsInstruction() + '\n\nDIRETIVA DE RESPOSTA SEM CÓDIGO NO CHAT: NUNCA responda com blocos de código grandes ou listagens de código-fonte no chat. Só produza códigos se a intenção APP_CREATION estiver ativa.',
               tools: intent.allowedTools.length ? [{ functionDeclarations: filterToolDeclarations(intent, AGENT_TOOL_DECLARATIONS) as any }] : undefined
             }
           });
@@ -4927,13 +4927,13 @@ app.post('/api/agent/chat', async (req, res) => {
           intent
         });
       } catch (err: any) {
-        console.warn(`[CoreSpark Engine] Candidate ${modelCandidate} error: ${err?.message}`);
+        console.warn(`[Kopilot Engine] Candidate ${modelCandidate} error: ${err?.message}`);
       }
     }
   }
 
   // 2. Autonomous rule-enforced fallback
-  console.log('[CoreSpark Engine] Applying local autonomous rule-enforced engine with real tool executions.');
+  console.log('[Kopilot Engine] Applying local autonomous rule-enforced engine with real tool executions.');
   const plannedActions = intent.mode === 'conversation' ? [] : planRealAgentActions(message);
 
   for (const action of plannedActions) {

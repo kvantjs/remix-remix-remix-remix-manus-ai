@@ -25,9 +25,9 @@ function toMember(row: any): ProjectMember {
 }
 
 export async function getProjectRole(projectId: string, user: AuthenticatedUser | null): Promise<ProjectRole | null> {
-  if (!process.env.MANUS_JWT_SECRET) return 'owner';
+  if (!process.env.KOPILOT_JWT_SECRET) return 'owner';
   if (!user) return null;
-  if (process.env.MANUS_PROJECT_OWNER_OPEN_ID && user.openId === process.env.MANUS_PROJECT_OWNER_OPEN_ID) return 'owner';
+  if (process.env.KOPILOT_PROJECT_OWNER_OPEN_ID && user.openId === process.env.KOPILOT_PROJECT_OWNER_OPEN_ID) return 'owner';
   if (databaseAvailable()) {
     const rows = await query<any[]>(`SELECT project_id, open_id, name, email, role, created_at, updated_at FROM project_members WHERE project_id = ? AND open_id = ? LIMIT 1`, [projectId, user.openId]);
     return rows[0]?.role || null;

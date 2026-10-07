@@ -14,7 +14,7 @@ export interface AgentSkill {
   systemInstruction: string;
 }
 
-const CORE_AGENT_SKILLS: AgentSkill[] = [
+const KOPILOT_AGENT_SKILLS: AgentSkill[] = [
   {
     id: 'skill-user-facing-directness',
     name: 'Comunicação Direta com o Usuário Final',
@@ -255,7 +255,7 @@ const ADVANCED_SKILL_SPECS: AdvancedSkillSpec[] = ([
 ] as AdvancedSkillTuple[]).map(([slug, name, category, mcpServers, description, capabilities, instruction]) => ({ slug, name, category, mcpServers, description, capabilities, systemInstruction: `[SKILL: ${slug.toUpperCase().replace(/-/g, '_')}]
 ${instruction}` }));
 const ADVANCED_AGENT_SKILLS: AgentSkill[] = ADVANCED_SKILL_SPECS.map(({ slug, ...skill }) => ({ ...skill, id: `skill-${slug}`, version: '1.0.0' }));
-export const AGENT_SKILLS: AgentSkill[] = [...CORE_AGENT_SKILLS, ...ADVANCED_AGENT_SKILLS];
+export const AGENT_SKILLS: AgentSkill[] = [...KOPILOT_AGENT_SKILLS, ...ADVANCED_AGENT_SKILLS];
 
 export function getSkillsSummary(): string {
   return AGENT_SKILLS.map((s, i) => `${i + 1}. **${s.name}** (v${s.version}) [MCP: ${s.mcpServers.join(', ')}]\n   ${s.description}`).join('\n\n');

@@ -1,16 +1,16 @@
-# Handoff de migração — Remix Manus AI
+# Handoff de migração — Remix Kopilot AI
 
 **Data do handoff:** 2026-10-05 02:24 (America/Sao_Paulo)
 
 ## 1. Repositório e estado atual
 
-- **Repositório GitHub privado:** https://github.com/kvantjs/remix-remix-remix-manus-ai
+- **Repositório GitHub privado:** https://github.com/kvantjs/remix-remix-remix-remix-manus-ai
 - **Branch principal:** `main`
 - **Último commit no GitHub:** `dae751dfc6aafc3c4538c903b4fac1dd3bd51537`
 - **Mensagem do último commit:** `fix: prevent automatic context from navigating browser`
 - **Preview atual:** https://8328-ixh7wh697fewj41r5gi8f-ba52054e.us4.manus.computer
-- **Diretório Webdev desta sessão:** `/home/ubuntu/remixmanusai`
-- **Stack:** React + Vite + Express + TypeScript + Playwright + MySQL opcional + Gemini/Manus API opcional.
+- **Diretório Webdev desta sessão:** `/home/ubuntu/remixkopilotai`
+- **Stack:** React + Vite + Express + TypeScript + Playwright + MySQL opcional + Gemini/Kopilot API opcional.
 
 O código foi versionado e enviado ao GitHub em commits incrementais. Não foram enviados secrets, `.env` reais, `node_modules`, `dist` ou estados runtime ignorados.
 
@@ -19,7 +19,7 @@ O código foi versionado e enviado ao GitHub em commits incrementais. Não foram
 O usuário importou um ZIP criado no Google AI Studio/Build Mode e pediu:
 
 1. importar a aplicação para GitHub e Webdev;
-2. implementar funcionalidades inspiradas no agente autônomo Manus, no computador cloud e no Webdev;
+2. implementar funcionalidades inspiradas no agente autônomo Kopilot, no computador cloud e no Webdev;
 3. criar APIs reais para agente, navegador, terminal, arquivos, projetos, versões, jobs, autenticação, banco, storage, scheduler e GitHub;
 4. criar uma separação rigorosa entre conversa, pesquisa web, computador cloud, criação de aplicações/sites, chamadas de ferramentas e operações de projeto;
 5. corrigir problemas de CAPTCHA/Cloudflare sem usar técnicas de evasão;
@@ -81,7 +81,7 @@ Tabelas implementadas ao longo das fases:
 
 Foram criadas camadas para:
 
-- sessão OAuth Manus;
+- sessão OAuth Kopilot;
 - cookie de sessão;
 - validação de identidade;
 - Storage gerenciado;
@@ -130,10 +130,10 @@ GET    /api/projects/:id/audit
 Variável opcional para proprietário inicial de projetos existentes:
 
 ```env
-MANUS_PROJECT_OWNER_OPEN_ID=""
+KOPILOT_PROJECT_OWNER_OPEN_ID=""
 ```
 
-Quando `MANUS_JWT_SECRET` não existe no Preview local, o ambiente funciona em modo local como `owner`. Em runtime autenticado, a autorização usa OAuth/membros persistidos.
+Quando `KOPILOT_JWT_SECRET` não existe no Preview local, o ambiente funciona em modo local como `owner`. Em runtime autenticado, a autorização usa OAuth/membros persistidos.
 
 ### 3.7 Roteador rigoroso de intenção
 
@@ -301,14 +301,14 @@ GEMINI_API_KEY="MY_GEMINI_API_KEY"
 APP_URL="MY_APP_URL"
 DATABASE_URL=""
 DRIZZLE_DATABASE_URL=""
-MANUS_API_URL=""
-MANUS_API_KEY=""
-MANUS_API_BROWSER_KEY=""
-MANUS_PROJECT_ID=""
-MANUS_JWT_SECRET=""
-MANUS_PROJECT_OWNER_OPEN_ID=""
-MANUS_OAUTH_PORTAL_URL=""
-MANUS_OAUTH_API_URL=""
+KOPILOT_API_URL=""
+KOPILOT_API_KEY=""
+KOPILOT_API_BROWSER_KEY=""
+KOPILOT_PROJECT_ID=""
+KOPILOT_JWT_SECRET=""
+KOPILOT_PROJECT_OWNER_OPEN_ID=""
+KOPILOT_OAUTH_PORTAL_URL=""
+KOPILOT_OAUTH_API_URL=""
 BROWSER_CHALLENGE_POLICY="stop_and_request_handoff"
 BROWSER_HEADLESS="true"
 ```
@@ -320,8 +320,8 @@ BROWSER_HEADLESS="true"
 1. Clonar o repositório:
 
 ```bash
-git clone https://github.com/kvantjs/remix-remix-remix-manus-ai.git
-cd remix-remix-remix-manus-ai
+git clone https://github.com/kvantjs/remix-remix-remix-remix-manus-ai.git
+cd remix-remix-remix-remix-manus-ai
 ```
 
 2. Instalar dependências:
@@ -358,7 +358,7 @@ npm run dev
 1. Reabrir o repositório no Webdev da nova conta.
 2. Reconfigurar secrets pelo formulário seguro, nunca no chat.
 3. Confirmar `DATABASE_URL` e executar readiness.
-4. Confirmar OAuth e definir `MANUS_PROJECT_OWNER_OPEN_ID` quando necessário.
+4. Confirmar OAuth e definir `KOPILOT_PROJECT_OWNER_OPEN_ID` quando necessário.
 5. Testar o fluxo explícito `abrir github.com`.
 6. Testar o fluxo `pesquisar na web e inspecionar a API do GitHub`.
 7. Confirmar que o contexto automático não modifica a URL.
@@ -388,7 +388,7 @@ npm run dev
 
 ## 10. Limitações importantes
 
-- A aplicação não é uma cópia integral da infraestrutura proprietária do Manus; são implementações funcionais equivalentes dentro do projeto.
+- A aplicação não é uma cópia integral da infraestrutura proprietária do Kopilot; são implementações funcionais equivalentes dentro do projeto.
 - APIs externas podem exigir secrets, OAuth, limites ou conectores próprios.
 - CAPTCHA/Cloudflare não são removidos nem contornados.
 - O GitHub pode desafiar qualquer ambiente por IP, sessão, frequência, cookies ou política própria.

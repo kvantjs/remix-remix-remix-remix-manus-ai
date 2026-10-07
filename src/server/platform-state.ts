@@ -37,7 +37,7 @@ const defaultConfig: PlatformConfig = {
   version: 1,
   revision: 1,
   project: {
-    name: 'Remix Manus AI',
+    name: 'Remix Kopilot AI',
     description: 'Aplicação full-stack criada no Google AI Studio e integrada ao Webdev.'
   },
   features: {
@@ -55,7 +55,7 @@ const defaultConfig: PlatformConfig = {
     distribution: process.env.RUNTIME_DISTRIBUTION || 'Ubuntu 24.04',
     cloudProvider: process.env.CLOUD_PROVIDER || 'container'
   },
-  routes: [{ path: '/', title: 'Remix Manus AI' }],
+  routes: [{ path: '/', title: 'Remix Kopilot AI' }],
   updatedAt: new Date().toISOString()
 };
 

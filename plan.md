@@ -1,7 +1,7 @@
 # Plano — Kvant Agent
 
 ## Objetivo
-Publicar no Manus WebDev a aplicação existente do Kvant com execução observável e streaming real.
+Publicar no Kopilot WebDev a aplicação existente do Kvant com execução observável e streaming real.
 
 ## Decisões de implementação
 - Backend Express + Playwright permanece no servidor WebDev.
@@ -17,7 +17,7 @@ Publicar no Manus WebDev a aplicação existente do Kvant com execução observ�
 - `src/components/KvantComputer.tsx`: superfícies internas navegador/terminal/editor.
 - `src/components/TerminalView.tsx`: terminal funcional e saída incremental.
 - `src/server/`: ferramentas, subagentes, segurança e estado de plataforma.
-- `public/manus-routes.json`: rotas declaradas do frontend.
+- `public/kopilot-routes.json`: rotas declaradas do frontend.
 
 ## Design e voz
 - Movimento: estação de engenharia operacional, densa e orientada a evidências.

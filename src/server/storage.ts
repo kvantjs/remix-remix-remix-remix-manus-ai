@@ -4,7 +4,7 @@ import { type AuthenticatedUser } from './auth.js';
 import { redactSecrets } from './security.js';
 
 function serviceConfig() {
-  return { base: process.env.MANUS_API_URL?.replace(/\/$/, ''), key: process.env.MANUS_API_KEY };
+  return { base: process.env.KOPILOT_API_URL?.replace(/\/$/, ''), key: process.env.KOPILOT_API_KEY };
 }
 
 function safeObjectKey(input: string) {
@@ -17,7 +17,7 @@ function safeObjectKey(input: string) {
 
 async function presign(operation: 'put' | 'get', key: string) {
   const { base, key: apiKey } = serviceConfig();
-  if (!base || !apiKey) throw new Error('MANUS_API_URL ou MANUS_API_KEY indisponível no servidor.');
+  if (!base || !apiKey) throw new Error('KOPILOT_API_URL ou KOPILOT_API_KEY indisponível no servidor.');
   const response = await fetch(`${base}/v1/storage/presign/${operation}?path=${encodeURIComponent(key)}`, {
     headers: { authorization: `Bearer ${apiKey}` }
   });
@@ -29,7 +29,7 @@ async function presign(operation: 'put' | 'get', key: string) {
 export async function createUpload(user: AuthenticatedUser, requestedKey: string, metadata: { name?: string; mimeType?: string; sizeBytes?: number }) {
   const key = safeObjectKey(requestedKey);
   const uploadUrl = await presign('put', key);
-  const stableUrl = `/manus-storage/${key}`;
+  const stableUrl = `/kopilot-storage/${key}`;
   const objectId = crypto.randomUUID();
   if (databaseAvailable()) {
     await query(
@@ -44,7 +44,7 @@ export async function createUpload(user: AuthenticatedUser, requestedKey: string
 
 export async function createDownloadUrl(requestedKey: string) {
   const key = safeObjectKey(requestedKey);
-  return { key, stableUrl: `/manus-storage/${key}`, downloadUrl: await presign('get', key), expiresInSeconds: 3600 };
+  return { key, stableUrl: `/kopilot-storage/${key}`, downloadUrl: await presign('get', key), expiresInSeconds: 3600 };
 }
 
 export async function listObjects(user: AuthenticatedUser) {

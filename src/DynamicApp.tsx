@@ -52,7 +52,7 @@ const LOG_MESSAGES: Record<Severity, string[]> = {
     'GET /api/v1/telemetry/live - 200 OK (14ms)',
     'Payment webhook processed for invoice_#4912',
     'Starting worker-node replica-42',
-    'Syncing local index with core cluster repository',
+    'Syncing local index with kopilot cluster repository',
     'User cobtinuacao@gmail.com logged in successfully',
     'Database migration patch 2.4.0-lite applied successfully',
     'Broker routed event "user.signup" to 3 active consumers'

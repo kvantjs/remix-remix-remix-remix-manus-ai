@@ -206,7 +206,7 @@ function sanitizeSourceCode(rawCode: string): { code: string; mainComponentName:
 
 function scopeRuntimeCss(css: string) {
   if (!css.trim()) return '';
-  // Keep generated CSS inside the preview so a user site cannot recolor the Manus shell.
+  // Keep generated CSS inside the preview so a user site cannot recolor the Kopilot shell.
   return css.replace(/(^|})\s*([^@}{][^{}]+)\{/g, (_match, boundary, selector) => {
     const scoped = String(selector).split(',').map(part => {
       const trimmed = part.trim();

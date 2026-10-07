@@ -1123,7 +1123,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
       {/* Header */}
       <header className="h-11 flex items-center justify-between px-6 border-b border-white/5 shrink-0 z-10 bg-[#1a1a1a]">
         <div className="flex items-center gap-2.5 cursor-pointer hover:bg-white/5 px-2.5 py-1.5 rounded-lg transition-colors group">
-          <span className="text-sm font-medium text-[#dcdcdc]">Manus 1.0 Lite</span>
+          <span className="text-sm font-medium text-[#dcdcdc]">Kopilot 1.0 Lite</span>
           <CaretDown size={14} className="text-[#dcdcdc]/40 group-hover:text-[#dcdcdc]" />
         </div>
         <div className="flex items-center gap-4 text-[#dcdcdc]/40">
@@ -1233,11 +1233,11 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
           onSend={(text) => handleSendMessage(text)} 
           onStop={handleStop}
           isThinking={isThinking} 
-          placeholder="Mensagem para o agente Manus ou digite @ para fontes e / para comandos..."
+          placeholder="Mensagem para o agente Kopilot ou digite @ para fontes e / para comandos..."
         />
         
         <p className="mt-2 text-center text-[10px] text-[#dcdcdc]/30">
-          Manus ativo: digite @ para fontes & arquivos, / para comandos rápidos e selecione o modelo de IA.
+          Kopilot ativo: digite @ para fontes & arquivos, / para comandos rápidos e selecione o modelo de IA.
         </p>
       </div>
 
@@ -1332,7 +1332,7 @@ function InlineChatQuestionnaire({
             <div className="size-5 rounded-full border border-white/20 flex items-center justify-center bg-[#1f1f1f]">
               <Question size={11} weight="bold" />
             </div>
-            <span className="text-[10px] font-bold uppercase tracking-widest opacity-50">O Manus tem uma pergunta</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest opacity-50">O Kopilot tem uma pergunta</span>
           </div>
           <div className="text-[10px] font-mono text-white/20 bg-white/5 px-2 py-0.5 rounded-full">
             {showTextArea ? 'Final' : `${currentStep + 1} de ${questions.length}`}
@@ -1548,7 +1548,7 @@ function MessageItem({
           className="size-6 object-contain rounded-md shadow-xs bg-bg-surface-panel p-0.5" 
           />
         <div className="flex items-center gap-2 text-xs font-medium">
-          <span className="text-text-content-primary">Manus</span>
+          <span className="text-text-content-primary">Kopilot</span>
           <span className="font-mono px-1.5 py-0.5 border border-solid" style={{ borderRadius: '6px', backgroundColor: '#1a1a1a', borderColor: '#303030', borderWidth: '2.1507px', color: '#c0c0c0', fontSize: '9px' }}>
             Lite
           </span>
@@ -1778,7 +1778,7 @@ function MessageItem({
                   <div className="size-3.5 border border-zinc-500/30 rounded-full flex items-center justify-center">
                     <div className="size-1.5 bg-zinc-400 rounded-full animate-pulse" />
                   </div>
-                  <span>Manus continuará após sua resposta</span>
+                  <span>Kopilot continuará após sua resposta</span>
                 </div>
                 <div className="flex items-center gap-1 text-text-content-secondary/40">
                   <button 
@@ -2024,7 +2024,7 @@ function ChatInput({ onSend, onStop, isThinking }: { onSend: (val: string) => vo
     <div className="relative group">
       <div className="bg-bg-surface-panel border border-border-divider-subtle rounded-2xl focus-within:border-border-control-active transition-all shadow-2xl overflow-hidden">
         <textarea 
-          placeholder="Mensagem para o agente Manus..."
+          placeholder="Mensagem para o agente Kopilot..."
           value={value}
           onChange={(e) => setValue(e.target.value)}
           rows={1}
@@ -2057,7 +2057,7 @@ function ChatInput({ onSend, onStop, isThinking }: { onSend: (val: string) => vo
                 src="https://imgdb.io/i/6lwOlmk.png" 
                 alt="Agente" 
                 className="size-5 object-contain rounded bg-bg-action-hover p-0.5" 
-                title="Agente Manus Conectado"
+                title="Agente Kopilot Conectado"
               />
               <div className="h-4 w-px bg-border-divider-subtle mx-1" />
               <div className="flex items-center gap-1.5 px-2 py-1 hover:bg-bg-action-hover rounded-md text-text-content-secondary/40 hover:text-text-content-primary transition-colors cursor-pointer">

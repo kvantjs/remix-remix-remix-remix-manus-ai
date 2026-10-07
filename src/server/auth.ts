@@ -53,7 +53,7 @@ function safeEqual(a: Buffer, b: Buffer) {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-export function verifyHs256Jwt(token: string, secret = process.env.MANUS_JWT_SECRET || ''): JwtClaims | null {
+export function verifyHs256Jwt(token: string, secret = process.env.KOPILOT_JWT_SECRET || ''): JwtClaims | null {
   if (!secret || !token) return null;
   const parts = token.split('.');
   if (parts.length !== 3) return null;
@@ -65,7 +65,7 @@ export function verifyHs256Jwt(token: string, secret = process.env.MANUS_JWT_SEC
     if (!safeEqual(expected, received)) return null;
     const claims = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8')) as JwtClaims;
     if (claims.exp && claims.exp < Math.floor(Date.now() / 1000)) return null;
-    if (process.env.MANUS_PROJECT_ID && claims.appId !== process.env.MANUS_PROJECT_ID) return null;
+    if (process.env.KOPILOT_PROJECT_ID && claims.appId !== process.env.KOPILOT_PROJECT_ID) return null;
     return claims;
   } catch {
     return null;
@@ -78,12 +78,12 @@ function signSession(user: AuthenticatedUser) {
     openId: user.openId,
     name: user.name,
     email: user.email,
-    appId: process.env.MANUS_PROJECT_ID,
+    appId: process.env.KOPILOT_PROJECT_ID,
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + SESSION_SECONDS
   }));
   const unsigned = `${header}.${payload}`;
-  const signature = crypto.createHmac('sha256', process.env.MANUS_JWT_SECRET || '').update(unsigned).digest('base64url');
+  const signature = crypto.createHmac('sha256', process.env.KOPILOT_JWT_SECRET || '').update(unsigned).digest('base64url');
   return `${unsigned}.${signature}`;
 }
 
@@ -110,9 +110,9 @@ function getPublicOrigin(req: Request, requestedOrigin?: string) {
 }
 
 export function beginOAuth(req: Request, res: Response, requestedOrigin?: string) {
-  const portal = process.env.MANUS_OAUTH_PORTAL_URL;
-  const appId = process.env.MANUS_PROJECT_ID;
-  if (!portal || !appId) throw new Error('MANUS_OAUTH_PORTAL_URL ou MANUS_PROJECT_ID indisponível.');
+  const portal = process.env.KOPILOT_OAUTH_PORTAL_URL;
+  const appId = process.env.KOPILOT_PROJECT_ID;
+  if (!portal || !appId) throw new Error('KOPILOT_OAUTH_PORTAL_URL ou KOPILOT_PROJECT_ID indisponível.');
   const origin = getPublicOrigin(req, requestedOrigin);
   const redirectUri = `${origin}/api/auth/callback`;
   const nonce = crypto.randomBytes(24).toString('hex');
@@ -129,9 +129,9 @@ export function beginOAuth(req: Request, res: Response, requestedOrigin?: string
 }
 
 async function exchangeCode(code: string, redirectUri: string) {
-  const base = process.env.MANUS_OAUTH_API_URL;
-  const clientId = process.env.MANUS_PROJECT_ID;
-  if (!base || !clientId) throw new Error('Configuração OAuth do Manus indisponível.');
+  const base = process.env.KOPILOT_OAUTH_API_URL;
+  const clientId = process.env.KOPILOT_PROJECT_ID;
+  if (!base || !clientId) throw new Error('Configuração OAuth do Kopilot indisponível.');
   const exchange = await fetch(`${base.replace(/\/$/, '')}/webdev.v1.WebDevAuthPublicService/ExchangeToken`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ clientId, grantType: 'authorization_code', code, redirectUri })
@@ -158,7 +158,7 @@ export async function finishOAuth(req: Request, res: Response, code: string, sta
   if (!decoded.redirectUri || Date.now() - decoded.issuedAt > 10 * 60 * 1000) throw new Error('State OAuth expirado.');
   const { user } = await exchangeCode(code, decoded.redirectUri);
   await storeUser(user);
-  if (!process.env.MANUS_JWT_SECRET) throw new Error('MANUS_JWT_SECRET indisponível para criar a sessão.');
+  if (!process.env.KOPILOT_JWT_SECRET) throw new Error('KOPILOT_JWT_SECRET indisponível para criar a sessão.');
   const token = signSession(user);
   res.setHeader('Set-Cookie', [
     serializeCookie(APP_SESSION_COOKIE, token, { maxAge: SESSION_SECONDS, path: '/', httpOnly: true, secure: true, sameSite: 'None' }),
@@ -187,8 +187,8 @@ export function getScheduledClaims(req: Request) {
 }
 
 export async function resolveScheduledIdentity(jwt: string) {
-  const base = process.env.MANUS_OAUTH_API_URL;
-  const projectId = process.env.MANUS_PROJECT_ID;
+  const base = process.env.KOPILOT_OAUTH_API_URL;
+  const projectId = process.env.KOPILOT_PROJECT_ID;
   if (!base || !projectId) throw new Error('Configuração de identidade agendada indisponível.');
   const response = await fetch(`${base.replace(/\/$/, '')}/webdev.v1.WebDevAuthPublicService/GetUserInfoWithJwt`, {
     method: 'POST', headers: { 'content-type': 'application/json' },

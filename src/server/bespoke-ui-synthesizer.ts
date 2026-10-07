@@ -23,7 +23,7 @@ export function synthesizeBespokeInterface(message: string, currentCode?: string
   }
   const seed = Math.abs(hash);
 
-  // 1. Definir Temas Dinâmicos e Cores OPAQUAS de alta qualidade (Zero repetição por Seed)
+  // 1. Definir Temas Dinâmicos e Kopilots OPAQUAS de alta qualidade (Zero repetição por Seed)
   const themes = [
     {
       name: 'Dark Obsidian & Neon Cyan (Obsidian Pulse)',
@@ -180,7 +180,7 @@ export function synthesizeBespokeInterface(message: string, currentCode?: string
       finance: ['NeoBank & Trust', 'Capital Partners', 'Wealth Management', 'Ativos Globais', 'Fintech Pro', 'Venture'],
       commerce: ['Store', 'Atelier de Moda', 'Urban Wear', 'Boutique', 'E-Commerce Global', 'Market'],
       health: ['Saúde Integrada', 'Medical Care', 'Performance Gym', 'Dental Studio', 'Equilíbrio Clínica'],
-      saas: ['Cloud & Telemetria', 'Analytics Platform', 'DevOps Hub', 'Server Control', 'Core Engine'],
+      saas: ['Cloud & Telemetria', 'Analytics Platform', 'DevOps Hub', 'Server Control', 'Kopilot Engine'],
       barber: ['Barbearia Club', 'Corte & Estilo', 'Grooming Lounge', 'Vintage Barber', 'Classic Cuts'],
       general: ['Smart Solution', 'SaaS Platform', 'Ecosystem', 'Interactive Labs', 'Sinergia']
     };
@@ -220,7 +220,7 @@ export function synthesizeBespokeInterface(message: string, currentCode?: string
   }
 
   // Detalhes extras com base no nicho
-  let iconName = 'Manus';
+  let iconName = 'Kopilot';
   let tagline = 'Inovação e Experiência Reativa Única';
   let tabs = "['Início', 'Recursos', 'Contato']";
   let itemsData = '';
@@ -475,7 +475,7 @@ export function synthesizeBespokeInterface(message: string, currentCode?: string
     `;
   } else {
     // Default / General
-    iconName = 'Manus';
+    iconName = 'Kopilot';
     tagline = 'Plataforma inovadora integrada para alta produtividade em tempo real';
     tabs = "['Geral', 'Métricas', 'Configurações']";
     itemsData = `[
@@ -725,7 +725,7 @@ Este é um projeto **React + Vite + Tailwind CSS** ultra completo de alta fideli
         version: "1.0.0",
         isBespoke: true,
         niche: niche,
-        author: "Manus AI Recreative Agent",
+        author: "Kopilot AI Recreative Agent",
         timestamp: new Date().toISOString()
       }, null, 2),
       lang: "json"

@@ -1,6 +1,6 @@
 {
-  "name": "Remix Remix Remix Remix Manus AI",
-  "description": "A high-fidelity recreation of the Manus AI agent platform, featuring a multi-pane workspace, real-time agent execution logs, and an integrated IDE. Powered by real-time Computer, WebDev, and Terminal MCPs in an isolated Linux runtime.",
+  "name": "Remix Remix Remix Remix Kopilot AI",
+  "description": "A high-fidelity recreation of the Kopilot AI agent platform, featuring a multi-pane workspace, real-time agent execution logs, and an integrated IDE. Powered by real-time Computer, WebDev, and Terminal MCPs in an isolated Linux runtime.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

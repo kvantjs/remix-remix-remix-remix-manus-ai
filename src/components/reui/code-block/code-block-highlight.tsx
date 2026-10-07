@@ -512,13 +512,13 @@ const loadedThemes = new Set<string>()
 async function loadHighlighter() {
   if (!highlighterPromise) {
     highlighterPromise = (async () => {
-      const [{ createHighlighterCore }, { createJavaScriptRegexEngine }] =
+      const [{ createHighlighterCore: createHighlighterKopilot }, { createJavaScriptRegexEngine }] =
         await Promise.all([
           import("shiki/core"),
           import("shiki/engine/javascript"),
         ])
 
-      return (await createHighlighterCore({
+      return (await createHighlighterKopilot({
         themes: [],
         langs: [],
         engine: createJavaScriptRegexEngine({ forgiving: true }),

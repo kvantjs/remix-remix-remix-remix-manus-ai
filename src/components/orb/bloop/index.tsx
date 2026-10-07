@@ -99,15 +99,15 @@ export function OrbBloop({
       ctx.globalAlpha = 0.85 + watercolorStrength * 0.15
       ctx.fill()
 
-      // Inner intense core highlight
-      const coreGrad = ctx.createRadialGradient(cx - baseRadius * 0.2, cy - baseRadius * 0.2, 0, cx, cy, baseRadius * 0.8)
-      coreGrad.addColorStop(0, highColor)
-      coreGrad.addColorStop(0.6, mainColor)
-      coreGrad.addColorStop(1, 'transparent')
+      // Inner intense kopilot highlight
+      const kopilotGrad = ctx.createRadialGradient(cx - baseRadius * 0.2, cy - baseRadius * 0.2, 0, cx, cy, baseRadius * 0.8)
+      kopilotGrad.addColorStop(0, highColor)
+      kopilotGrad.addColorStop(0.6, mainColor)
+      kopilotGrad.addColorStop(1, 'transparent')
 
       ctx.beginPath()
       ctx.arc(cx, cy, baseRadius * 0.65, 0, Math.PI * 2)
-      ctx.fillStyle = coreGrad
+      ctx.fillStyle = kopilotGrad
       ctx.globalAlpha = 0.9
       ctx.fill()
 

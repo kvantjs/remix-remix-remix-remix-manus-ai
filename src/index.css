@@ -10,7 +10,7 @@
   --font-serif: "Libre Baskerville", "Noto Serif", "Noto Serif SC", "Noto Serif JP", "Noto Serif KR", serif;
   --font-mono: "DM Sans", "Noto Sans", monospace;
   
-  /* Manus AI Base Palette */
+  /* Kopilot AI Base Palette */
   --color-base-black-deep: #1a1a1a;
   --color-base-black-elevated: #1a1a1a;
   --color-base-charcoal-light: #282828;
@@ -169,7 +169,7 @@ body {
   animation: spin-slow 3s linear infinite;
 }
 
-/* Manus specific selection */
+/* Kopilot specific selection */
 ::selection {
   background: rgba(52, 50, 45, 0.5);
   color: inherit;

@@ -17,9 +17,9 @@ walkDir('./src', (filePath) => {
   if (filePath.endsWith('.ts') || filePath.endsWith('.tsx') || filePath.endsWith('.css')) {
     let content = fs.readFileSync(filePath, 'utf8');
     let updated = content
-      .replace(/Manus AI/g, 'Sparkle AI')
-      .replace(/Manus/g, 'Sparkle')
-      .replace(/manus/g, 'sparkle');
+      .replace(/Kopilot AI/g, 'Sparkle AI')
+      .replace(/Kopilot/g, 'Sparkle')
+      .replace(/kopilot/g, 'sparkle');
     if (content !== updated) {
       fs.writeFileSync(filePath, updated, 'utf8');
       console.log(`Updated: ${filePath}`);
