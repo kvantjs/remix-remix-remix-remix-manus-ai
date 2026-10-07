@@ -348,12 +348,12 @@ export default function ToolChips({
             return !current;
           })
         }
-        className="-mx-1.5 flex w-fit items-center gap-1.5 rounded-lg px-2 py-1 text-[12.5px] font-medium text-text-content-secondary transition-colors  hover:bg-white/5 hover:text-text-content-primary cursor-pointer"
+        className="-mx-1.5 flex w-fit items-center gap-1.5 rounded-lg px-2 py-1 text-[12.5px] font-medium text-text-content-secondary transition-colors duration-150 hover:bg-white/5 hover:text-text-content-primary cursor-pointer"
       >
         <CaretDown
           size={12}
           weight="bold"
-          className="transition-transform  text-text-content-secondary"
+          className="transition-transform duration-200 text-text-content-secondary"
           style={{ transform: open ? "rotate(0deg)" : "rotate(-90deg)" }}
         />
         <span className="tabular-nums">{copy.header}</span>
@@ -361,7 +361,7 @@ export default function ToolChips({
 
       {/* tool call rows */}
       <div
-        className="grid transition-[grid-template-rows,opacity] "
+        className="grid transition-[grid-template-rows,opacity] duration-300"
         style={{ gridTemplateRows: open ? "1fr" : "0fr", opacity: open ? 1 : 0 }}
       >
         <div className="-mx-1 overflow-hidden px-1.5 pb-1">
@@ -374,22 +374,22 @@ export default function ToolChips({
                     type="button"
                     aria-expanded={rowOpen}
                     onClick={() => toggleRow(row.label)}
-                    className="group/row -mx-[3px] flex min-h-7 w-[calc(100%+6px)] min-w-0 items-start gap-2 rounded-lg px-2 py-1 text-left transition-all  hover:bg-white/5 cursor-pointer"
+                    className="group/row -mx-[3px] flex min-h-7 w-[calc(100%+6px)] min-w-0 items-start gap-2 rounded-lg px-2 py-1 text-left transition-all duration-150 hover:bg-white/5 cursor-pointer"
                   >
                     <span className="relative flex size-5 shrink-0 items-center justify-center">
-                      <span className={`transition-opacity  flex size-5 items-center justify-center rounded-[7px] bg-cover bg-center border border-white/10 shadow-xs ${rowOpen ? "opacity-0" : "group-hover/row:opacity-0"}`} style={{ backgroundImage: `url('https://imgdb.io/i/z2ZOrTk.png')` }}>
+                      <span className={`transition-opacity duration-100 flex size-5 items-center justify-center rounded-[7px] bg-cover bg-center border border-white/10 shadow-xs ${rowOpen ? "opacity-0" : "group-hover/row:opacity-0"}`} style={{ backgroundImage: `url('https://imgdb.io/i/z2ZOrTk.png')` }}>
                         {getContextualToolIcon(row.icon, row.label, row.chip)}
                       </span>
                       <CaretRight
                         size={11}
                         weight="bold"
-                        className={`absolute text-text-content-secondary transition-all  ${rowOpen ? "opacity-100 rotate-90" : "opacity-0 group-hover/row:opacity-100"}`}
+                        className={`absolute text-text-content-secondary transition-all duration-150 ${rowOpen ? "opacity-100 rotate-90" : "opacity-0 group-hover/row:opacity-100"}`}
                       />
                     </span>
                     <span className="min-w-0 max-w-[42%] shrink-0 break-words text-[12.5px] font-medium text-text-content-primary">{row.label}</span>
                     <span
                       className={`inline-flex min-h-5.5 min-w-0 flex-1 items-start rounded-md bg-white/[0.04] border border-white/[0.06] px-2 py-0.5
-                        break-words [overflow-wrap:anywhere] whitespace-pre-wrap text-[11px] text-text-content-secondary transition-colors  group-hover/row:bg-white/[0.08] group-hover/row:text-text-content-primary
+                        break-words [overflow-wrap:anywhere] whitespace-pre-wrap text-[11px] text-text-content-secondary transition-colors duration-100 group-hover/row:bg-white/[0.08] group-hover/row:text-text-content-primary
                         ${row.mono ? "font-mono" : ""}`}
                     >
                       {row.chip}
@@ -398,7 +398,7 @@ export default function ToolChips({
 
                   {/* expanded detail */}
                   <div
-                    className="grid transition-[grid-template-rows,opacity] "
+                    className="grid transition-[grid-template-rows,opacity] duration-300"
                     style={{
                       gridTemplateRows: rowOpen ? "1fr" : "0fr",
                       opacity: rowOpen ? 1 : 0,
@@ -442,7 +442,7 @@ export default function ToolChips({
                     onBlur={closePreview(d.file)}
                     className="inline-flex h-6.5 max-w-full items-center gap-1.5 rounded-md
                       bg-white/[0.04] border border-white/[0.08] px-2 font-mono text-[11px] text-text-content-primary shadow-xs
-                      transition-all  hover:bg-white/[0.08] hover:border-white/15 cursor-pointer"
+                      transition-all duration-150 hover:bg-white/[0.08] hover:border-white/15 cursor-pointer"
                     style={{ animation: `pop-in 250ms cubic-bezier(0.23,1,0.32,1) ${i * 80}ms both` }}
                   >
                     <span className="inline-flex size-4 items-center justify-center rounded-[7px] bg-cover bg-center border border-white/10 overflow-hidden" style={{ backgroundImage: `url('https://imgdb.io/i/z2ZOrTk.png')` }}>
@@ -457,9 +457,9 @@ export default function ToolChips({
               <button
                 type="button"
                 className="inline-flex h-6.5 items-center rounded-md px-1.5 font-mono text-[11px] text-text-content-secondary/60
-                  underline decoration-transparent underline-offset-2 transition-colors 
+                  underline decoration-transparent underline-offset-2 transition-colors duration-100
                   hover:text-text-content-primary hover:decoration-current cursor-pointer"
-                style={{ animation: ` 300ms ease-out ${diffs.length * 80}ms both` }}
+                style={{ animation: `fade-in 300ms ease-out ${diffs.length * 80}ms both` }}
               >
                 {copy.more}
               </button>

@@ -10,78 +10,16 @@ import { promisify } from 'util';
 import fs from 'fs/promises';
 import { existsSync, createReadStream } from 'fs';
 // Playwright stub for AI Studio environment
-const mockLocator = {
-  boundingBox: async () => ({ x: 100, y: 100, width: 200, height: 50 }),
-  click: async () => {},
-  fill: async () => {},
-  innerText: async () => '',
-  getAttribute: async () => null,
-  first: () => ({
-    boundingBox: async () => ({ x: 100, y: 100, width: 200, height: 50 }),
-    click: async () => {},
-    fill: async () => {},
-    innerText: async () => '',
-    getAttribute: async () => null
-  })
-};
-
-const mockPage = {
-  isClosed: () => false,
-  viewportSize: () => ({ width: 1280, height: 800 }),
-  evaluate: async (fn: any) => {
-    if (typeof fn === 'function') {
-      try { return fn(); } catch { return 0; }
-    }
-    return 0;
-  },
-  screenshot: async () => Buffer.from(''),
-  title: async () => 'Kvant AI Agent Sandbox Browser',
-  url: () => 'https://kvant.ai',
-  mouse: {
-    move: async () => {},
-    click: async () => {},
-    wheel: async () => {}
-  },
-  keyboard: {
-    type: async () => {},
-    press: async () => {}
-  },
-  waitForTimeout: async () => {},
-  waitForLoadState: async () => {},
-  waitForFunction: async () => {},
-  locator: () => ({
-    first: () => mockLocator,
-    all: async () => []
-  }),
-  getByText: () => ({
-    first: () => mockLocator
-  }),
-  content: async () => '<h1>Browser stubbed in AI Studio</h1>',
-  goto: async (url: string) => ({
-    status: () => 200,
-    statusText: () => 'OK'
-  }),
-  close: async () => {}
-};
-
-const mockContext = {
-  addInitScript: async () => {},
-  newPage: async () => mockPage,
-  close: async () => {}
-};
-
-const mockBrowser = {
-  isConnected: () => true,
-  newContext: async () => mockContext,
-  contexts: () => [mockContext],
-  newPage: async () => mockPage,
-  close: async () => {}
-};
-
 const chromium = {
-  launch: async () => mockBrowser
+  launch: async () => ({
+    newPage: async () => ({
+      goto: async () => ({}),
+      content: async () => '<h1>Browser stubbed in AI Studio</h1>',
+      close: async () => ({}),
+    }),
+    close: async () => ({}),
+  }),
 } as any;
-
 type Browser = any;
 type Page = any;
 import { AGENT_TOOL_DECLARATIONS, AgentToolExecutor, ensureSandboxDir } from './src/server/agent-tools.js';
@@ -594,7 +532,6 @@ AS 7 LEIS INVIOLÁVEIS DO AGENTE DE CRIAÇÃO:
 - DEFINIÇÃO OBRIGATÓRIA DE ÍCONES NO TOPO: Todo ícone utilizado no código JSX DEVE ser explicitamente importado no topo do arquivo. Se for usar ícone de crescimento/tendência, importe obrigatoriamente "TrendUp, TrendUp as TrendingUp" de '@phosphor-icons/react' ou "TrendingUp" de 'lucide-react'. NUNCA deixe o TrendingUp indefinido no código!
 
 9. ACESSO REAL AO COMPUTADOR NA NUVEM 100% OPERACIONAL (SUPERUSER CLOUD ACCESS)
-- REQUISITO CRÍTICO DE EXECUÇÃO EM LETRAS MINÚSCULAS: Todo comando de terminal ou de script que você executar DEVE estar estritamente em letras minúsculas (por exemplo, use 'python3 - <<'py'' e delimitador 'py' em letras minúsculas. É TERMINANTEMENTE PROIBIDO usar delimitadores em letras maiúsculas como 'PY' ou comandos em maiúsculas).
 - Você possui ACESSO TOTAL, irrestrito e superuser a um Computador na Nuvem Ubuntu 24.04 x86_64, Node.js 22, Bash, Sistema de Arquivos e Navegador Web.
 - Você pode orquestrar e acionar ferramentas do computador na nuvem:
   * "computer.shell" / "bash.exec": Executa comandos de terminal reais no container.

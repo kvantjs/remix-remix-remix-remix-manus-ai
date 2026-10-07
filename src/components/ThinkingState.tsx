@@ -153,11 +153,11 @@ export default function ThinkingState({
       >
         <div className="size-5 rounded-[7px] bg-cover bg-center overflow-hidden flex items-center justify-center shadow-xs border border-white/10" style={{ backgroundImage: `url('https://imgdb.io/i/z2ZOrTk.png')` }}>
           {icon ? (
-            <span className={`flex shrink-0 transition-colors text-text-content-secondary ${working ? '' : ''}`}>
+            <span className={`flex shrink-0 transition-colors text-text-content-secondary ${working ? 'animate-pulse' : ''}`}>
               {icon}
             </span>
           ) : (
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`text-text-content-secondary ${working ? '-slow text-text-content-primary' : ''}`}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: '#999999' }} className={`text-text-content-secondary ${working ? 'animate-spin-slow text-text-content-primary' : ''}`}>
               <path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z" />
             </svg>
           )}
@@ -171,7 +171,7 @@ export default function ThinkingState({
         </span>
         <svg
           width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-          className="text-text-content-secondary transition-transform "
+          className="text-text-content-secondary transition-transform duration-300"
           style={{ transform: expanded ? "rotate(180deg)" : "rotate(0)" }}
         >
           <path d="M6 9l6 6 6-6" />
@@ -186,12 +186,12 @@ export default function ThinkingState({
 
       {/* expandable trace content */}
       {expanded && (
-        <div className="mt-2 w-full   ">
+        <div className="mt-2 w-full animate-in fade-in duration-300">
           {variant === "Reasoning" ? (
             /* Frameless Transparent AI Reasoning Trace */
             <div className="space-y-1.5 pl-3 border-l border-border-divider-subtle/40 ml-1 text-xs">
               <div className="flex items-center gap-2 font-mono text-[10px] text-text-content-secondary uppercase tracking-wider">
-                <span className="size-1.5 rounded-full bg-text-content-secondary " />
+                <span className="size-1.5 rounded-full bg-text-content-secondary animate-pulse" />
                 Raciocínio do Agente
               </div>
               <div className="space-y-1.5 text-text-content-primary/90 font-normal leading-relaxed text-[12.5px]">
@@ -260,7 +260,7 @@ export default function ThinkingState({
                 const isActive = working && i === v.rows.length - 1;
                 return (
                   <div key={`step_${row.primary}_${i}`} className="min-w-0 flex items-start gap-2.5 py-1 text-xs text-text-content-primary/80 transition-colors">
-                    <span className={`size-1.5 rounded-full ${isActive ? 'bg-zinc-400  shadow-[0_0_8px_rgba(161,161,170,0.5)]' : 'bg-text-content-secondary/60'} shrink-0`} />
+                    <span className={`size-1.5 rounded-full ${isActive ? 'bg-zinc-400 animate-pulse shadow-[0_0_8px_rgba(161,161,170,0.5)]' : 'bg-text-content-secondary/60'} shrink-0`} />
                     <span className={`min-w-0 break-words whitespace-pre-wrap [overflow-wrap:anywhere] font-medium text-[12px] ${isActive ? 'text-text-content-primary' : ''}`}>{row.primary}</span>
                     {row.secondary && (
                       <span className="text-[11px] font-mono text-text-content-secondary/60 shrink-0 ml-auto">{row.secondary}</span>

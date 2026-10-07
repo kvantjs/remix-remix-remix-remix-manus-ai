@@ -266,15 +266,37 @@ export function KvantComputer({
   const [iframeReloadKey, setIframeReloadKey] = useState(0);
   const iframeLoadTimeoutRef = useRef<number | null>(null);
   const latestSurfaceTrace = [...(toolCalls || [])].reverse().find(trace => trace.actionType || trace.screenData?.terminalOutput || trace.screenData?.fileContent);
-  const activeSurface: 'terminal' | 'editor' = latestSurfaceTrace?.actionType === 'editor'
-    ? 'editor'
-    : 'terminal';
+  const activeSurface: 'browser' | 'terminal' | 'editor' = browserStatus === 'loading'
+    ? 'browser'
+    : latestSurfaceTrace?.actionType === 'terminal'
+      ? 'terminal'
+      : latestSurfaceTrace?.actionType === 'editor'
+        ? 'editor'
+        : 'browser';
 
   const handleTurnOnComputer = (targetUrlAfterBoot?: string) => {
     setIsComputerActive(true);
-    setBootSecondsRemaining(0);
-    setIsLoading(false);
-    setBrowserStatus('interactive');
+    setBootSecondsRemaining(5);
+    setIsLoading(true);
+    setBrowserStatus('loading');
+    let remaining = 5;
+    const timer = window.setInterval(() => {
+      remaining -= 1;
+      setBootSecondsRemaining(Math.max(remaining, 0));
+      if (remaining <= 0) {
+        window.clearInterval(timer);
+        setIsLoading(false);
+        setBrowserStatus('interactive');
+      }
+    }, 1000);
+    if (targetUrlAfterBoot) {
+      setCurrentUrl(targetUrlAfterBoot);
+      try {
+        setPageTitle(new URL(targetUrlAfterBoot).hostname || targetUrlAfterBoot);
+      } catch {
+        setPageTitle(targetUrlAfterBoot);
+      }
+    }
   };
 
   const handleTurnOffComputer = () => {
@@ -289,13 +311,25 @@ export function KvantComputer({
     }
   }, [agentIntent, isWorking, isComputerActive, forceIdle]);
 
-  // Instant computer activation
+  // A inicialização do computador é deliberadamente visível e bloqueia qualquer ação com animação ampliada
   useEffect(() => {
     if (!/inicializ|iniciando|boot/i.test(statusText || '') && !/inicializ|iniciando|boot/i.test(contextText || '')) return;
+    if (bootSecondsRemaining > 0) return;
     setIsComputerActive(true);
-    setBrowserStatus('interactive');
-    setIsLoading(false);
-    setBootSecondsRemaining(0);
+    setBrowserStatus('loading');
+    setIsLoading(true);
+    setBootSecondsRemaining(5);
+    let remaining = 5;
+    const timer = window.setInterval(() => {
+      remaining -= 1;
+      setBootSecondsRemaining(Math.max(remaining, 0));
+      if (remaining <= 0) {
+        window.clearInterval(timer);
+        setIsLoading(false);
+        setBrowserStatus('interactive');
+      }
+    }, 1000);
+    return () => window.clearInterval(timer);
   }, [statusText, contextText]);
 
   // Update browserStatus from props if provided
@@ -825,40 +859,217 @@ export function KvantComputer({
                 Envie uma instrução ao agente no chat para ligar o computador e iniciar as automações.
               </p>
           </div>
+        ) : isBooting ? (
+          /* COMPUTER BOOTING ANIMATION SCREEN */
+          <div className="flex-1 bg-[#1a1a1a] flex flex-col items-center justify-center p-6 text-center select-none overflow-y-auto space-y-6 animate-in fade-in duration-300">
+            <div className="flex flex-col items-center justify-center pt-6 pb-2">
+              <Loader />
+            </div>
+
+            <div className="flex flex-col items-center space-y-1.5 max-w-sm">
+              <div className="bg-[#50a2ff]/10 border border-[#50a2ff]/30 text-[#50a2ff] px-3 py-1 rounded-full text-xs font-semibold tracking-wide uppercase">
+                Inicializando computador do agente
+              </div>
+              <p className="text-sm font-medium text-white tracking-tight">
+                Ambiente Computer MCP em inicialização
+              </p>
+              <p className="text-xs text-zinc-400 font-mono">
+                {bootSecondsRemaining}s restantes · Conectando ao container Ubuntu 24.04
+              </p>
+            </div>
+          </div>
+        ) : (isIdle && isLive) ? (
+          /* ACTIVE BUT IDLE COMPUTER SCREEN (NOTHING TO SHOW) */
+          <div className="flex-1 bg-bg-canvas-main flex flex-col items-center justify-center p-6 text-center select-none overflow-y-auto space-y-4 animate-in fade-in duration-500">
+              <img 
+                src="https://imgdb.io/i/-E1nG20.png" 
+                alt="Nada para mostrar" 
+                className="w-56 sm:w-64 md:w-72 h-auto object-contain drop-shadow-md"
+              />
+
+              <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+                Navegador pronto
+              </h3>
+
+              <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed max-w-sm">
+                O computador está disponível e aguardando uma navegação real do agente. Nenhum site é aberto automaticamente.
+              </p>
+          </div>
         ) : (
           <div 
-            className={`relative flex-1 bg-[#1a1a1a] overflow-hidden flex flex-col min-h-0 cursor-not-allowed select-none`}
+            className={`relative flex-1 bg-white overflow-hidden flex flex-col min-h-0 cursor-not-allowed select-none`}
+            style={{ colorScheme: 'light', backgroundColor: '#ffffff' }}
           >
+            {/* Floating CAPTCHA / Security Challenge Alert Banner */}
+            {isCaptchaOrChallenge && (
+              <div className="absolute top-3 left-1/2 -translate-x-1/2 z-40 bg-amber-500/95 text-slate-950 font-medium text-xs px-4 py-2 rounded-xl shadow-2xl border border-amber-300 flex items-center gap-3 backdrop-blur-md animate-in slide-in-from-top-4 duration-300">
+                <ShieldWarning size={16} className="text-slate-950 shrink-0 animate-bounce" />
+                <span><strong>CAPTCHA / Desafio de Segurança Detectado!</strong> O navegador ao vivo está liberado para interagir.</span>
+                <span className="text-slate-950/70 text-[11px] font-semibold shrink-0">O agente pausou a automação.</span>
+              </div>
+            )}
+
             {activeSurface === 'terminal' && <TerminalView activeCode={customCode} liveToolCalls={toolCalls} />}
             {activeSurface === 'editor' && <AgentCodeSurface toolCalls={toolCalls} customFiles={customFiles} onFileUpdate={onFileUpdate} />}
+            {/* Complete website rendered via proxy or dynamic runtime with decreased zoom (85% scale) in light mode */}
+            <div className={activeSurface === 'browser' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>
+            {isExternalWeb || !customCode ? (
+              <div className="relative w-full h-full flex-1 overflow-hidden bg-white" style={{ colorScheme: 'light', backgroundColor: '#ffffff' }}>
+                <div 
+                  className="origin-top-left transition-transform duration-200 bg-white" 
+                  style={{ transform: 'scale(0.70)', width: '142.86%', height: '142.86%', colorScheme: 'light', backgroundColor: '#ffffff' }}
+                >
+                  {!shouldShowLiveIframe && liveScreenshot ? (
+                    <div className="w-full h-full bg-[#f7f7f7] flex items-center justify-center overflow-hidden group/screenshot">
+                      <img
+                        src={liveScreenshot}
+                        alt={`Captura ao vivo de ${pageTitle || currentUrl}`}
+                        className={`h-full w-full object-contain pointer-events-none transition-all duration-700 group-hover/screenshot:scale-[1.01] ${isLoading && agentCursor.status?.includes('Rolando') ? '-translate-y-8 opacity-90 blur-[0.5px]' : ''}`}
+                        onError={() => setLiveScreenshot(null)}
+                      />
+
+                      {browserStatus === 'loading' && !isLoading && !liveScreenshot && (
+                        <div className="absolute inset-0 z-10 bg-[#1a1a1a] flex flex-col items-center justify-center animate-in fade-in duration-300">
+                          <div className="flex flex-col items-center gap-4">
+                            <div className="sp-vortex-loader" />
+                            <span className="text-[11px] font-bold text-white/50 uppercase tracking-widest animate-pulse">Carregando Domínio Real...</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {browserStatus === 'error' && (
+                        <div className="absolute inset-0 z-10 bg-red-500/5 backdrop-blur-[2px] flex flex-col items-center justify-center animate-in fade-in duration-300">
+                          <div className="bg-white border border-red-200 rounded-2xl p-6 shadow-2xl flex flex-col items-center gap-4 max-w-sm text-center">
+                            <div className="size-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center">
+                              <XCircle size={28} weight="fill" />
+                            </div>
+                            <div className="space-y-1">
+                              <h4 className="text-sm font-bold text-slate-900">Erro de Conectividade</h4>
+                              <p className="text-[11px] text-slate-500 leading-relaxed">Não foi possível carregar a página solicitada. O site pode estar inacessível ou bloqueando o acesso automatizado.</p>
+                            </div>
+                            <p className="text-[10px] text-slate-400">A próxima tentativa será iniciada exclusivamente pelo agente.</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="relative w-full h-full bg-white" style={{ colorScheme: 'light', backgroundColor: '#ffffff' }}>
+                      <iframe
+                        key={iframeReloadKey}
+                        ref={iframeRef}
+                        src={proxySrc}
+                        title="Computador na Nuvem"
+                        className={`w-full h-full border-0 absolute inset-0 bg-white pointer-events-none`}
+                        style={{ colorScheme: 'light', backgroundColor: '#ffffff' }}
+                        sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
+                        onLoad={() => {
+                          if (iframeLoadTimeoutRef.current) window.clearTimeout(iframeLoadTimeoutRef.current);
+                          setIframeLoaded(true);
+                          setIsLoading(false);
+                          setBrowserStatus('interactive');
+                        }}
+                        onError={() => {
+                          if (iframeLoadTimeoutRef.current) window.clearTimeout(iframeLoadTimeoutRef.current);
+                          setIframeLoaded(false);
+                          setBrowserStatus('error');
+                        }}
+                      />
+                      {browserStatus === 'error' ? (
+                        <div role="alert" className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#1a1a1a] p-6 text-center">
+                          <XCircle size={30} weight="fill" className="mb-3 text-red-400" />
+                          <p className="text-sm font-semibold text-white">O navegador do agente não respondeu</p>
+                          <p className="mt-1 max-w-xs text-xs leading-relaxed text-white/60">A página não pôde ser carregada no viewport visual. O agente pode tentar novamente sem perder a tarefa.</p>
+                          <button
+                            type="button"
+                            onClick={() => { setBrowserStatus('loading'); setIframeReloadKey(value => value + 1); }}
+                            className="mt-4 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-black transition hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                          >
+                            Tentar carregar novamente
+                          </button>
+                        </div>
+                      ) : !iframeLoaded && (
+                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#1a1a1a] p-6 animate-in fade-in duration-500">
+                          <div className="flex flex-col items-center gap-6">
+                            <div className="relative">
+                               <div className="absolute -inset-4 bg-white/5 rounded-full blur-xl animate-pulse" />
+                               <div className="sp-vortex-loader" />
+                            </div>
+                            <div className="text-center space-y-1.5">
+                              <p className="text-xs font-semibold text-white/90 tracking-wide">Navegador do agente conectado</p>
+                              <p className="text-[10px] text-white/40 max-w-[200px] leading-relaxed">Sincronizando ambiente visual para <span className="font-mono text-white/60">{pageTitle || currentUrl}</span></p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className={`w-full h-full flex-1 relative overflow-hidden bg-white text-slate-900 pointer-events-none`} style={{ colorScheme: 'light', backgroundColor: '#ffffff' }}>
+                <div 
+                  className="origin-top-left transition-transform duration-200 overflow-auto w-full h-full bg-white" 
+                  style={{ transform: 'scale(0.70)', width: '142.86%', height: '142.86%', colorScheme: 'light', backgroundColor: '#ffffff' }}
+                >
+                  <DynamicRuntimeRunner code={customCode} />
+                </div>
+              </div>
+            )}
+            </div>
           </div>
         )}
+
 
         {/* AGENT MOUSE CURSOR: Positioned over the remote desktop */}
         {agentCursor.visible && isComputerActive && !isIdle && !isBooting && (liveScreenshot || iframeLoaded || customCode) && (isWorking || userControlMode || liveScreenshot || customCode) && (
           <span 
-            className="absolute pointer-events-none transition-all  ease-out z-50 bg-transparent"
+            className="absolute pointer-events-none transition-all duration-300 ease-out z-50 bg-transparent !bg-transparent border-none !border-none shadow-none !shadow-none"
             style={{
               left: `calc(${Math.min(100, Math.max(0, (agentCursor.x / (agentCursor.viewportWidth || 1280)) * 100))}% - 12px)`,
               top: `calc(32px + ${Math.min(100, Math.max(0, (agentCursor.y / (agentCursor.viewportHeight || 800)) * 100))}% - 12px)`,
+              backgroundColor: 'transparent'
             }}
           >
-            <span className="relative flex items-center bg-transparent">
+            <span className={`relative flex items-center bg-transparent !bg-transparent cursor-animation-${agentCursor.animation || 'idle'}`} style={{ backgroundColor: 'transparent' }}>
+              {(agentCursor.animation === 'moving' || agentCursor.animation === 'loading') && (
+                <span className="absolute -left-3 top-1 flex gap-0.5 opacity-70">
+                  <span className="size-1 rounded-full bg-cyan-300 animate-ping" />
+                  <span className="size-1 rounded-full bg-blue-300 animate-pulse" />
+                </span>
+              )}
+              {agentCursor.animation === 'clicking' && (
+                <span className="absolute inset-0 size-11 -left-2.5 -top-2.5 rounded-full border-2 border-blue-400/70 animate-ping" />
+              )}
+              {agentCursor.animation === 'scrolling' && (
+                <span className="absolute -right-5 -top-1 flex flex-col items-center text-cyan-300 animate-bounce">
+                  <span className="text-[9px] leading-none">⌃</span><span className="text-[9px] leading-none">⌄</span>
+                </span>
+              )}
+              {agentCursor.animation === 'typing' && (
+                <span className="absolute -right-3 -top-2 h-5 w-0.5 bg-amber-300 animate-pulse" />
+              )}
+              {agentCursor.animation === 'reading' && (
+                <span className="absolute -left-2 top-3 h-0.5 w-8 bg-emerald-300/80 blur-[0.5px] animate-pulse" />
+              )}
               <NavigationArrow 
                 size={22} 
                 weight="fill" 
-                className={`text-white ${agentCursor.animation === 'clicking' ? 'scale-75' : 'scale-100'}`}
+                className={`text-white transition-transform duration-200 ${agentCursor.animation === 'clicking' ? 'scale-75 text-blue-400' : agentCursor.animation === 'loading' ? 'animate-spin text-cyan-300' : 'scale-100'}`}
                 style={{ 
-                   stroke: '#000000', 
-                   strokeWidth: '1.75px', 
-                   strokeLinejoin: 'round', 
-                   paintOrder: 'stroke fill',
-                   filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.6))'
+                  stroke: '#000000', 
+                  strokeWidth: '1.75px', 
+                  strokeLinejoin: 'round', 
+                  paintOrder: 'stroke fill',
+                  filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.6))'
                 }}
               />
             </span>
           </span>
         )}
+
+        {/* Agent Keystroke HUD removed per user request */}
+
+        {/* Agent Typing Banner removed per user request */}
 
       </div>
 
@@ -894,13 +1105,13 @@ export function KvantComputer({
             <div className="flex-1 relative flex items-center h-4 group">
               <div className="h-1 w-full bg-[#262626] rounded-full overflow-hidden">
                 <div 
-                  className="h-full bg-blue-500 rounded-full transition-all  shadow-[0_0_8px_rgba(59,130,246,0.5)]"
+                  className="h-full bg-blue-500 rounded-full transition-all duration-150 shadow-[0_0_8px_rgba(59,130,246,0.5)]"
                   style={{ width: `${scrubberValue}%` }}
                 />
               </div>
 
               <div 
-                className="absolute size-2 rounded-full bg-blue-500 ring-2 ring-blue-400/40 shadow-md shadow-blue-500/30 transition-all  pointer-events-none"
+                className="absolute size-2 rounded-full bg-blue-500 ring-2 ring-blue-400/40 shadow-md shadow-blue-500/30 transition-all duration-150 pointer-events-none group-hover:scale-125"
                 style={{ left: `calc(${scrubberValue}% - 4px)` }}
               />
 
@@ -950,7 +1161,7 @@ export function KvantComputer({
               className="flex items-center gap-1.5 text-xs shrink-0 cursor-pointer transition-colors"
               title="Voltar ao vivo"
             >
-              <span className={`size-1.5 rounded-full ${isLive ? 'bg-emerald-500' : 'bg-emerald-500/40'}`} />
+              <span className={`size-1.5 rounded-full ${isLive ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)]' : 'bg-emerald-500/40'}`} />
               <span className={`text-[11px] ${isLive ? 'text-white font-semibold' : 'text-zinc-400'}`}>Ao vivo</span>
             </div>
           </div>
@@ -965,8 +1176,11 @@ export function KvantComputer({
                 <span>O computador do Kvant está inativo</span>
               </div>
             ) : isWorking ? (
-              <div className="flex items-center gap-2 text-white/50">
-                 <span>Processando tarefa...</span>
+              <WorkingLoader />
+            ) : isBooting ? (
+              <div className="flex items-center gap-1.5 text-cyan-300/80">
+                <div className="size-2 rounded-full bg-cyan-400 animate-pulse" />
+                <span>Inicializando computador do agente · {bootSecondsRemaining}s restantes</span>
               </div>
             ) : (
               <div className="flex items-center gap-1.5" style={{ color: '#68ca3c' }}>

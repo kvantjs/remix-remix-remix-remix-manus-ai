@@ -108,10 +108,10 @@
 
   /* Application Specific Variables */
   --app-bg: #1a1a1a;
-  --sidebar-bg: #161616;
+  --sidebar-bg: #1a1a1a;
   --panel-border: #232323;
   --chat-bubble-user-text: #ffffff;
-  --chat-input-bg: #161616;
+  --chat-input-bg: #1a1a1a;
   --chat-input-border-focus: #404040;
   --chat-timestamp: #a1a1aa;
   --btn-primary-bg: #ffffff;

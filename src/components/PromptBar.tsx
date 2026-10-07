@@ -576,7 +576,7 @@ export default function PromptBar({
                           event.stopPropagation();
                           setConnected((current) => !current);
                         }}
-                        className={`shrink-0 text-[12px] font-medium transition-colors  px-2 py-0.5 rounded ${
+                        className={`shrink-0 text-[12px] font-medium transition-colors duration-100 px-2 py-0.5 rounded ${
                           connected ? "text-green bg-green-500/10 border border-green-500/20" : "text-blue-400 hover:text-blue-300 hover:underline"
                         }`}
                       >
@@ -651,7 +651,7 @@ export default function PromptBar({
 
         {/* ── composer ───────────────────────────────────── */}
         <div
-          className={`relative isolate flex flex-col overflow-hidden border border-line bg-surface shadow-card transition-[border-color,border-radius,box-shadow]  focus-within:border-line-strong focus-within:shadow-raised ${
+          className={`relative isolate flex flex-col overflow-hidden border border-line bg-surface shadow-card transition-[border-color,border-radius,box-shadow] duration-200 focus-within:border-line-strong focus-within:shadow-raised ${
             tall ? "gap-2.5 p-3.5" : "gap-1.5 p-2"
           } ${
             pill ? (attachments.length > 0 || wide ? "rounded-[24px]" : "rounded-full") : tall ? "rounded-[22px]" : "rounded-[16px]"
@@ -690,7 +690,7 @@ export default function PromptBar({
                     type="button"
                     aria-label={`Remover ${file}`}
                     onClick={() => setAttachments((current) => current.filter((_, j) => j !== i))}
-                    className={`-my-1 flex size-6 items-center justify-center text-ink-3 transition-colors  hover:bg-line/70 hover:text-ink cursor-pointer ${
+                    className={`-my-1 flex size-6 items-center justify-center text-ink-3 transition-colors duration-100 hover:bg-line/70 hover:text-ink cursor-pointer ${
                       pill ? "rounded-full" : "rounded-[5px]"
                     }`}
                   >
@@ -718,7 +718,7 @@ export default function PromptBar({
                 setPlusOpen((current) => !current);
                 inputRef.current?.focus();
               }}
-              className={`flex size-7 shrink-0 items-center justify-center justify-self-start text-ink-3 transition-[background-color,color,transform]  hover:bg-hover hover:text-ink active:scale-[0.94] cursor-pointer ${
+              className={`flex size-7 shrink-0 items-center justify-center justify-self-start text-ink-3 transition-[background-color,color,transform] duration-150 hover:bg-hover hover:text-ink active:scale-[0.94] cursor-pointer ${
                 pill ? "rounded-full" : "rounded-[8px]"
               } ${plusOpen ? "bg-hover text-ink" : ""} ${wide ? "col-start-1 row-start-2" : "col-start-1 row-start-1"}`}
             >
@@ -775,7 +775,7 @@ export default function PromptBar({
                 setPlusOpen(false);
                 setModelOpen((current) => !current);
               }}
-              className={`flex h-7 shrink-0 items-center gap-1.5 px-2 text-[12px] font-medium text-ink-2 bg-field/60 border border-line/60 transition-all  hover:bg-hover hover:text-ink active:scale-[0.97] cursor-pointer ${
+              className={`flex h-7 shrink-0 items-center gap-1.5 px-2 text-[12px] font-medium text-ink-2 bg-field/60 border border-line/60 transition-all duration-150 hover:bg-hover hover:text-ink active:scale-[0.97] cursor-pointer ${
                 pill ? "rounded-full" : "rounded-[8px]"
               } ${wide ? "col-start-2 row-start-2 justify-self-start" : "col-start-3 row-start-1"}`}
             >
@@ -791,7 +791,7 @@ export default function PromptBar({
               aria-label={listening ? "Parar ditado" : "Iniciar ditado por voz"}
               aria-pressed={listening}
               onClick={() => setListening((current) => !current)}
-              className={`flex size-7 shrink-0 items-center justify-center transition-[background-color,color,transform]  active:scale-[0.94] cursor-pointer ${
+              className={`flex size-7 shrink-0 items-center justify-center transition-[background-color,color,transform] duration-150 active:scale-[0.94] cursor-pointer ${
                 pill ? "rounded-full" : "rounded-[8px]"
               } ${listening ? "bg-accent-tint text-accent-ink" : "text-ink-3 hover:bg-hover hover:text-ink"} ${wide ? "col-start-4 row-start-2" : "col-start-4 row-start-1"}`}
             >
@@ -816,7 +816,7 @@ export default function PromptBar({
                 type="button"
                 aria-label="Interromper agente"
                 onClick={onStop}
-                className={`flex size-7 shrink-0 items-center justify-center bg-red-500/20 text-red-400 border border-red-500/30 transition-all  hover:bg-red-500/30 active:scale-[0.94] cursor-pointer ${
+                className={`flex size-7 shrink-0 items-center justify-center bg-red-500/20 text-red-400 border border-red-500/30 transition-all duration-150 hover:bg-red-500/30 active:scale-[0.94] cursor-pointer ${
                   pill ? "rounded-full" : "rounded-[8px]"
                 } ${wide ? "col-start-5 row-start-2" : "col-start-5 row-start-1"}`}
                 title="Interromper agente"
@@ -831,7 +831,7 @@ export default function PromptBar({
                 aria-label="Enviar prompt"
                 disabled={!canSend}
                 onClick={send}
-                className={`flex size-7 shrink-0 items-center justify-center transition-[background-color,color,transform,opacity]  enabled:active:scale-[0.94] cursor-pointer ${
+                className={`flex size-7 shrink-0 items-center justify-center transition-[background-color,color,transform,opacity] duration-200 enabled:active:scale-[0.94] cursor-pointer ${
                   pill ? "rounded-full" : "rounded-[8px]"
                 } ${wide ? "col-start-5 row-start-2" : "col-start-5 row-start-1"} ${
                   canSend ? "bg-white text-black hover:bg-white/90 shadow-xs" : "bg-line text-ink-3/40 cursor-not-allowed opacity-50"

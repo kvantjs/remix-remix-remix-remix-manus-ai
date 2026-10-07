@@ -346,7 +346,7 @@ export default function DynamicApp() {
               }`}>
                 <span className="relative flex h-2 w-2">
                   {isLive && (
-                    <span className=" absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   )}
                   <span className={`relative inline-flex rounded-full h-2 w-2 ${isLive ? 'bg-emerald-500' : 'bg-white/30'}`}></span>
                 </span>
@@ -376,7 +376,7 @@ export default function DynamicApp() {
         >
           {filteredLogs.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-white/30 space-y-2">
-              <Activity size={28} className="" />
+              <Activity size={28} className="animate-pulse" />
               <p className="text-xs font-mono">Nenhum log encontrado para os filtros selecionados.</p>
               <button 
                 onClick={() => {

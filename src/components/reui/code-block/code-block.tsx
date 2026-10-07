@@ -298,7 +298,7 @@ const LINE_STATE_CLASS = [
  * colour remounts them mid-read). Reduced motion disables the row entry.
  */
 const LINE_MOTION_CLASS =
-  "[[data-streaming]_&]: [[data-streaming]_&]:-0 [[data-streaming]_&]: [[data-streaming]_&]: [[data-streaming]_&]:ease-out motion-reduce:animate-none"
+  "[[data-streaming]_&]:animate-in [[data-streaming]_&]:fade-in-0 [[data-streaming]_&]:slide-in-from-bottom-1 [[data-streaming]_&]:duration-150 [[data-streaming]_&]:ease-out motion-reduce:animate-none"
 
 /**
  * Deliberately no per-token animation. The highlighter runs a chunk behind
@@ -666,7 +666,7 @@ const CodeBlockLineRow = memo(function CodeBlockLineRow({
             /* An underline caret: a thin strip on the baseline, the shape a
                terminal uses, instead of a bold block that outweighs the text
                it follows. */
-            className="ml-0.5 inline-block h-[0.12em] w-[0.55em] translate-y-[0.02em]  rounded-[1px] bg-(--code-block-caret-color) motion-reduce:animate-none"
+            className="ml-0.5 inline-block h-[0.12em] w-[0.55em] translate-y-[0.02em] animate-pulse rounded-[1px] bg-(--code-block-caret-color) motion-reduce:animate-none"
           />
         ) : null}
       </span>

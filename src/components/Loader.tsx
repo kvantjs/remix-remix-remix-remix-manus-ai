@@ -68,6 +68,8 @@ const StyledWrapper = styled.div`
     background: #606060;
     margin: 0 2px;
     border-radius: 50%;
+    animation: snowing 5s linear infinite;
+    animation-duration: calc(15s / var(--i));
     transform-origin: bottom;
   }
 

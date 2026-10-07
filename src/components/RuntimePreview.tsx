@@ -100,7 +100,7 @@ export function RuntimePreview({ activeCode, customFiles = {}, onSendPrompt, isW
       </div>
 
       <div className="flex-1 overflow-hidden relative flex flex-col items-center justify-center p-2 bg-[#1a1a1a]">
-        <div className={`transition-all  bg-transparent border border-[#1a1a1a] shadow-2xl overflow-hidden flex flex-col ${device === 'desktop' ? 'w-full h-full rounded-xl' : 'w-[375px] h-[667px] my-auto rounded-[36px] ring-8 ring-[#222] border-4 border-[#333]'}`}>
+        <div className={`transition-all duration-300 bg-transparent border border-[#1a1a1a] shadow-2xl overflow-hidden flex flex-col ${device === 'desktop' ? 'w-full h-full rounded-xl' : 'w-[375px] h-[667px] my-auto rounded-[36px] ring-8 ring-[#222] border-4 border-[#333]'}`}>
           {device === 'mobile' && <div className="h-6 bg-[#161616] px-6 pt-1 flex items-center justify-between text-[10px] text-white/50 border-b border-white/5 shrink-0"><span>9:41</span><div className="w-16 h-3 bg-[#0a0a0a] rounded-full mx-auto" /><span>5G</span></div>}
           <div key={`${refreshKey}-${runtimeCode}`} className="flex-1 overflow-auto w-full h-full relative bg-transparent">
             {isWorking ? (

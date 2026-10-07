@@ -517,7 +517,7 @@ export function DynamicRuntimeRunner({ code, customFiles = {} }: DynamicRuntimeR
   if (isCompiling) {
     return (
       <div className="h-full flex items-center justify-center p-8 text-white/40 text-xs gap-2.5">
-        <div className="size-4 border-2 border-blue-500 border-t-transparent rounded-full " />
+        <div className="size-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
         <span>Compilando client/src/App.tsx...</span>
       </div>
     );
@@ -527,7 +527,7 @@ export function DynamicRuntimeRunner({ code, customFiles = {} }: DynamicRuntimeR
     return (
       <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-4">
         <div className="size-12 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center text-white/40">
-          <PhosphorIcons.Sparkle size={24} className="text-blue-400 " />
+          <PhosphorIcons.Sparkle size={24} className="text-blue-400 animate-pulse" />
         </div>
         <div className="space-y-1 max-w-sm">
           <h2 className="text-sm font-semibold text-white">Preview de Runtime Pronto</h2>
