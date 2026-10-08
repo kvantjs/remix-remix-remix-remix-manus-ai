@@ -3872,12 +3872,12 @@ function extractUserDestinationUrl(message: string): { targetUrl: string | null;
   }
 
   // 2. Check for explicit search phrases (e.g. "pesquise notícias sobre IA", "procure por receita de bolo")
-  const searchMatch = cleanMsg.match(/(?:pesquis(?:e|ar)|busqu(?:e|ar)|procur(?:e|ar)|search for|search|procure na web por|pesquise por)\s+["']?([^"'\n\r]+)["']?/i);
+  const searchMatch = cleanMsg.match(/(?:pesquis(?:e|ar)|busqu(?:e|ar)|procur(?:e|ar)|search(?:\s+for)?)(?:\s+(?:na|no|em)\s+(?:web|internet|google))?\s+(?:por|sobre)?\s*["']?([^"'\n\r]+)["']?/i);
   const lower = cleanMsg.toLowerCase();
   if (searchMatch && !lower.includes('endereço') && !lower.includes('endereco') && !lower.includes('acesse') && !lower.includes('abra o site') && !lower.includes('crie') && !lower.includes('criar') && !lower.includes('desenvolva')) {
     const rawQuery = searchMatch[1]
       .trim()
-      .replace(/^(?:no|na|em)\s+google\s+/i, '')
+      .replace(/^(?:na|no|em)\s+(?:web|internet|google)\s+(?:por|sobre)\s+/i, '')
       .replace(/\s+e\s+(?:abra|abrir|acesse|acessar|leia|ler|role|rolar).*/i, '')
       .replace(/^(?:sobre|por)\s+/i, '')
       .trim();
@@ -3963,6 +3963,7 @@ function planRealAgentActions(message: string): Array<{ toolName: string; args: 
   const terminalCommand = extractExplicitTerminalCommand(cleanMsg);
   const naturalSearchMatch = cleanMsg.match(/\b(?:pesquis(?:e|ar)|busqu(?:e|ar)|procur(?:e|ar)|search(?:\s+for)?)\b(?:\s+(?:na|no|em)\s+(?:web|internet|google))?\s+(?:por|sobre)?\s*([\s\S]+)$/i);
   const naturalSearchQuery = naturalSearchMatch?.[1]
+    ?.replace(/^(?:na|no|em)\s+(?:web|internet|google)\s+(?:por|sobre)\s+/i, '')
     ?.replace(/\s+(?:e\s+)?(?:mostre|exiba|retorne|informe|deixe|faça|faca|abra|acesse|leia|role)\b[\s\S]*$/i, '')
     .replace(/[.!?]+$/, '')
     .trim();
@@ -4204,8 +4205,11 @@ function generateComprehensiveAgentReport(
       let outputSnippet = '';
       try {
         const parsed = JSON.parse(t.result);
-        if (parsed.stdout) outputSnippet = `\n  *Saída:* \`${parsed.stdout.slice(0, 150).trim()}\``;
-        else if (parsed.output) outputSnippet = `\n  *Saída:* \`${parsed.output.slice(0, 150).trim()}\``;
+        const stdout = parsed.stdout || parsed.result?.stdout;
+        const stderr = parsed.stderr || parsed.result?.stderr;
+        if (stdout) outputSnippet = `\n  *Saída:* \`${String(stdout).slice(0, 150).trim()}\``;
+        else if (stderr) outputSnippet = `\n  *Saída de erro:* \`${String(stderr).slice(0, 150).trim()}\``;
+        else if (parsed.output) outputSnippet = `\n  *Saída:* \`${String(parsed.output).slice(0, 150).trim()}\``;
       } catch {
         if (typeof t.result === 'string' && t.result.length > 0) {
           outputSnippet = `\n  *Saída:* \`${t.result.slice(0, 150).trim()}\``;
@@ -4986,7 +4990,9 @@ app.post('/api/agent/chat/stream', async (req, res) => {
       await new Promise(r => setTimeout(r, 500));
     }
 
-    const isCodeAction = intent.mode === 'app_creation' || intent.mode === 'integrated';
+    // A solicitação integrada pode usar código e computador, mas o fallback
+    // final deve preservar as evidências reais de terminal e navegador.
+    const isCodeAction = intent.mode === 'app_creation';
     let finalResult: any;
 
     if (intent.mode === 'conversation') {
@@ -5233,7 +5239,28 @@ app.post('/api/agent/chat', async (req, res) => {
     if (action.toolName === 'fs.writeFile') continue;
     try {
       let trace;
-      if (action.toolName === 'browser.navigate') {
+      if (action.toolName === 'bash_exec') {
+        const command = String(action.args.command || '').trim();
+        const res = await agentToolExecutor.executeTool('bash_exec', action.args);
+        const output = [res.result?.stdout, res.result?.stderr ? `[stderr]\n${res.result.stderr}` : '']
+          .filter(Boolean)
+          .join('\n');
+        trace = {
+          id: `terminal_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          toolName: 'bash_exec',
+          server: 'bash_sandbox',
+          arguments: { command },
+          result: JSON.stringify(res.result || { error: res.error }),
+          timestamp: new Date().toLocaleTimeString(),
+          status: res.success ? 'success' : 'error',
+          actionType: 'terminal',
+          screenData: {
+            command,
+            terminalOutput: output || res.error || '',
+            actionDescription: res.actionDescription || `Comando Bash concluído com exit code ${res.result?.exitCode ?? 1}`
+          }
+        };
+      } else if (action.toolName === 'browser.navigate') {
         const res = await agentToolExecutor.executeTool('browser_navigate', { url: action.args.url });
         trace = {
           id: `tool_${Date.now()}`,
@@ -5259,7 +5286,7 @@ app.post('/api/agent/chat', async (req, res) => {
     }
   }
 
-        const isCodeAction = intent.mode === 'app_creation' || intent.mode === 'integrated';
+  const isCodeAction = intent.mode === 'app_creation';
   let fallback: any;
 
   if (intent.mode === 'conversation') {

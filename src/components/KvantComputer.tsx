@@ -804,8 +804,13 @@ export function KvantComputer({
       const lastTool = toolCalls[toolCalls.length - 1];
       if (!lastTool) return;
 
-      if (lastTool.screenData?.screenshot) {
-        setLiveScreenshot(lastTool.screenData.screenshot);
+      // Etapas como inspect/scroll podem não carregar uma imagem nova. Nesse
+      // caso, a tela continua sendo a última captura real do navegador, não
+      // um iframe vazio que acaba sendo classificado como erro por timeout.
+      const latestScreenshotTrace = [...toolCalls].reverse().find(trace => Boolean(trace.screenData?.screenshot));
+      const latestScreenshot = lastTool.screenData?.screenshot || latestScreenshotTrace?.screenData?.screenshot;
+      if (latestScreenshot) {
+        setLiveScreenshot(latestScreenshot);
       }
 
       if (lastTool.result) {
