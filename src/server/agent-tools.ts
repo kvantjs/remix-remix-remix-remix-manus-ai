@@ -52,7 +52,7 @@ export const AGENT_TOOL_DECLARATIONS = [
   },
   {
     name: 'bash_exec',
-    description: 'Executa comandos shell Bash no Ubuntu 24.04 em uma área de trabalho isolada (sandbox) com limites de tempo e recursos, retornando exitCode, stdout e stderr.',
+    description: 'Executa comandos shell Bash no Ubuntu 24.04 em uma área de trabalho isolada (sandbox). A execução é aguardada obrigatoriamente até a finalização do processo, retornando exitCode, stdout e stderr completos antes de prosseguir.',
     parameters: {
       type: 'OBJECT',
       properties: {
@@ -70,7 +70,7 @@ export const AGENT_TOOL_DECLARATIONS = [
   },
   {
     name: 'python_exec',
-    description: 'Executa código Python 3 no ambiente computacional isolado para cálculos, análise de dados ou automações.',
+    description: 'Executa código Python 3 no ambiente computacional isolado para cálculos, análise de dados ou automações, aguardando o término completo do processo e os retornos de saída.',
     parameters: {
       type: 'OBJECT',
       properties: {

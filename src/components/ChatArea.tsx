@@ -39,18 +39,23 @@ import {
   ThumbsDown,
   ArrowClockwise,
   CheckCircle,
-  ChatCircleDots
+  ChatCircleDots,
+  CaretLeft,
+  ListBullets
 } from '@phosphor-icons/react';
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { ToolCallTrace, AgentExecutionLog } from '../types/project';
 import { markdownFences } from '@/components/reui/code-block/code-block-highlight';
 import { ProfessionalCodeBlock } from './ProfessionalCodeBlock';
 import { SyntaxCodeView, InlineCodeSnippet } from './SyntaxCodeView';
-import ThinkingState from './ThinkingState';
+import ThinkingState, { AnimatedThinkingStatus, ThinkingPhase } from './ThinkingState';
+import { WorkingDot } from './WorkingLoader';
 import ToolChips, { getContextualToolIcon, getContextualFileIcon, ToolStep, ToolDiff } from './ToolChips';
 import StreamingText from './StreamingText';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { Favicon, extractCleanDomain } from '@/lib/favicon';
+import { sanitizeAndEnrichClientNote, AgentProgressNote, removeAllEmojis } from '@/lib/agentNotes';
 import PromptBar from './PromptBar';
 import { QuestionnaireQuestion, DEFAULT_APP_QUESTIONS } from './AgentContextQuestionnaire';
 import {
@@ -118,16 +123,6 @@ interface ExecutionStep {
   status: 'running' | 'complete' | 'warning';
   timestamp?: string;
 }
-
-
-interface AgentProgressNote {
-  id: string;
-  label: string;
-  text: string;
-  status: 'running' | 'complete' | 'warning';
-  timestamp: string;
-}
-
 
 type ToolPresentation = { label: string; chip: string; detail: string };
 
@@ -349,6 +344,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
   };
 
   const [isThinking, setIsThinking] = useState(false);
+  const [agentLivePhase, setAgentLivePhase] = useState<ThinkingPhase>('Pensando');
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [currentStep, setCurrentStep] = useState('Analisando solicitação...');
   const [executionSteps, setExecutionSteps] = useState<ExecutionStep[]>([]);
@@ -372,22 +368,55 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
     });
   };
 
-  const updateProgressNote = (label: string, text: string, status: AgentProgressNote['status'] = 'running') => {
-    const normalizedLabel = String(label || 'Etapa do agente').trim();
-    const normalizedText = String(text || '').trim() || 'Processando esta etapa...';
-    setProgressNotes(previous => {
-      const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      // There is only one live note. Keep a stable id so React updates the
-      // same message instead of replaying a growing list on every event.
-      const note = {
-        id: previous[0]?.id || 'agent-live-note',
-        label: normalizedLabel,
-        text: normalizedText,
+  const highlightProgressNote = (label: string, text: string, status: AgentProgressNote['status'] = 'complete') => {
+    const { cleanLabel, cleanText } = sanitizeAndEnrichClientNote(label, text);
+    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    setProgressNotes((previous) => {
+      const persistentId = `destaque_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const newPersistent: AgentProgressNote = {
+        id: persistentId,
+        label: cleanLabel,
+        text: cleanText,
         status,
-        timestamp
+        timestamp,
+        isPersistent: true
       };
-      progressNotesRef.current = [note];
-      return [note];
+      const existingPersistent = previous.filter((n) => n.isPersistent);
+      const existingLive = previous.find((n) => !n.isPersistent);
+      // No fixed limit (e.g. -3), the agent chooses how many to highlight
+      const nextPersistent = [...existingPersistent, newPersistent];
+      const next = existingLive ? [...nextPersistent, existingLive] : nextPersistent;
+      progressNotesRef.current = next;
+      return next;
+    });
+  };
+
+  const updateProgressNote = (
+    label: string,
+    text: string,
+    status: AgentProgressNote['status'] = 'running',
+    options?: { isPersistent?: boolean }
+  ) => {
+    if (options?.isPersistent) {
+      highlightProgressNote(label, text, status);
+      return;
+    }
+    const { cleanLabel, cleanText } = sanitizeAndEnrichClientNote(label, text);
+    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    setProgressNotes((previous) => {
+      const existingPersistent = previous.filter((n) => n.isPersistent);
+      const existingLive = previous.find((n) => !n.isPersistent);
+      const liveNote: AgentProgressNote = {
+        id: existingLive?.id || 'agent-live-note',
+        label: cleanLabel,
+        text: cleanText,
+        status,
+        timestamp,
+        isPersistent: false
+      };
+      const next = [...existingPersistent, liveNote];
+      progressNotesRef.current = next;
+      return next;
     });
   };
 
@@ -404,13 +433,11 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
   const addOpeningProgressNote = (prompt: string) => {
     const cleanPrompt = prompt.replace(/\s+/g, ' ').trim();
     const isCreation = /crie|criar|site|aplicaç|aplicac|dashboard|landing|loja|app/i.test(cleanPrompt);
-    updateProgressNote(
-      'Entendimento do pedido',
-      isCreation
-        ? `Entendi o objetivo: vou estruturar uma aplicação própria a partir de “${cleanPrompt.slice(0, 180)}${cleanPrompt.length > 180 ? '…' : ''}”. Primeiro vou definir a arquitetura e depois validar cada arquivo no preview.`
-        : `Entendi a solicitação: “${cleanPrompt.slice(0, 220)}${cleanPrompt.length > 220 ? '…' : ''}”. Vou organizar a execução em etapas verificáveis.`,
-      'complete'
-    );
+    const openingText = isCreation
+      ? `Compreendi a **especificação completa** para a criação da sua aplicação a partir do pedido: _“${cleanPrompt.slice(0, 220)}${cleanPrompt.length > 220 ? '…' : ''}”_. O plano arquitetural foi estruturado com foco em ==componentes modulares==, fluxo de dados consistente e design de alto padrão. Vamos iniciar a construção e validar cada funcionalidade diretamente no ambiente.`
+      : `Compreendi com **precisão técnica** o escopo da sua solicitação: _“${cleanPrompt.slice(0, 240)}${cleanPrompt.length > 240 ? '…' : ''}”_. A execução foi organizada em etapas estruturadas e ==critérios verificáveis==, garantindo estabilidade e alta fidelidade visual.`;
+
+    highlightProgressNote('Entendimento da solicitação', openingText, 'complete');
   };
 
   const beginExecutionStep = (label: string, detail: string) => {
@@ -538,7 +565,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
 
   const handleResumeFromBackground = (summaryText: string) => {
     setIsAgentInBackground(false);
-    setMessages(prev => prev.map(m => m.status === 'in_background' ? { ...m, status: 'completed' } : m));
+    setMessages(prev => prev.filter(m => m.status !== 'in_background' && !m.questionnaire));
     
     // Seamless context injection: Continue working without adding a visible user message to the UI
     const injectedContext = `[Contexto Adquirido Autonomamente]: O usuário definiu as preferências: ${summaryText}. O subagente sincronizou os dados. Continue a tarefa agora.`;
@@ -547,7 +574,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
 
   const handleResumeWithDefaults = () => {
     setIsAgentInBackground(false);
-    setMessages(prev => prev.map(m => m.status === 'in_background' ? { ...m, status: 'completed' } : m));
+    setMessages(prev => prev.filter(m => m.status !== 'in_background' && !m.questionnaire));
     handleSendMessage(`[Contexto Definido]: Prossiga com a melhor arquitetura de software, padrão Fintech/SaaS, paleta escura e recursos dinâmicos autônomos.`);
   };
 
@@ -590,6 +617,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
     }
 
     setIsThinking(true);
+    setAgentLivePhase('Pensando');
     progressNotesRef.current = [];
     setProgressNotes([]);
     progressNotesRef.current = [];
@@ -666,22 +694,24 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                 try {
                   const data = JSON.parse(line.replace('data: ', '').trim());
                   if (currentEvent === 'computer_starting') {
-                    updateProgressNote('Inicialização do computador', 'O Computer MCP está iniciando; nenhuma ação será executada durante o boot.', 'running');
-                    setCurrentStep(data.text || 'Inicializando o computador do agente...');
-                    beginExecutionStep('Inicializando computador do agente', 'Boot de 7 segundos; nenhuma ação será executada durante a inicialização.');
+                    setAgentLivePhase('Trabalhando');
+                    updateProgressNote('Ambiente operacional', 'O ambiente de execução seguro está iniciando. Todos os recursos necessários estão sendo carregados para viabilizar as ações com rastreabilidade e integridade.', 'running');
+                    setCurrentStep(data.text || 'Inicializando o ambiente seguro do agente...');
+                    beginExecutionStep('Inicializando ambiente do agente', 'Preparando ambiente seguro e ferramentas de execução.');
                     if (onAgentStateChange) {
                       onAgentStateChange({
                         isWorking: true,
-                        statusText: data.text || 'Inicializando o computador do agente...',
-                        contextText: 'O computador está iniciando. As ações serão liberadas somente após o boot de 7 segundos.',
+                        statusText: data.text || 'Inicializando o ambiente do agente...',
+                        contextText: 'O ambiente seguro está carregando os módulos necessários para as ações planejadas.',
                         toolCalls: [...liveToolCalls],
                         browserStatus: 'loading'
                       });
                     }
                   } else if (currentEvent === 'computer_ready') {
-                    updateProgressNote('Inicialização do computador', 'Boot concluído; o computador está pronto para executar a próxima etapa.', 'complete');
-                    completeExecutionStep('Inicializando computador do agente', data.text || 'Computador iniciado; execução liberada.');
-                    setCurrentStep(data.text || 'Computador iniciado; execução liberada.');
+                    setAgentLivePhase('Raciocinando');
+                    highlightProgressNote('Ambiente operacional pronto', '**Ambiente operacional inicializado**. Todos os serviços essenciais estão ativos e liberados para a execução com ==alto rigor técnico e estabilidade==.', 'complete');
+                    completeExecutionStep('Inicializando ambiente do agente', data.text || 'Ambiente seguro pronto para execução.');
+                    setCurrentStep(data.text || 'Ambiente do agente pronto para ações.');
                     if (onAgentStateChange) {
                       onAgentStateChange({
                         isWorking: true,
@@ -692,21 +722,36 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                       });
                     }
                   } else if (currentEvent === 'stage_note') {
-                    const stageLabel = data.label || 'Nota da etapa';
-                    updateProgressNote(`${stageLabel} · ${Date.now().toString().slice(-5)}`, data.text || 'Etapa registrada pelo agente.', 'running');
+                    setAgentLivePhase('Pensando');
+                    const stageLabel = data.label || 'Etapa do desenvolvimento';
+                    if (data.highlight || data.persistent) {
+                      highlightProgressNote(stageLabel, `**Marco de desenvolvimento**: ${data.text || 'Etapa técnica consolidada pelo agente com sucesso.'}`, 'complete');
+                    } else {
+                      updateProgressNote(stageLabel, data.text || 'Etapa registrada pelo agente.', 'running');
+                    }
                     setCurrentStep(data.text || stageLabel);
                   } else if (currentEvent === 'execution_gate') {
+                    setAgentLivePhase('Pensando');
                     updateProgressNote('Transição para execução', data.text || 'Pensamento concluído; preparando a próxima ação.', 'running');
                     setCurrentStep(data.text || 'Preparando a próxima ação...');
                   } else if (currentEvent === 'deliberation') {
-                    const deliberationLabel = data.label || 'Deliberação profunda';
-                    const deliberationText = data.text || 'Avaliando critérios verificáveis.';
-                    updateProgressNote(deliberationLabel, data.complete ? `Etapa concluída: ${deliberationText}` : deliberationText, data.complete ? 'complete' : 'running');
-                    if (data.complete) restartExecutionAnimation();
-                    setCurrentStep(data.text || data.label || 'Deliberação profunda em andamento');
-                    beginExecutionStep(data.label || 'Deliberação profunda', data.text || 'Avaliando critérios verificáveis.');
+                    setAgentLivePhase('Raciocinando');
+                    const deliberationLabel = data.label || 'Planejamento Arquitetural';
+                    const deliberationText = data.text || 'Avaliando critérios técnicos e diretrizes de projeto.';
                     if (data.complete) {
-                      completeExecutionStep(data.label || 'Deliberação profunda', data.text || 'Etapa validada.');
+                      highlightProgressNote(
+                        deliberationLabel,
+                        `**Decisão arquitetural validada**: ${deliberationText}. Os critérios de aceite foram estabelecidos e a implementação seguirá com ==alta estabilidade e precisão técnica==.`,
+                        'complete'
+                      );
+                      restartExecutionAnimation();
+                    } else {
+                      updateProgressNote(deliberationLabel, deliberationText, 'running');
+                    }
+                    setCurrentStep(data.text || data.label || 'Planejamento e análise em andamento');
+                    beginExecutionStep(deliberationLabel, deliberationText);
+                    if (data.complete) {
+                      completeExecutionStep(deliberationLabel, `${deliberationText} Etapa validada.`);
                     }
                     if (onAgentStateChange) {
                       onAgentStateChange({
@@ -717,6 +762,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                       });
                     }
                   } else if (currentEvent === 'status') {
+                    setAgentLivePhase(data.text?.toLowerCase().includes('racioc') || data.text?.toLowerCase().includes('analis') ? 'Raciocinando' : 'Pensando');
                     updateProgressNote('Raciocínio e coordenação', data.text || 'Coordenando a próxima ação do agente.', 'running');
                     setCurrentStep(data.text);
                     beginExecutionStep('Raciocinando sobre a próxima ação', data.text);
@@ -730,6 +776,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                       });
                     }
                   } else if (currentEvent === 'step') {
+                    setAgentLivePhase('Trabalhando');
                     updateProgressNote(data.toolName || 'Etapa de execução', data.text || 'Executando a próxima etapa do plano.', 'running');
                     setCurrentStep(data.text);
                     beginExecutionStep('Executando etapa do plano', data.text);
@@ -742,11 +789,16 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                       });
                     }
                   } else if (currentEvent === 'tool_start') {
+                    setAgentLivePhase('Trabalhando');
                     activateExecutionAnimation();
+                    const rawCommand = data.arguments?.command || data.arguments?.code || '';
+                    if (data.arguments && rawCommand) {
+                      data.arguments.command = String(rawCommand).toLowerCase().trim();
+                    }
                     const presentation = describeToolExecution(data.toolName, data.arguments || {}, data.reason || '');
                     const startedFilePath = String(data.arguments?.filePath || data.arguments?.path || data.arguments?.filename || '').trim();
-                    const presentationLabel = startedFilePath ? `${presentation.label} · ${startedFilePath}` : `${presentation.label} · etapa ${Date.now().toString().slice(-5)}`;
-                    updateProgressNote(presentationLabel, `Iniciei esta etapa: ${presentation.detail || presentation.chip}`, 'running');
+                    const presentationLabel = startedFilePath ? `${presentation.label} · ${startedFilePath}` : presentation.label;
+                    updateProgressNote(presentationLabel, `Executando a operação: ${presentation.detail || presentation.chip}. O agente está aplicando as alterações com precisão técnica para certificar que o fluxo permaneça consistente e validado.`, 'running');
                     setCurrentStep(`${presentation.label}: ${presentation.chip}`);
                     beginExecutionStep(presentation.label, presentation.detail);
                     const activeTrace: ToolCallTrace = {
@@ -770,7 +822,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                         url: data.arguments?.url || 'about:blank',
                         title: 'Acessando ao vivo...',
                         actionDescription: data.reason,
-                        command: data.arguments?.command,
+                        command: rawCommand ? String(rawCommand).toLowerCase().trim() : undefined,
                         filePath: data.arguments?.filePath || data.arguments?.path || data.arguments?.filename,
                         fileContent: data.arguments?.content || data.arguments?.code
                       }
@@ -794,6 +846,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                       });
                     }
                   } else if (currentEvent === 'browser_progress') {
+                    setAgentLivePhase('Trabalhando');
                     browserProgressSequenceRef.current += 1;
                     activateExecutionAnimation();
                     updateProgressNote('Navegador ao vivo', data.actionDescription || data.status || 'Acompanhando mouse, rolagem e conteúdo da página.', 'running');
@@ -828,39 +881,105 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                       });
                     }
                   } else if (currentEvent === 'terminal_output') {
+                    setAgentLivePhase('Trabalhando');
                     activateExecutionAnimation();
-                    const command = data.command || 'comando do agente';
+                    const rawCmd = data.command || 'bash_exec';
+                    const command = String(rawCmd).toLowerCase().trim();
                     const chunk = String(data.chunk || '');
-                    const terminalTrace: ToolCallTrace = {
-                      id: `terminal_live_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-                      toolName: data.toolName || 'bash_exec',
-                      server: 'Terminal Bash MCP',
-                      arguments: { command },
-                      result: chunk || (data.done ? `Processo finalizado com exitCode ${data.exitCode ?? 0}` : 'Processo em execução...'),
-                      timestamp: new Date().toLocaleTimeString(),
-                      status: data.done ? (Number(data.exitCode || 0) === 0 ? 'success' : 'error') : 'running',
-                      actionType: 'terminal',
-                      screenData: { command, terminalOutput: chunk, actionDescription: data.done ? 'Comando finalizado' : 'Recebendo saída do terminal ao vivo' }
-                    };
-                    liveToolCalls.push(terminalTrace);
-                    updateProgressNote('Terminal ao vivo', chunk ? `${command}: ${chunk.slice(-240)}` : `${command} em execução...`, data.done ? 'complete' : 'running');
+                    const isDone = Boolean(data.done);
+                    const exitCode = data.exitCode ?? 0;
+
+                    // Update existing running terminal trace in place if present
+                    let existingIndex = -1;
+                    for (let i = liveToolCalls.length - 1; i >= 0; i--) {
+                      const t = liveToolCalls[i];
+                      if (t.actionType === 'terminal' || t.toolName?.toLowerCase().includes('bash') || t.toolName?.toLowerCase().includes('python')) {
+                        existingIndex = i;
+                        break;
+                      }
+                    }
+
+                    if (existingIndex >= 0) {
+                      const existing = liveToolCalls[existingIndex];
+                      const prevOutput = existing.screenData?.terminalOutput || '';
+                      const updatedOutput = chunk ? (prevOutput ? `${prevOutput}${chunk}` : chunk) : prevOutput;
+
+                      liveToolCalls[existingIndex] = {
+                        ...existing,
+                        status: isDone ? (Number(exitCode) === 0 ? 'success' : 'error') : 'running',
+                        result: updatedOutput || (isDone ? `Processo finalizado com exitCode ${exitCode}` : 'Processo em execução...'),
+                        screenData: {
+                          ...existing.screenData,
+                          command,
+                          terminalOutput: updatedOutput,
+                          actionDescription: isDone ? `Comando concluído (exit ${exitCode})` : 'Recebendo saída do terminal ao vivo'
+                        }
+                      };
+                    } else {
+                      const terminalTrace: ToolCallTrace = {
+                        id: `terminal_live_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                        toolName: data.toolName || 'bash_exec',
+                        server: 'Terminal Bash MCP',
+                        arguments: { command },
+                        result: chunk || (isDone ? `Processo finalizado com exitCode ${exitCode}` : 'Processo em execução...'),
+                        timestamp: new Date().toLocaleTimeString(),
+                        status: isDone ? (Number(exitCode) === 0 ? 'success' : 'error') : 'running',
+                        actionType: 'terminal',
+                        screenData: { command, terminalOutput: chunk, actionDescription: isDone ? 'Comando finalizado' : 'Recebendo saída do terminal ao vivo' }
+                      };
+                      liveToolCalls.push(terminalTrace);
+                    }
+
+                    updateProgressNote('Terminal ao vivo', chunk ? `${command}: ${chunk.slice(-240)}` : `${command} em execução...`, isDone ? 'complete' : 'running');
                     setCurrentStep(chunk ? `Terminal: ${chunk.slice(-160)}` : `Executando: ${command}`);
                     if (onAgentStateChange) {
                       onAgentStateChange({
                         isWorking: true,
-                        statusText: data.done ? `Terminal finalizado (exit ${data.exitCode ?? 0})` : `Terminal executando: ${command}`,
+                        statusText: isDone ? `Terminal finalizado (exit ${exitCode})` : `Terminal executando: ${command}`,
                         contextText: chunk || `Recebendo saída incremental de ${command}`,
                         toolCalls: [...liveToolCalls]
                       });
                     }
                   } else if (currentEvent === 'tool_finish') {
+                    setAgentLivePhase('Raciocinando');
                     restartExecutionAnimation();
                     const toolCall = data.toolCall;
+                    if (toolCall.arguments?.command) {
+                      toolCall.arguments.command = String(toolCall.arguments.command).toLowerCase().trim();
+                    }
+                    if (toolCall.screenData?.command) {
+                      toolCall.screenData.command = String(toolCall.screenData.command).toLowerCase().trim();
+                    }
+
                     const finishedPresentation = describeToolExecution(toolCall.toolName, toolCall.arguments || {}, toolCall.screenData?.actionDescription || '');
                     const finishedFilePath = String(toolCall.arguments?.filePath || toolCall.arguments?.path || toolCall.arguments?.filename || '').trim();
                     const finishedLabel = finishedFilePath ? `${finishedPresentation.label} · ${finishedFilePath}` : finishedPresentation.label;
-                    updateProgressNote(finishedLabel, `Etapa concluída: ${finishedPresentation.detail || 'resultado incorporado ao contexto.'}`, toolCall.status === 'error' ? 'warning' : 'complete');
-                    liveToolCalls.push(toolCall);
+                    updateProgressNote(finishedLabel, `Operação concluída com sucesso: ${finishedPresentation.detail || 'as atualizações foram incorporadas e validadas no projeto.'}`, toolCall.status === 'error' ? 'warning' : 'complete');
+                    
+                    // Replace active trace if present, otherwise push
+                    let runningIndex = -1;
+                    for (let i = liveToolCalls.length - 1; i >= 0; i--) {
+                      const t = liveToolCalls[i];
+                      if ((t.actionType === 'terminal' || t.toolName === toolCall.toolName) && (t.status === 'running' || t.id.startsWith('active_') || t.id.startsWith('terminal_'))) {
+                        runningIndex = i;
+                        break;
+                      }
+                    }
+
+                    if (runningIndex >= 0) {
+                      liveToolCalls[runningIndex] = {
+                        ...toolCall,
+                        id: liveToolCalls[runningIndex].id,
+                        screenData: {
+                          ...liveToolCalls[runningIndex].screenData,
+                          ...toolCall.screenData,
+                          command: toolCall.screenData?.command || toolCall.arguments?.command || liveToolCalls[runningIndex].screenData?.command,
+                          terminalOutput: toolCall.screenData?.terminalOutput || liveToolCalls[runningIndex].screenData?.terminalOutput
+                        }
+                      };
+                    } else {
+                      liveToolCalls.push(toolCall);
+                    }
                     
                     // Live build: If the tool updated a file, sync with workspace immediately
                     if (onFileUpdate && toolCall.arguments?.content && (toolCall.toolName.includes('write') || toolCall.toolName.includes('create') || toolCall.toolName.includes('edit'))) {
@@ -897,10 +1016,12 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                       });
                     }
                   } else if (currentEvent === 'approval_required') {
+                    setAgentLivePhase('Pensando');
                     setCurrentStep(`Aguardando autorização: ${data.approval?.reason || 'Ação destrutiva'}`);
                     beginExecutionStep('Aguardando sua autorização', data.approval?.reason || 'O agente pausou antes de uma ação sensível.');
                     completeExecutionStep('Aguardando sua autorização', data.approval?.reason || 'Ação pausada até sua decisão.', 'warning');
                   } else if (currentEvent === 'complete') {
+                    setAgentLivePhase('Pensando');
                     setShowExecutionAnimation(false);
                     setInitialThoughtComplete(false);
                     setFinalResponseReceived(true);
@@ -1181,24 +1302,25 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
           {isThinking && !finalResponseReceived && (
             <div className="flex w-full flex-col gap-4" aria-live="polite">
               {!initialThoughtComplete && (
-                <InitialThinkingAnimation elapsedSeconds={elapsedSeconds} />
+                <InitialThinkingAnimation elapsedSeconds={elapsedSeconds} livePhase={agentLivePhase} />
               )}
 
-              {/* Notes are a standalone status stream, not an assistant message
-                  and not part of the animated thinking trace. */}
-              {initialThoughtComplete && progressNotes.length > 0 && (
-                <AgentProgressNotes notes={progressNotes} />
-              )}
-
-              {/* The execution animation is deliberately rendered in its own
-                  region so it cannot visually merge with the notes above. */}
-              {initialThoughtComplete && showExecutionAnimation && (
+              {/* The execution animation with embedded notes placed below the header and above the tool chips */}
+              {initialThoughtComplete && showExecutionAnimation ? (
                 <LocalActiveThinkingState
                   elapsedSeconds={elapsedSeconds}
                   step={currentStep}
                   steps={executionSteps}
+                  notes={progressNotes}
+                  livePhase={agentLivePhase}
+                  onHighlightNote={(n) => highlightProgressNote(n.label, n.text, n.status)}
                 />
-              )}
+              ) : initialThoughtComplete && progressNotes.length > 0 ? (
+                <AgentProgressNotes
+                  notes={progressNotes}
+                  onHighlightNote={(n) => highlightProgressNote(n.label, n.text, n.status)}
+                />
+              ) : null}
             </div>
           )}
 
@@ -1213,7 +1335,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                <div className="flex flex-col gap-0.5">
                  <span className="text-[10px] font-bold text-text-content-primary/80 uppercase tracking-widest">Subagente em Espera</span>
                  <span className="text-[10px] text-text-content-secondary/60 font-mono flex items-center gap-1.5">
-                    <span className="size-1 bg-amber-400/40 rounded-full animate-pulse" />
+                    <span className="size-1 bg-zinc-400/50 rounded-full animate-pulse" />
                     Aguardando escolhas do usuário no questionário · {bgElapsedSeconds}s
                  </span>
                </div>
@@ -1305,22 +1427,7 @@ function InlineChatQuestionnaire({
   };
 
   if (isSubmitted) {
-    return (
-      <div className="w-full max-w-2xl border border-emerald-500/20 bg-[#1f1f1f] rounded-2xl p-4 my-2 animate-in fade-in zoom-in-95 duration-300">
-        <div className="flex items-center gap-2 text-emerald-400 font-semibold text-sm mb-3">
-          <CheckCircle size={18} weight="fill" />
-          <span>Preferências Configuradas</span>
-        </div>
-        <div className="space-y-1.5">
-          {questions.map((q) => (
-            <div key={q.name} className="flex justify-between items-center bg-white/5 rounded-lg px-3 py-1.5 border border-white/5" style={{ borderRadius: '4px' }}>
-              <span className="text-[9px] text-white/40 uppercase font-mono truncate mr-2">{q.title.replace('?', '')}</span>
-              <span className="text-[11px] text-white font-medium truncate">{selectedChoices[q.name] ? q.choices.find(c => c.value === selectedChoices[q.name])?.label : "—"}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+    return null;
   }
 
   return (
@@ -1465,14 +1572,54 @@ function MessageItem({
   isAlreadyStreamed?: boolean;
 }) {
   const isAssistant = message.role === 'assistant';
-  const isWaiting = message.status === 'in_background' || Boolean(message.questionnaire && message.status !== 'completed');
+
+  // Parse questionnaire from content if present in <c-questionnaire-... /> tag
+  let activeQuestionnaire = message.questionnaire;
+  let cleanText = message.content || '';
+
+  if (!activeQuestionnaire && cleanText.includes('<c-questionnaire')) {
+    const match = cleanText.match(/<c-questionnaire[-\w]*\s+([^>]*)\/>/s) || cleanText.match(/<c-questionnaire[-\w]*\s+([^>]*)>([\s\S]*?)<\/c-questionnaire[-\w]*>/s);
+    if (match) {
+      const attrsStr = match[1];
+      const titleMatch = attrsStr.match(/title=(["'])(.*?)\1/s);
+      const descMatch = attrsStr.match(/description=(["'])(.*?)\1/s);
+      const questionsMatch = attrsStr.match(/questions=(["'])([\s\S]*?)\1/s);
+
+      if (questionsMatch) {
+        try {
+          let qJson = questionsMatch[2]
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;/g, "'")
+            .replace(/&amp;/g, '&');
+          const rawQuestions = JSON.parse(qJson);
+          const normalizedQuestions = rawQuestions.map((q: any, idx: number) => ({
+            name: q.id || q.name || `q_${idx}`,
+            title: q.label || q.title || '',
+            description: q.description,
+            choices: (q.options || q.choices || []).map((opt: any) =>
+              typeof opt === 'string' ? { value: opt.toLowerCase().replace(/[^a-z0-9]+/g, '_'), label: opt } : opt
+            )
+          }));
+          activeQuestionnaire = {
+            title: titleMatch ? titleMatch[2] : 'Questionário de Contexto',
+            description: descMatch ? descMatch[2] : undefined,
+            questions: normalizedQuestions
+          };
+          cleanText = cleanText.replace(match[0], '').trim();
+        } catch (e) {
+          console.error('Failed to parse questionnaire JSON from tag:', e);
+        }
+      }
+    }
+  }
+
+  const isWaiting = message.status === 'in_background' || Boolean(activeQuestionnaire && message.status !== 'completed');
   const [showCodeSnippet, setShowCodeSnippet] = useState(false);
   const [copied, setCopied] = useState(false);
   const [rating, setRating] = useState<number>(0);
   const [hoverRating, setHoverRating] = useState<number>(0);
 
   // Keep message content intact so code blocks are fully syntax-highlighted
-  const cleanText = message.content || '';
 
   if (!isAssistant) {
     return (
@@ -1587,9 +1734,9 @@ function MessageItem({
         </div>
 
         {/* Inline Selection Questionnaire Component (@reui/c-questionnaire-7) */}
-        {isWaiting && (isAlreadyStreamed || !message.isStreaming) && (
+        {activeQuestionnaire && activeQuestionnaire.questions && activeQuestionnaire.questions.length > 0 && (
           <InlineChatQuestionnaire 
-            questionnaire={message.questionnaire}
+            questionnaire={activeQuestionnaire}
             onSubmit={(answers, summaryText) => {
               onFinishQuestionnaire?.(answers, summaryText);
             }}
@@ -1813,44 +1960,237 @@ function MessageItem({
   );
 }
 
-function InitialThinkingAnimation({ elapsedSeconds }: { elapsedSeconds: number }) {
+function InitialThinkingAnimation({ elapsedSeconds, livePhase }: { elapsedSeconds: number; livePhase?: ThinkingPhase }) {
   return (
     <div className="w-full max-w-[820px] pl-8 animate-in fade-in duration-300">
-      <div className="flex items-center gap-2.5 py-1">
-        <span className="flex size-5 shrink-0 items-center justify-center rounded-[7px] bg-cover bg-center border border-white/10 shadow-xs" style={{ backgroundImage: `url('https://imgdb.io/i/z2ZOrTk.png')` }}>
-          <Sparkle size={13} weight="fill" className="animate-pulse text-white" />
-        </span>
-        <span className="thinking-shimmer text-[12px] font-medium">Pensando e preparando a próxima etapa · {elapsedSeconds || 1}s</span>
+      <div className="flex items-center gap-2 py-0.5">
+        <WorkingDot size={11} />
+        <AnimatedThinkingStatus
+          livePhase={livePhase}
+          elapsedSeconds={elapsedSeconds || 1}
+        />
       </div>
     </div>
   );
 }
 
-function AgentProgressNotes({ notes }: { notes: AgentProgressNote[] }) {
-  const note = notes[0];
-  if (!note) return null;
+function AgentProgressNotes({
+  notes,
+  inline = false,
+  activeTool,
+  onHighlightNote,
+}: {
+  notes: AgentProgressNote[];
+  inline?: boolean;
+  activeTool?: { primary: string; secondary?: string; icon?: string };
+  onHighlightNote?: (note: AgentProgressNote) => void;
+}) {
+  if (!notes || notes.length === 0) return null;
+
+  const persistentNotes = useMemo(() => notes.filter((n) => n.isPersistent), [notes]);
+  const liveNotes = useMemo(() => notes.filter((n) => !n.isPersistent), [notes]);
+
+  const [activeNoteIndex, setActiveNoteIndex] = useState(0);
+  const [liveIndex, setLiveIndex] = useState(0);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  // Sync index when new persistent notes are generated
+  const prevCountRef = useRef(persistentNotes.length);
+  useEffect(() => {
+    if (persistentNotes.length > prevCountRef.current) {
+      setActiveNoteIndex(persistentNotes.length - 1);
+      prevCountRef.current = persistentNotes.length;
+    }
+  }, [persistentNotes.length]);
+
+  // Motion alternation for persistent highlighted note: exactly 5s
+  useEffect(() => {
+    if (persistentNotes.length <= 1) return;
+    const timer = setInterval(() => {
+      setActiveNoteIndex((prev) => (prev + 1) % persistentNotes.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [persistentNotes.length]);
+
+  // Motion alternation for live progress notes: exactly 2s
+  useEffect(() => {
+    if (liveNotes.length <= 1) return;
+    const timer = setInterval(() => {
+      setLiveIndex((prev) => (prev + 1) % liveNotes.length);
+    }, 2000);
+    return () => clearInterval(timer);
+  }, [liveNotes.length]);
+
+  const safePersistentIndex = Math.min(activeNoteIndex, Math.max(0, persistentNotes.length - 1));
+  const currentHighlightedNote = persistentNotes[safePersistentIndex] || persistentNotes[0];
+
+  // Secondary notes: from 2nd note onward (or all notes other than the currently active one)
+  const secondaryNotes = persistentNotes.slice(1);
+
+  const safeLiveIndex = Math.min(liveIndex, Math.max(0, liveNotes.length - 1));
+  const currentLiveNote = liveNotes[safeLiveIndex];
+
+  const isDuplicateOfPersistent = Boolean(
+    currentLiveNote &&
+      currentHighlightedNote &&
+      removeAllEmojis(currentLiveNote.text.trim()) === removeAllEmojis(currentHighlightedNote.text.trim())
+  );
 
   return (
-    <section
+    <div
       aria-label="Notas do agente"
-      className="w-full max-w-[820px] pl-8 animate-in fade-in duration-300"
+      className={`w-full ${inline ? 'my-2 max-w-[760px]' : 'max-w-[820px] pl-8'} flex flex-col gap-2.5 text-left`}
     >
-      <div className="min-w-0 text-left">
-        <div className="mb-1 flex items-center gap-2 text-[10px] font-medium text-text-content-secondary/55">
-          <span className={`size-1.5 rounded-full ${note.status === 'running' ? 'bg-white/60 animate-pulse' : note.status === 'warning' ? 'bg-amber-300/80' : 'bg-white/35'}`} />
-          <span>Nota · {note.label}</span>
-          <span className="font-mono text-[9px] text-text-content-secondary/35">{note.timestamp}</span>
+      {/* 1. Primary Highlighted Note: Pure text, no background card, 5s motion alternation */}
+      <AnimatePresence mode="wait">
+        {currentHighlightedNote && (
+          <motion.div
+            key={currentHighlightedNote.id + '_' + safePersistentIndex}
+            initial={{ opacity: 0, y: 10, filter: 'blur(4px)' }}
+            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+            exit={{ opacity: 0, y: -10, filter: 'blur(4px)' }}
+            transition={{
+              duration: 0.55,
+              ease: [0.16, 1, 0.3, 1],
+            }}
+            className="w-full text-left py-0.5"
+          >
+            <MarkdownRenderer
+              content={removeAllEmojis(String(currentHighlightedNote.text || '')).trim()}
+              className="text-[13px] leading-relaxed text-text-content-primary font-normal [&_p]:my-1.5 [&_strong]:text-white [&_strong]:font-bold [&_ul]:my-2 [&_ol]:my-2 [&_li]:my-1.5 [&_code]:bg-white/10 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_mark]:bg-neutral-800 [&_mark]:text-neutral-100 [&_mark]:border-neutral-700/60 [&_mark]:px-1.5 [&_mark]:py-0.5 [&_mark]:rounded [&_mark]:font-medium [&_mark]:shadow-xs"
+            />
+
+            {/* Tool Chips below highlighted note: Only shown if a tool is executing or associated with note */}
+            {activeTool ? (
+              <div className="mt-2.5 flex items-center gap-2 text-xs font-mono text-neutral-300 bg-white/[0.04] border border-white/10 px-2.5 py-1.5 rounded-md w-fit animate-in fade-in duration-300">
+                <span className="flex size-4 items-center justify-center rounded bg-white/10 text-neutral-200">
+                  {getContextualToolIcon(
+                    activeTool.icon || activeTool.primary,
+                    activeTool.primary,
+                    activeTool.secondary || ''
+                  )}
+                </span>
+                <span className="font-medium text-neutral-200">{activeTool.primary}</span>
+                {activeTool.secondary && (
+                  <span className="text-[10px] text-neutral-400 truncate max-w-[240px]">
+                    {activeTool.secondary}
+                  </span>
+                )}
+              </div>
+            ) : currentHighlightedNote.toolExecution ? (
+              <div className="mt-2.5 flex items-center gap-2 text-xs font-mono text-neutral-300 bg-white/[0.04] border border-white/10 px-2.5 py-1.5 rounded-md w-fit animate-in fade-in duration-300">
+                <span className="size-1.5 rounded-full bg-neutral-400" />
+                <span className="font-medium text-neutral-200">{currentHighlightedNote.toolExecution.tool}</span>
+                {currentHighlightedNote.toolExecution.detail && (
+                  <span className="text-[10px] text-neutral-400 truncate max-w-[240px]">
+                    {currentHighlightedNote.toolExecution.detail}
+                  </span>
+                )}
+              </div>
+            ) : null}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 2. Dropdown trigger below primary note with icon and text */}
+      {secondaryNotes.length > 0 && (
+        <div className="w-full text-left">
+          <button
+            type="button"
+            onClick={() => setIsDropdownOpen((prev) => !prev)}
+            className="inline-flex items-center gap-1.5 text-[11.5px] font-sans text-neutral-400 hover:text-neutral-200 transition-colors cursor-pointer py-0.5 select-none"
+          >
+            <CaretRight
+              size={12}
+              className={`transition-transform duration-200 text-neutral-400 ${
+                isDropdownOpen ? 'rotate-90' : ''
+              }`}
+            />
+            <span>
+              {isDropdownOpen
+                ? 'Ocultar notas adicionais'
+                : `Ver outras notas destacadas (${secondaryNotes.length})`}
+            </span>
+          </button>
+
+          {/* Dropdown list showing from 2nd note onward, all at once, small text, connected by a vertical line */}
+          <AnimatePresence>
+            {isDropdownOpen && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                className="w-full overflow-hidden pt-1 pb-1"
+              >
+                <div className="relative pl-3.5 border-l border-white/10 ml-1.5 space-y-3.5 my-1.5">
+                  {secondaryNotes.map((note, idx) => (
+                    <div
+                      key={note.id || idx}
+                      className="relative group text-left"
+                    >
+                      {/* Node dot linking on the continuous line */}
+                      <div className="absolute -left-[17.5px] top-1.5 size-1.5 rounded-full bg-neutral-500 group-hover:bg-neutral-300 transition-colors" />
+
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-2 text-[10px] font-mono text-neutral-400">
+                          <span className="font-semibold text-neutral-300">
+                            Nota #{idx + 2} · {removeAllEmojis(note.label || 'Nota')}
+                          </span>
+                          <span>{note.timestamp}</span>
+                        </div>
+                        <MarkdownRenderer
+                          content={removeAllEmojis(String(note.text || '')).trim()}
+                          className="text-[11.5px] leading-relaxed text-text-content-secondary font-normal [&_p]:my-0.5 [&_strong]:text-neutral-200 [&_strong]:font-medium [&_mark]:bg-neutral-800 [&_mark]:text-neutral-100 [&_mark]:border-neutral-700/60 [&_mark]:px-1.5 [&_mark]:py-0.5 [&_mark]:rounded [&_mark]:text-[10.5px]"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
-        <MarkdownRenderer
-          content={note.text}
-          className="text-[15px] leading-relaxed text-text-content-primary/90"
-        />
-      </div>
-    </section>
+      )}
+
+      {/* 3. Live Animated Note: 2s motion alternation */}
+      {currentLiveNote && !isDuplicateOfPersistent && (
+        <div className="w-full min-w-0 transition-all duration-300 text-left">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentLiveNote.id + '_' + safeLiveIndex}
+              initial={{ opacity: 0, y: 8, filter: 'blur(3px)' }}
+              animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, y: -8, filter: 'blur(3px)' }}
+              transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <MarkdownRenderer
+                content={removeAllEmojis(String(currentLiveNote.text || '')).trim()}
+                className="text-[13px] leading-relaxed text-text-content-secondary font-normal [&_p]:my-1.5 [&_strong]:text-white/90 [&_strong]:font-bold [&_mark]:bg-neutral-800 [&_mark]:text-neutral-100 [&_mark]:border-neutral-700/60 [&_mark]:px-1.5 [&_mark]:py-0.5 [&_mark]:rounded [&_mark]:font-medium [&_mark]:shadow-xs"
+              />
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      )}
+    </div>
   );
 }
 
-function LocalActiveThinkingState({ elapsedSeconds, step, steps }: { elapsedSeconds: number; step: string; steps: ExecutionStep[] }) {
+function LocalActiveThinkingState({
+  elapsedSeconds,
+  step,
+  steps,
+  notes,
+  livePhase: propLivePhase,
+  onHighlightNote,
+}: {
+  elapsedSeconds: number;
+  step: string;
+  steps: ExecutionStep[];
+  notes?: AgentProgressNote[];
+  livePhase?: ThinkingPhase;
+  onHighlightNote?: (note: AgentProgressNote) => void;
+}) {
   // A step is a real web search only if it explicitly involves search engines or browsing and is NOT a command, terminal, check, or sandbox task.
   const isWebSearchStep = (text: string) => {
     const isCommandOrCheck = /verify|check|exec|run|npm|test|install|sandbox|terminal|fs_|c[oó]digo|write|read/i.test(text);
@@ -1869,12 +2209,10 @@ function LocalActiveThinkingState({ elapsedSeconds, step, steps }: { elapsedSeco
 
   const isReasoningActive = step.toLowerCase().includes('racioc') || step.toLowerCase().includes('analis') || step.toLowerCase().includes('planej');
 
-  let contextVariant = "Steps";
-  if (isCurrentlyCoding || hasCodingInHistory || isQueryRelatedToCoding) {
-    contextVariant = "Coding";
-  } else if (isCurrentlySearching || hasSearchInHistory || isQueryRelatedToSearch) {
+  let contextVariant = "Coding";
+  if (isCurrentlySearching || hasSearchInHistory || isQueryRelatedToSearch) {
     contextVariant = "Search";
-  } else if (isReasoningActive) {
+  } else if (isReasoningActive && !hasCodingInHistory) {
     contextVariant = "Reasoning";
   }
 
@@ -1885,11 +2223,26 @@ function LocalActiveThinkingState({ elapsedSeconds, step, steps }: { elapsedSeco
   // Only the current/running step belongs in the live animation. Keeping the
   // historical steps here was what made the whole list replay from the top.
   const activeStep = [...steps].reverse().find(s => s.status === 'running') || steps[steps.length - 1];
-  const mappedRows = activeStep ? [{
-    primary: activeStep.label,
-    secondary: activeStep.detail,
-    mono: contextVariant === "Coding" || activeStep.label.includes('.') || activeStep.label.includes('npm') || activeStep.label.includes('run')
-  }] : [{ primary: step || 'Preparando a próxima etapa...' }];
+  const cleanLabel = String(activeStep?.label || step || 'Preparando a próxima etapa...').replace(/\r?\n+/g, ' ').trim();
+  const cleanDetail = activeStep?.detail ? String(activeStep.detail).replace(/\r?\n+/g, ' ').trim() : undefined;
+
+  const mappedRows = steps.length > 0 ? [{
+    primary: cleanLabel,
+    secondary: cleanDetail,
+    icon: activeStep?.label || step,
+    mono: contextVariant === "Coding" || cleanLabel.includes('.') || cleanLabel.includes('npm') || cleanLabel.includes('run')
+  }] : [];
+
+  // Synchronize live phase with live actions
+  const isToolRunning = steps.some(s => s.status === 'running' && !/racioc|deliber|analis|planej|critér/i.test(`${s.label} ${s.detail}`));
+  const isReasoning = isReasoningActive || steps.some(s => s.status === 'running' && /racioc|deliber|analis|planej|critér/i.test(`${s.label} ${s.detail}`));
+
+  let currentLivePhase: ThinkingPhase = propLivePhase || 'Pensando';
+  if (isToolRunning || isCurrentlyCoding || isCurrentlySearching) {
+    currentLivePhase = 'Trabalhando';
+  } else if (isReasoning) {
+    currentLivePhase = 'Raciocinando';
+  }
 
   return (
     <section
@@ -1898,17 +2251,20 @@ function LocalActiveThinkingState({ elapsedSeconds, step, steps }: { elapsedSeco
     >
       {/* This is a plain status lane: no card, background or border. */}
       <div className="ml-8 transition-all duration-300 ease-out">
-        <div className="mb-1 flex items-center gap-2 text-[10px] font-medium text-text-content-secondary/70">
-          <Sparkle size={12} weight="fill" className="animate-pulse text-text-content-primary/60" />
-          <span>Pensando</span>
-          <span className="font-mono text-[9px] text-text-content-secondary/45">{elapsedSeconds || 1}s</span>
-        </div>
         <ThinkingState
           variant={currentVariant}
           rows={mappedRows}
           elapsedSeconds={elapsedSeconds}
           working={true}
-          active={currentVariant === "Search" ? `Pesquisando: ${step || "fontes relevantes na web"}` : undefined}
+          livePhase={currentLivePhase}
+          notes={notes && notes.length > 0 ? (
+            <AgentProgressNotes
+              notes={notes}
+              inline
+              activeTool={isToolRunning && mappedRows.length > 0 ? mappedRows[0] : undefined}
+              onHighlightNote={onHighlightNote}
+            />
+          ) : null}
         />
       </div>
     </section>
@@ -1953,8 +2309,13 @@ function ExecutionTimeline({
   const renderStep = (step: ExecutionStep, index: number) => {
     const isRunning = step.status === 'running';
     const isWarning = step.status === 'warning';
+    const cleanLabelStr = String(step.label || '').replace(/\r?\n+/g, ' ').trim();
+    const truncatedLabel = cleanLabelStr.length > 70 ? `${cleanLabelStr.slice(0, 70)}…` : cleanLabelStr;
+    const cleanDetailStr = step.detail ? String(step.detail).replace(/\r?\n+/g, ' ').trim() : undefined;
+    const truncatedDetail = cleanDetailStr && cleanDetailStr.length > 40 ? `${cleanDetailStr.slice(0, 40)}…` : cleanDetailStr;
+
     return (
-      <div key={`${step.id}_${index}`} className={`relative flex min-h-7 w-full min-w-0 items-start gap-2 rounded-md px-1.5 py-1 text-left transition-colors duration-200 ${isRunning ? 'bg-bg-action-hover/50' : 'hover:bg-bg-action-hover/30'}`} style={{ animation: `thinking-fade-up 320ms cubic-bezier(0.23,1,0.32,1) ${index * 120}ms both` }}>
+      <div key={`${step.id}_${index}`} className={`relative flex min-h-7 w-full min-w-0 items-center gap-2 rounded-md px-1.5 py-1 text-left transition-colors duration-200 whitespace-nowrap overflow-hidden ${isRunning ? 'bg-bg-action-hover/50' : 'hover:bg-bg-action-hover/30'}`} style={{ animation: `thinking-fade-up 320ms cubic-bezier(0.23,1,0.32,1) ${index * 120}ms both` }}>
         {searchVariant ? (
           <Favicon 
             urlOrDomain={step.detail || step.label} 
@@ -1966,13 +2327,19 @@ function ExecutionTimeline({
         ) : isRunning ? (
           <Spinner size={13} className="animate-spin text-text-content-secondary shrink-0" />
         ) : (
-          <span className="flex size-5 shrink-0 items-center justify-center rounded-[7px] bg-cover bg-center border border-white/10 shadow-xs" style={{ backgroundImage: `url('https://imgdb.io/i/z2ZOrTk.png')` }}>
+          <span className="flex size-5 shrink-0 items-center justify-center rounded-[7px] bg-white/5 border border-white/10 shadow-xs" style={{ backgroundImage: `url('https://imgdb.io/i/z2ZOrTk.png')` }}>
             {getContextualToolIcon(step.label, step.label, step.detail)}
           </span>
         )}
-        <div className="min-w-0 flex-1 flex flex-col items-stretch gap-0.5">
-          <span className={`min-w-0 break-words [overflow-wrap:anywhere] text-[11px] ${searchVariant ? 'text-text-content-primary/80' : 'text-text-content-primary/70'} ${codingVariant ? 'font-mono' : 'font-medium'}`}>{step.label}</span>
-          {step.detail && <span className="min-w-0 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[10px] text-text-content-secondary/70">{step.detail}</span>}
+        <div className="min-w-0 flex-1 flex items-center justify-between gap-2 overflow-hidden whitespace-nowrap">
+          <span className={`min-w-0 truncate whitespace-nowrap text-[12.5px] ${searchVariant ? 'text-text-content-primary/90' : 'text-text-content-primary/85'} ${codingVariant ? 'font-mono' : 'font-medium'}`}>
+            {truncatedLabel}
+          </span>
+          {truncatedDetail && (
+            <span className="min-w-0 truncate whitespace-nowrap text-[11px] text-text-content-secondary/70 font-mono bg-white/5 px-2 py-0.5 rounded border border-white/5 shrink-0 max-w-[200px]">
+              {truncatedDetail}
+            </span>
+          )}
         </div>
         {step.timestamp && <span className="ml-auto shrink-0 text-[9px] font-mono text-text-content-secondary/40">{step.timestamp}</span>}
       </div>
@@ -1982,14 +2349,11 @@ function ExecutionTimeline({
   return (
     <div className={`execution-timeline flex w-full max-w-[780px] flex-col bg-transparent p-0 ${completed ? 'mt-1' : ''}`} style={{ minHeight: working || expanded ? 148 : undefined, transition: 'min-height 400ms cubic-bezier(0.23,1,0.32,1)' }}>
       <div className="flex items-center gap-2">
-        <button type="button" aria-expanded={expanded} onClick={() => setManualExpanded((current) => !(current ?? autoExpanded))} className="-mx-1.5 flex w-fit items-center gap-2 rounded-lg px-1.5 py-1 text-left transition-colors hover:bg-bg-action-hover cursor-pointer">
-          <span className="flex size-5 shrink-0 items-center justify-center rounded-[7px] bg-cover bg-center border border-white/10 shadow-xs" style={{ backgroundImage: `url('https://imgdb.io/i/z2ZOrTk.png')` }}>
-            <Sparkle size={13} weight="fill" className={working ? 'text-white animate-pulse' : 'text-text-content-secondary'} />
-          </span>
+        <button type="button" aria-expanded={expanded} onClick={() => setManualExpanded((current) => !(current ?? autoExpanded))} className="flex w-fit items-center gap-1.5 py-0.5 text-left transition-colors hover:opacity-85 cursor-pointer">
           <span role="status" className="text-[13px] font-medium">
             {working ? <span className="thinking-shimmer">{activeLabel}</span> : <span className="text-text-content-primary/60">{doneLabel}</span>}
           </span>
-          <CaretDown size={13} className={`text-text-content-secondary/40 transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`} />
+          <CaretDown size={13} className={`text-text-content-secondary/40 transition-transform duration-300 ml-0.5 ${expanded ? 'rotate-180' : ''}`} />
         </button>
       </div>
       <p className="pl-6 text-[10px] text-text-content-secondary/60">{working ? (focusedStep?.detail || focusedStep?.label || activeStep || 'Preparing the next step...') : 'The trace settled and remains expandable.'}</p>

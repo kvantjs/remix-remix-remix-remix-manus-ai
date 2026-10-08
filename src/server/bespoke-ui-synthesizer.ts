@@ -698,13 +698,13 @@ export default function App() {
 
 Este é um projeto **React + Vite + Tailwind CSS** ultra completo de alta fidelidade desenvolvido do zero com uma interface de UI/UX totalmente única e autêntica.
 
-## 🌟 Diferenciais de UI/UX
+## Diferenciais de UI/UX
 - **Contraste de Alto Nível**: Aplicação da regra 60-30-10 com tons opacos e profundos que garantem foco no conteúdo.
 - **Fundo Atmosférico Exclusivo**: Gradientes e malhas de luz integrados nativamente no canvas da aplicação.
 - **Sincronização HMR Sem Limites**: Atualizações instantâneas de estado e simulações complexas.
 - **Console de Telemetria Integrado**: Logs e métricas de desempenho simuladas ao vivo.
 
-## 📁 Estrutura de Pastas e Arquivos Gerados
+## Estrutura de Pastas e Arquivos Gerados
 - \`client/README.md\` - Documentação detalhada em Markdown.
 - \`client/metadata.json\` - Metadados da aplicação e configuração de temas.
 - \`client/.gitignore\` - Filtro de controle de versão do Git.

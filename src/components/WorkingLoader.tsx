@@ -87,4 +87,53 @@ const StyledWrapper = styled.div`
   }
 `;
 
+export const WorkingDot = ({ size = 11, className = '' }: { size?: number; className?: string }) => {
+  return (
+    <StyledDotWrapper $size={size} className={className}>
+      <div className="container">
+        <span />
+      </div>
+    </StyledDotWrapper>
+  );
+};
+
+const StyledDotWrapper = styled.div<{ $size: number }>`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  .container {
+    border-radius: 50%;
+    height: ${props => props.$size}px;
+    width: ${props => props.$size}px;
+    animation: rotate_3922 1.2s linear infinite;
+    background-color: #9b59b6;
+    background-image: linear-gradient(white, white, blue);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .container span {
+    position: absolute;
+    border-radius: 50%;
+    height: 100%;
+    width: 100%;
+    background-color: white;
+    background-image: linear-gradient(#4682B4, #4682B4, #4682B4);
+    filter: blur(2.5px);
+  }
+
+  @keyframes rotate_3922 {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+`;
+
 export default WorkingLoader;

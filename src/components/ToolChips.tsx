@@ -348,7 +348,7 @@ export default function ToolChips({
             return !current;
           })
         }
-        className="-mx-1.5 flex w-fit items-center gap-1.5 rounded-lg px-2 py-1 text-[12.5px] font-medium text-text-content-secondary transition-colors duration-150 hover:bg-white/5 hover:text-text-content-primary cursor-pointer"
+        className="flex w-fit items-center gap-1.5 rounded-lg py-1 text-[12.5px] font-medium text-text-content-secondary transition-colors duration-150 hover:bg-white/5 hover:text-text-content-primary cursor-pointer"
       >
         <CaretDown
           size={12}
@@ -364,7 +364,7 @@ export default function ToolChips({
         className="grid transition-[grid-template-rows,opacity] duration-300"
         style={{ gridTemplateRows: open ? "1fr" : "0fr", opacity: open ? 1 : 0 }}
       >
-        <div className="-mx-1 overflow-hidden px-1.5 pb-1">
+        <div className="overflow-hidden pb-1">
           <div className="mt-1.5 flex flex-col gap-1">
             {steps.map((row, rowIdx) => {
               const rowOpen = openRows.has(row.label);
@@ -374,7 +374,7 @@ export default function ToolChips({
                     type="button"
                     aria-expanded={rowOpen}
                     onClick={() => toggleRow(row.label)}
-                    className="group/row -mx-[3px] flex min-h-7 w-[calc(100%+6px)] min-w-0 items-start gap-2 rounded-lg px-2 py-1 text-left transition-all duration-150 hover:bg-white/5 cursor-pointer"
+                    className="group/row flex min-h-7 w-full min-w-0 items-start gap-2 rounded-lg px-1.5 py-1 text-left transition-all duration-150 hover:bg-white/5 cursor-pointer"
                   >
                     <span className="relative flex size-5 shrink-0 items-center justify-center">
                       <span className={`transition-opacity duration-100 flex size-5 items-center justify-center rounded-[7px] bg-cover bg-center border border-white/10 shadow-xs ${rowOpen ? "opacity-0" : "group-hover/row:opacity-0"}`} style={{ backgroundImage: `url('https://imgdb.io/i/z2ZOrTk.png')` }}>

@@ -45,6 +45,7 @@ export default function App() {
   );
   const [agentIntent, setAgentIntent] = useState<any>(null);
   const [browserStatus, setBrowserStatus] = useState<'loading' | 'interactive' | 'error' | 'blocked'>('interactive');
+  const [activeTaskTitle, setActiveTaskTitle] = useState<string>('Testar o conector Nao e resumir suas capacidades');
 
   const handleFileUpdate = useCallback((files: Array<{ path: string; code: string; lang?: string }>) => {
     setCustomFiles(prev => {
@@ -113,12 +114,20 @@ export default function App() {
 
   const handleSendPrompt = useCallback((prompt: string) => {
     setPendingPrompt(prompt);
+    if (prompt && prompt.trim()) {
+      setActiveTaskTitle(prompt.trim());
+    }
   }, []);
 
   return (
     <div className={`${theme} flex h-screen w-full flex-col lg:flex-row bg-[#1a1a1a] text-text-content-primary overflow-hidden font-sans selection:bg-blue-500/20`}>
       <h1 className="sr-only">Kvant — agente de desenvolvimento autônomo</h1>
-      <Sidebar theme={theme} toggleTheme={toggleTheme} />
+      <Sidebar 
+        theme={theme} 
+        toggleTheme={toggleTheme} 
+        isWorking={isWorking}
+        activeTaskLabel={activeTaskTitle}
+      />
       <main className="flex-1 min-h-0 min-w-0 flex flex-col lg:flex-row overflow-hidden relative bg-[#1a1a1a]">
         <ChatArea 
           onFileUpdate={handleFileUpdate} 

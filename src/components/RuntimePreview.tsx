@@ -12,7 +12,6 @@ import {
   PencilSimpleLine
 } from '@phosphor-icons/react';
 import { DynamicRuntimeRunner } from './DynamicRuntimeRunner';
-import Loader from './Loader';
 
 interface RuntimePreviewProps {
   activeCode?: string;
@@ -105,7 +104,7 @@ export function RuntimePreview({ activeCode, customFiles = {}, onSendPrompt, isW
           <div key={`${refreshKey}-${runtimeCode}`} className="flex-1 overflow-auto w-full h-full relative bg-transparent">
             {isWorking ? (
               <div className="w-full h-full flex items-center justify-center bg-[#1a1a1a]">
-                <Loader />
+                <div className="sp-vortex-loader" />
               </div>
             ) : hasApp ? (
               <DynamicRuntimeRunner key={refreshKey} code={runtimeCode} customFiles={customFiles} />

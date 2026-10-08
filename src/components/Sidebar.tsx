@@ -16,8 +16,19 @@ import {
   Sun,
   Moon
 } from '@phosphor-icons/react';
+import Loader from './Loader';
 
-export function Sidebar({ theme, toggleTheme }: { theme: 'light' | 'dark'; toggleTheme: () => void }) {
+export function Sidebar({ 
+  theme, 
+  toggleTheme,
+  isWorking = false,
+  activeTaskLabel
+}: { 
+  theme: 'light' | 'dark'; 
+  toggleTheme: () => void;
+  isWorking?: boolean;
+  activeTaskLabel?: string;
+}) {
   return (
     <aside className="hidden lg:flex w-[292px] bg-[#1f1f1f] border-r border-border-divider-subtle flex-col h-full shrink-0">
       {/* Header */}
@@ -80,7 +91,11 @@ export function Sidebar({ theme, toggleTheme }: { theme: 'light' | 'dark'; toggl
               <Plus size={12} className="cursor-pointer hover:text-text-content-primary" />
             </div>
           </div>
-          <TaskItem label="Testar o conector Nao e resumir suas capacidades" active />
+          <TaskItem 
+            label={activeTaskLabel || "Testar o conector Nao e resumir suas capacidades"} 
+            active 
+            isWorking={isWorking} 
+          />
           <TaskItem label="Converter o site para React + Vite e remover arquivos desnecessários" />
           <TaskItem label="Aplicação completa na infraestrutura de teste" />
         </div>
@@ -148,11 +163,15 @@ function NavItem({ icon, label, badge, color }: { icon: React.ReactNode; label: 
   );
 }
 
-function TaskItem({ label, active }: { label: string; active?: boolean }) {
+function TaskItem({ label, active, isWorking }: { label: string; active?: boolean; isWorking?: boolean }) {
   const displayLabel = label.length > 32 ? label.substring(0, 32) + '...' : label;
   return (
     <button className={`w-full flex items-center gap-3 px-3 py-2 text-xs text-left rounded-lg transition-colors ${active ? 'bg-bg-action-hover text-text-content-primary' : 'text-text-content-secondary hover:bg-bg-action-hover hover:text-text-content-primary/60'}`} title={label}>
-      <ChatCircleText size={14} className="shrink-0 opacity-40" />
+      {active && isWorking ? (
+        <Loader size={14} className="shrink-0" />
+      ) : (
+        <ChatCircleText size={14} className="shrink-0 opacity-40" />
+      )}
       <span className="truncate">{displayLabel}</span>
     </button>
   );

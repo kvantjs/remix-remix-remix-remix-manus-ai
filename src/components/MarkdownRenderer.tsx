@@ -57,6 +57,7 @@ export function parseInlineMarkdown(text: string): React.ReactNode[] {
     | { type: 'italic'; text: string }
     | { type: 'bold-italic'; text: string }
     | { type: 'strike'; text: string }
+    | { type: 'highlight'; text: string }
     | { type: 'code'; text: string }
     | { type: 'link'; text: string; url: string };
 
@@ -107,6 +108,16 @@ export function parseInlineMarkdown(text: string): React.ReactNode[] {
       const end = text.indexOf('~~', i + 2);
       if (end !== -1) {
         tokens.push({ type: 'strike', text: text.slice(i + 2, end) });
+        i = end + 2;
+        continue;
+      }
+    }
+
+    // Check for highlight ==...==
+    if (text.startsWith('==', i)) {
+      const end = text.indexOf('==', i + 2);
+      if (end !== -1) {
+        tokens.push({ type: 'highlight', text: text.slice(i + 2, end) });
         i = end + 2;
         continue;
       }
@@ -173,6 +184,12 @@ export function parseInlineMarkdown(text: string): React.ReactNode[] {
           <del key={key} className="line-through text-text-content-secondary/70">
             {token.text}
           </del>
+        );
+      case 'highlight':
+        return (
+          <mark key={key} className="bg-neutral-800 text-neutral-100 px-1.5 py-0.5 rounded text-[12.5px] font-medium not-italic border border-neutral-700/60 selection:bg-neutral-700 shadow-xs">
+            {token.text}
+          </mark>
         );
       case 'code':
         return <InlineCodeSnippet key={key} code={token.text} />;

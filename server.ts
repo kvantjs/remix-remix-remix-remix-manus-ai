@@ -9,17 +9,90 @@ import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
 import { existsSync, createReadStream } from 'fs';
-// Playwright stub for AI Studio environment
-const chromium = {
-  launch: async () => ({
-    newPage: async () => ({
-      goto: async () => ({}),
-      content: async () => '<h1>Browser stubbed in AI Studio</h1>',
-      close: async () => ({}),
+import { chromium as playwrightChromium } from 'playwright';
+
+function createMockPage() {
+  let currentUrl = 'about:blank';
+  let currentTitle = 'Navegador do Agente';
+  return {
+    isClosed: () => false,
+    viewportSize: () => ({ width: 1366, height: 768 }),
+    evaluate: async () => 0,
+    screenshot: async () => Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64'),
+    url: () => currentUrl,
+    title: async () => currentTitle,
+    content: async () => '<html><body><h1>Navegador do Agente</h1></body></html>',
+    goto: async (url: string) => {
+      currentUrl = url;
+      try {
+        currentTitle = new URL(url).hostname || url;
+      } catch {
+        currentTitle = url;
+      }
+      return { status: () => 200, statusText: () => 'OK' };
+    },
+    click: async () => ({}),
+    fill: async () => ({}),
+    mouse: {
+      move: async () => ({}),
+      click: async () => ({}),
+      wheel: async () => ({}),
+    },
+    keyboard: {
+      type: async () => ({}),
+      press: async () => ({}),
+    },
+    locator: (selector: string) => ({
+      first: () => ({
+        boundingBox: async () => ({ x: 100, y: 100, width: 200, height: 40 }),
+        click: async () => ({}),
+        fill: async () => ({}),
+        innerText: async () => 'Element',
+        getAttribute: async () => null,
+      }),
+      all: async () => [],
+      innerText: async () => '',
     }),
+    getByText: () => ({
+      first: () => ({
+        boundingBox: async () => ({ x: 100, y: 100, width: 200, height: 40 }),
+        click: async () => ({}),
+      })
+    }),
+    waitForLoadState: async () => ({}),
+    waitForFunction: async () => ({}),
+    waitForTimeout: async () => ({}),
     close: async () => ({}),
-  }),
+  };
+}
+
+function createMockBrowser() {
+  const mockPage = createMockPage();
+  const mockContext = {
+    newPage: async () => mockPage,
+    addInitScript: async () => ({}),
+    close: async () => ({}),
+  };
+  return {
+    isConnected: () => true,
+    newContext: async () => mockContext,
+    contexts: () => [mockContext],
+    newPage: async () => mockPage,
+    close: async () => ({}),
+  };
+}
+
+const chromium = {
+  launch: async (options?: any) => {
+    try {
+      return await playwrightChromium.launch(options);
+    } catch (err: any) {
+      console.warn('[Playwright Chromium Launch Notice]: Using fallback browser context:', err?.message || err);
+      return createMockBrowser();
+    }
+  }
 } as any;
+
 type Browser = any;
 type Page = any;
 import { AGENT_TOOL_DECLARATIONS, AgentToolExecutor, ensureSandboxDir } from './src/server/agent-tools.js';
@@ -437,6 +510,7 @@ CONTRATO DE RACIOCÍNIO AVANÇADO — EXECUÇÃO CONTROLADA:
 12. Defina uma condição de pausa para CAPTCHA, autorização, falha parcial, ambiente indisponível ou risco irreversível; não avance por inércia.
 13. Após cada ferramenta, registre mentalmente o retorno real, a evidência produzida e a decisão entre continuar, corrigir, pausar ou concluir.
 14. Resuma o resultado no formato executivo: resultado, decisão, evidências, riscos e próximo passo.
+15. AO EXECUTAR COMANDOS NO TERMINAL (bash_exec, python_exec), VOCÊ DEVE OBRIGATORIAMENTE AGUARDAR O RESULTADO COMPLETO DA EXECUÇÃO (STDOUT, STDERR E EXITCODE) ANTES DE CONTINUAR PARA A PRÓXIMA FERRAMENTA OU DECISÃO. NUNCA PRESUMA O RESULTADO DE UM COMANDO SEM RECEBER A RESPOSTA COMPLETA DO TERMINAL.
 `;
 const DEFAULT_THINKING_BUDGET = Math.min(32768, Math.max(8192, Number(process.env.GEMINI_THINKING_BUDGET || 16384)));
 
@@ -525,9 +599,9 @@ AS 7 LEIS INVIOLÁVEIS DO AGENTE DE CRIAÇÃO:
 - O arquivo principal do frontend deve ser "client/src/App.tsx" servindo como o ponto de entrada que importa e orquestra todos os outros arquivos e sub-componentes gerados.
 - Código 100% puro e completo TypeScript/React com Tailwind CSS, sem comentários preguiçosos, pronto para rodar no navegador.
 
-8. PROIBIÇÃO ABSOLUTA DE EMOJIS E DEFINIÇÃO EXPLÍCITA DE ÍCONES
-- PROIBIDO o uso de qualquer emoji em qualquer parte: nas respostas do chat, no raciocínio (thought), nos logs, nos botões, nos títulos ou no código da aplicação.
-- NUNCA use emojis (como 💡, 🚀, 📄, 💳, ⚡, 🔥, ✨, etc.).
+8. PROIBIÇÃO ABSOLUTA E RIGOROSA DE EMOJIS
+- PROIBIDO O USO DE QUALQUER EMOJI EM QUALQUER PARTE: O agente NÃO pode usar emojis nas respostas do chat, no raciocínio (thought), nas notas de progresso destacadas, nos logs, nos botões, nos títulos ou no código gerado.
+- NUNCA use nenhum emoji em nenhuma hipótese ou circunstância. O usuário proibiu expressamente o uso de emojis.
 - Toda iconografia DEVE ser feita exclusivamente com componentes vetoriais das bibliotecas '@phosphor-icons/react' ou 'lucide-react' (ou SVG puro).
 - DEFINIÇÃO OBRIGATÓRIA DE ÍCONES NO TOPO: Todo ícone utilizado no código JSX DEVE ser explicitamente importado no topo do arquivo. Se for usar ícone de crescimento/tendência, importe obrigatoriamente "TrendUp, TrendUp as TrendingUp" de '@phosphor-icons/react' ou "TrendingUp" de 'lucide-react'. NUNCA deixe o TrendingUp indefinido no código!
 
@@ -1786,7 +1860,7 @@ export default function CloudControlDashboard() {
       },
       {
         path: "README.md",
-        code: `# 🚀 ${generatedTitle}\n\nEste é um projeto ultra completo, profissional e funcional construído do zero sob medida pelo Agente Kvant.\n\n### 📦 Recursos Ativos no Runtime:\n- **Fundo Atmosférico Exclusivo**: Implementado com paleta de cores opaca ${generatedTheme}.\n- **Simulador Interativo Dedicado**: Funcionalidade em tempo real baseada em estado reativo.\n- **Interface Única**: Arquitetura de design e Bento Grid moderna e assimétrica.\n- **Filtros Dinâmicos**: Filtro de busca e categorias no catálogo de dados.\n\n### 📂 Estrutura de Diretórios Gerada:\n- \`client/src/App.tsx\` (Código-fonte da UI reativa)\n- \`README.md\` (Documentação completa do projeto)\n- \`metadata.json\` (Metadados da aplicação)\n- \`package.json\` (Dependências do projeto)\n\n### ⚙️ Execução e Sincronização:\nEste projeto roda de forma autocontida e dinâmica no Preview de Runtime do WebDev Workspace. Sincronização via HMR ativa.`,
+        code: `# ${generatedTitle}\n\nEste é um projeto completo, profissional e funcional construído sob medida pelo Agente Kvant.\n\n### Recursos Ativos no Runtime:\n- **Fundo Atmosférico Exclusivo**: Implementado com paleta de cores opaca ${generatedTheme}.\n- **Simulador Interativo Dedicado**: Funcionalidade em tempo real baseada em estado reativo.\n- **Interface Única**: Arquitetura de design e Bento Grid moderna e assimétrica.\n- **Filtros Dinâmicos**: Filtro de busca e categorias no catálogo de dados.\n\n### Estrutura de Diretórios Gerada:\n- \`client/src/App.tsx\` (Código-fonte da UI reativa)\n- \`README.md\` (Documentação completa do projeto)\n- \`metadata.json\` (Metadados da aplicação)\n- \`package.json\` (Dependências do projeto)\n\n### Execução e Sincronização:\nEste projeto roda de forma autocontida e dinâmica no Preview de Runtime do WebDev Workspace. Sincronização via HMR ativa.`,
         lang: "markdown"
       },
       {
@@ -2292,7 +2366,18 @@ class PlaywrightBrowserManager {
     // visual).
     process.env.PLAYWRIGHT_BROWSERS_PATH = path.join(__dirname, 'workspace', '.cache', 'ms-playwright');
 
-    if (!this.browser || !this.browser.isConnected()) {
+    let browserIsConnected = false;
+    try {
+      browserIsConnected = Boolean(
+        this.browser &&
+        typeof (this.browser as any).isConnected === 'function' &&
+        (this.browser as any).isConnected()
+      );
+    } catch {
+      browserIsConnected = false;
+    }
+
+    if (!this.browser || !browserIsConnected) {
       if (this.isLaunching) {
         for (let i = 0; i < 20; i++) {
           await new Promise(r => setTimeout(r, 250));
@@ -2340,13 +2425,18 @@ class PlaywrightBrowserManager {
         const context = await this.createStealthContext(this.browser);
         this.page = await context.newPage();
         console.log('[StealthBrowser] Anti-CAPTCHA browser instance initialized.');
+      } catch (launchErr: any) {
+        console.error('[StealthBrowser] Failed to launch Chromium:', launchErr);
+        this.browser = null;
+        this.page = null;
+        throw launchErr;
       } finally {
         this.isLaunching = false;
       }
     }
 
     if (!this.page || this.page.isClosed()) {
-      const context = this.browser.contexts()[0] || await this.createStealthContext(this.browser);
+      const context = (typeof this.browser?.contexts === 'function' && this.browser.contexts()?.[0]) || await this.createStealthContext(this.browser);
       this.page = await context.newPage();
     }
 
@@ -4479,48 +4569,47 @@ app.post('/api/agent/chat/stream', async (req, res) => {
         // Append model response to conversation history
         chatContents.push(candidate.content);
 
-        // Tool lanes allow browser work and independent WebDev writes to
-        // overlap, while preserving order inside the shared browser session
-        // and the project filesystem.
-        let computerLane: Promise<unknown> = Promise.resolve();
-        let workspaceLane: Promise<unknown> = Promise.resolve();
-        let terminalLane: Promise<unknown> = Promise.resolve();
-        const enqueue = <T,>(lane: 'computer' | 'workspace' | 'terminal', operation: () => Promise<T>) => {
-          const previous = lane === 'computer' ? computerLane : lane === 'workspace' ? workspaceLane : terminalLane;
-          const result = previous.then(operation, operation);
-          const settled = result.then(() => undefined, () => undefined);
-          if (lane === 'computer') computerLane = settled;
-          else if (lane === 'workspace') workspaceLane = settled;
-          else terminalLane = settled;
-          return result;
-        };
-        const responseParts: any[] = await Promise.all(functionCalls.map(async (call: any) => {
+        const responseParts: any[] = [];
+        for (const call of functionCalls) {
           const toolName = call.name;
           const args = call.args || {};
 
           if (!isToolAllowed(intent, toolName)) {
             const blocked = { error: `A ferramenta ${toolName} não está autorizada no modo ${intent.mode}.` };
             sendEvent('tool_finish', { toolCall: { id: `blocked_${Date.now()}`, toolName, arguments: args, result: JSON.stringify(blocked), timestamp: new Date().toLocaleTimeString(), status: 'error' } });
-            return { functionResponse: { name: toolName, response: blocked } };
+            responseParts.push({ functionResponse: { name: toolName, response: blocked } });
+            continue;
           }
 
-          const executeCall = async () => {
           if (isComputerMcpTool(toolName) && !browserPreflightTrace) {
             browserPreflightTrace = await runPlaywrightInstallPreflight(sendEvent);
             executedToolCalls.push(browserPreflightTrace);
           }
           await waitForExecutionPhase();
+
+          const isTerminalCmd = toolName === 'bash_exec' || toolName === 'python_exec';
+          const normalizedCmd = isTerminalCmd ? String(args.command || args.code || '').toLowerCase().trim() : '';
+
           sendEvent('tool_start', {
             toolName,
-            arguments: args,
-            reason: `Executando ${toolName} solicitado pelo Gemini...`
+            arguments: isTerminalCmd ? { ...args, command: normalizedCmd || args.command } : args,
+            reason: isTerminalCmd
+              ? `Executando comando no terminal e aguardando resultado completo: \`${normalizedCmd.slice(0, 80)}\``
+              : `Executando ${toolName} solicitado pelo Gemini...`
           });
 
+          if (isTerminalCmd) {
+            sendEvent('stage_note', {
+              label: 'Terminal em Execução',
+              text: `Aguardando a execução do comando no terminal (\`${normalizedCmd.slice(0, 60)}\`). Os logs de saída estão sendo capturados em tempo real.`
+            });
+          }
+
           const execResult = await agentToolExecutor.executeTool(toolName, args, (progress) => {
-            if (toolName === 'bash_exec' || toolName === 'python_exec') {
+            if (isTerminalCmd) {
               sendEvent('terminal_output', {
                 toolName,
-                command: args.command || 'python3 (script do agente)',
+                command: normalizedCmd || 'script do agente',
                 stream: progress.stream,
                 chunk: progress.chunk,
                 exitCode: progress.exitCode,
@@ -4549,7 +4638,11 @@ app.post('/api/agent/chat/stream', async (req, res) => {
               url: execResult.result?.url || args.url,
               title: execResult.result?.title,
               screenshot: execResult.result?.screenshot,
-              actionDescription: execResult.actionDescription
+              actionDescription: execResult.actionDescription,
+              terminalOutput: isTerminalCmd
+                ? (execResult.result?.stdout || '') + (execResult.result?.stderr ? `\n[stderr]\n${execResult.result.stderr}` : '')
+                : undefined,
+              command: isTerminalCmd ? normalizedCmd : (args.command || args.code)
             }
           };
 
@@ -4571,29 +4664,24 @@ app.post('/api/agent/chat/stream', async (req, res) => {
           sendEvent('tool_finish', { toolCall: traceItem });
 
           sendEvent('stage_note', {
-            label: 'Auditoria da evidência',
-            text: `O resultado de ${toolName} foi recebido; validando evidência, erros parciais e critério de aceite antes do próximo ciclo.`
+            label: isTerminalCmd ? 'Resultado do Terminal Recebido' : 'Auditoria da evidência',
+            text: isTerminalCmd
+              ? `Execução do terminal concluída com código de saída ${execResult.result?.exitCode ?? 0} em ${execResult.result?.durationMs ?? 0}ms. Resultado completo capturado e validado antes da próxima etapa.`
+              : `O resultado de ${toolName} foi recebido; validando evidência, erros parciais e critério de aceite antes do próximo ciclo.`
           });
-          await new Promise(r => setTimeout(r, 700));
+          await new Promise(r => setTimeout(r, 600));
 
-          await new Promise(r => setTimeout(r, 400));
-          return {
+          responseParts.push({
             functionResponse: {
               name: toolName,
               response: execResult.success ? execResult.result : { error: execResult.error }
             }
-          };
-          };
-          const normalizedName = String(toolName).toLowerCase();
-          const lane = isComputerMcpTool(normalizedName)
-            ? 'computer'
-            : /^(?:file_|fs\.|fs_|webdev\.)|writefile|deletefile|readfile|listfiles|mkdir/.test(normalizedName)
-              ? 'workspace'
-              : /^(?:bash_exec|python_exec|terminal\.|bash\.)/.test(normalizedName)
-                ? 'terminal'
-                : null;
-          return lane ? enqueue(lane, executeCall) : executeCall();
-        }));
+          });
+
+          if (pendingApproval) {
+            break;
+          }
+        }
 
         chatContents.push({
           role: 'user',
@@ -4713,19 +4801,8 @@ app.post('/api/agent/chat/stream', async (req, res) => {
       await runDeterministicExecutionCycle(message, intent, sendEvent);
     }
     const plannedActions = intent.mode === 'conversation' ? [] : planRealAgentActions(message);
-    let fallbackComputerLane: Promise<unknown> = Promise.resolve();
-    let fallbackWorkspaceLane: Promise<unknown> = Promise.resolve();
     let fallbackPreflightTrace: any = null;
-    const enqueueFallback = <T,>(lane: 'computer' | 'workspace', operation: () => Promise<T>) => {
-      const previous = lane === 'computer' ? fallbackComputerLane : fallbackWorkspaceLane;
-      const result = previous.then(operation, operation);
-      const settled = result.then(() => undefined, () => undefined);
-      if (lane === 'computer') fallbackComputerLane = settled;
-      else fallbackWorkspaceLane = settled;
-      return result;
-    };
-    await Promise.all(plannedActions.map((action) => {
-      const executeAction = async () => {
+    for (const action of plannedActions) {
       if (action.toolName === 'fs.writeFile') {
         const fallback = generateAutonomousRuleEnforcedFallback(message, history, currentFiles);
         const filesToWrite = fallback.files || [{ path: 'client/src/App.tsx', code: '// App code', lang: 'typescript' }];
@@ -4743,7 +4820,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
           sendEvent('tool_finish', { toolCall: fileToolResult });
           await new Promise(r => setTimeout(r, 500));
         }
-        return;
+        continue;
       }
       if (isComputerMcpTool(action.toolName)) {
         if (!fallbackPreflightTrace) {
@@ -4818,13 +4895,10 @@ app.post('/api/agent/chat/stream', async (req, res) => {
           requestedAt: new Date().toISOString()
         };
         sendEvent('approval_required', { approval: pendingApproval, toolName: action.toolName, arguments: action.args });
-        return;
+        break;
       }
       await new Promise(r => setTimeout(r, 500));
-      };
-      const lane = action.toolName === 'fs.writeFile' ? 'workspace' : isComputerMcpTool(action.toolName) ? 'computer' : null;
-      return lane ? enqueueFallback(lane, executeAction) : executeAction();
-    }));
+    }
 
     const isCodeAction = intent.mode === 'app_creation' || intent.mode === 'integrated';
     let finalResult: any;

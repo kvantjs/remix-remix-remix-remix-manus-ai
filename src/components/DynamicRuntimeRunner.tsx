@@ -44,7 +44,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
       return (
         <div className="p-6 bg-red-950/30 border border-red-500/30 rounded-xl text-red-200 text-xs font-mono space-y-3 m-4">
           <div className="font-bold text-red-400 flex items-center gap-2">
-            <span>⚠️ Erro de renderização em client/src/App.tsx:</span>
+            <span>Erro de renderização em client/src/App.tsx:</span>
           </div>
           <p className="text-white/80 whitespace-pre-wrap">{this.state.error.message}</p>
         </div>
@@ -455,7 +455,7 @@ export function DynamicRuntimeRunner({ code, customFiles = {} }: DynamicRuntimeR
         // Common utility helpers
         clsx: (...args: any[]) => args.filter(Boolean).join(' '),
         cn: (...args: any[]) => args.filter(Boolean).join(' '),
-        confetti: () => console.log('🎉 Confetti action executed'),
+        confetti: () => console.log('Confetti action executed'),
         // Multi-file subcomponents
         ...subComponents,
         ...Object.fromEntries(importedIdentifiers.filter(identifier => identifier !== 'React' && !(identifier in subComponents)).map(identifier => [identifier, (SafePhosphorIcons as any)[identifier] || FallbackIcon]))

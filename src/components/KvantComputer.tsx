@@ -22,7 +22,6 @@ import { OrbBloop } from '@/components/orb/bloop/index';
 import { BloopState } from '@/components/orb/bloop/types';
 import { BLOOP_PALETTES, BloopPaletteName } from '@/components/orb/bloop/palettes';
 import WorkingLoader from './WorkingLoader';
-import Loader from './Loader';
 
 interface KvantComputerProps {
   toolCalls?: ToolCallTrace[];
@@ -137,12 +136,15 @@ function AgentCodeSurface({ toolCalls = [], customFiles = {}, onFileUpdate }: { 
   const [value, setValue] = useState(incoming);
   useEffect(() => { if (incoming && incoming !== value) setValue(incoming); }, [incoming]);
   return (
-    <div className="flex-1 min-h-0 flex flex-col bg-[#1a1a1a] text-white">
-      <div className="h-9 shrink-0 flex items-center justify-between px-3 border-b border-white/10 bg-[#1a1a1a] font-mono text-[11px]">
-        <span className="text-blue-300">{filePath}</span><span className="text-white/40">CodeMirror · edição ao vivo</span>
+    <div className="flex-1 min-h-0 flex flex-col bg-[#1a1a1a] text-white select-text">
+      <div className="h-9 shrink-0 flex items-center justify-between px-3 border-b border-white/10 bg-[#1a1a1a] font-mono text-[11px] select-none">
+        <span className="text-blue-300">{filePath}</span>
+        <span className="text-amber-400 font-semibold px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/30">
+          Apenas o agente pode editar e gerar código
+        </span>
       </div>
-      <div className="flex-1 min-h-0 overflow-auto">
-        <CodeMirror value={value} height="100%" theme={vscodeDark} extensions={[javascript({ jsx: true, typescript: true })]} onChange={(code) => { setValue(code); onFileUpdate?.([{ path: filePath, code, lang: 'typescript' }]); }} basicSetup={{ lineNumbers: true, foldGutter: true, autocompletion: true }} />
+      <div className="flex-1 min-h-0 overflow-auto select-text">
+        <CodeMirror value={value} height="100%" theme={vscodeDark} extensions={[javascript({ jsx: true, typescript: true })]} readOnly={true} editable={false} basicSetup={{ lineNumbers: true, foldGutter: true }} />
       </div>
     </div>
   );
@@ -863,7 +865,7 @@ export function KvantComputer({
           /* COMPUTER BOOTING ANIMATION SCREEN */
           <div className="flex-1 bg-[#1a1a1a] flex flex-col items-center justify-center p-6 text-center select-none overflow-y-auto space-y-6 animate-in fade-in duration-300">
             <div className="flex flex-col items-center justify-center pt-6 pb-2">
-              <Loader />
+              <div className="sp-vortex-loader" />
             </div>
 
             <div className="flex flex-col items-center space-y-1.5 max-w-sm">

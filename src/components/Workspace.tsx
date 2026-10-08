@@ -341,7 +341,7 @@ export function Workspace({
       {/* 4. Terminal Tab */}
       {activeTopTab === 'terminal_tab' && (
         <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg-canvas-main">
-          <TerminalView activeCode={activeCodeContent} />
+          <TerminalView activeCode={activeCodeContent} liveToolCalls={toolCalls} />
         </div>
       )}
 
@@ -581,7 +581,7 @@ export function Workspace({
               />
             )}
             {workspaceSubTab === 'terminal' && (
-              <TerminalView activeCode={activeCodeContent} />
+              <TerminalView activeCode={activeCodeContent} liveToolCalls={toolCalls} />
             )}
             {workspaceSubTab === 'automations' && <AutomationsView />}
             {workspaceSubTab === 'projects' && <ProjectsView />}
@@ -873,8 +873,8 @@ function InteractiveCodeEditor({ activeFile, onFileChange, customFiles, onFileUp
           <div className="flex items-center gap-2 font-mono text-xs truncate" style={{ color: '#f5f5f5' }}>
             <FileCode size={15} className="shrink-0" style={{ color: '#f5f5f5' }} />
             <span className="font-semibold" style={{ color: '#f5f5f5' }}>{activeFile}</span>
-            <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-white/5 border border-white/10 font-sans tracking-wide select-none" style={{ color: '#f5f5f5' }}>
-              Apenas Leitura
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-amber-400 font-sans tracking-wide select-none">
+              Apenas o agente pode gerar, editar e executar código
             </span>
             {!isSaved && (
               <span className="size-2 rounded-full bg-amber-400 animate-pulse" title="Alterações não salvas" />
@@ -958,7 +958,7 @@ function InteractiveCodeEditor({ activeFile, onFileChange, customFiles, onFileUp
             <span style={{ color: '#f5f5f5' }}>{lineCount} linhas</span>
           </div>
           <div className="flex items-center gap-2" style={{ color: '#f5f5f5' }}>
-            <span style={{ color: '#f5f5f5' }}>⚡ Sincronização em Tempo Real Ativa</span>
+            <span style={{ color: '#f5f5f5' }}>Sincronização em Tempo Real Ativa</span>
           </div>
         </div>
       </div>
