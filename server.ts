@@ -2360,12 +2360,6 @@ class PlaywrightBrowserManager {
       return this.page;
     }
 
-    // O preflight do Computer MCP usa o workspace como HOME. Fixar o cache
-    // evita que o instalador baixe Chromium em um caminho e o launcher procure
-    // em outro (situação que fazia a navegação cair antes do primeiro evento
-    // visual).
-    process.env.PLAYWRIGHT_BROWSERS_PATH = path.join(__dirname, 'workspace', '.cache', 'ms-playwright');
-
     let browserIsConnected = false;
     try {
       browserIsConnected = Boolean(
@@ -2858,9 +2852,32 @@ async function runPlaywrightInstallPreflight(emit?: (event: string, data: any) =
   }
   if (playwrightInstallPromise) return playwrightInstallPromise;
 
+  // Playwright already knows the browser cache path. Reuse it when Chromium is
+  // installed instead of forcing a second, project-local download on every
+  // fresh server process.
+  const expectedExecutable = chromium.executablePath();
+  if (existsSync(expectedExecutable)) {
+    const trace = {
+      id: `playwright_install_available_${Date.now()}`,
+      toolName: 'playwright.preflight',
+      server: 'playwright_chromium',
+      arguments: {},
+      result: 'Chromium encontrado no cache padrão do Playwright.',
+      timestamp: new Date().toLocaleTimeString(),
+      status: 'success',
+      actionType: 'system',
+      screenData: { actionDescription: 'Chromium já instalado; reutilizando o executável disponível.' }
+    };
+    cachedPlaywrightInstallTrace = trace;
+    emit?.('stage_note', {
+      label: 'Navegador pronto para uso',
+      text: 'Chromium já está instalado. O agente vai reutilizar o navegador e iniciar a navegação solicitada.'
+    });
+    return trace;
+  }
+
   playwrightInstallPromise = (async () => {
-  const browserCache = path.join(__dirname, 'workspace', '.cache', 'ms-playwright');
-  const command = `PLAYWRIGHT_BROWSERS_PATH=${JSON.stringify(browserCache)} npx playwright install chromium`;
+  const command = 'npx playwright install chromium';
   const executionCommand = `cd ${JSON.stringify(__dirname)} && ${command}`;
   emit?.('stage_note', {
     label: 'Preparação do Computer MCP',
@@ -3895,6 +3912,24 @@ function extractUserDestinationUrl(message: string): { targetUrl: string | null;
   return { targetUrl: null, isExplicitSearch: false, searchQuery: null };
 }
 
+function extractExplicitTerminalCommand(message: string): string | null {
+  const lower = String(message || '').toLocaleLowerCase('pt-BR');
+  const explicitlyRequestsTerminal = /\b(?:execute|executa|executar|rode|rodar|roda|run)\b/i.test(lower)
+    && /\b(?:terminal|bash|shell)\b/i.test(lower);
+  if (!explicitlyRequestsTerminal) return null;
+
+  const fenced = message.match(/```(?:bash|sh)?\s*([\s\S]*?)```/i);
+  const inline = message.match(/`([^`\n]+)`/);
+  const quotedCommand = fenced?.[1] || inline?.[1];
+  if (quotedCommand?.trim()) return quotedCommand.trim();
+
+  const afterCommand = message.match(/\b(?:comando|command)\s*[:=]?\s*(?:bash\s+)?([\s\S]+?)(?:\s+(?:e\s+)?(?:mostre|exiba|retorne|informe)\b[\s\S]*)?$/i);
+  if (!afterCommand?.[1]) return null;
+
+  const command = afterCommand[1].trim().replace(/^["'“”]+|["'“”]+$/g, '').trim();
+  return command || null;
+}
+
 // Helper to determine agent action plan based on user prompt (Unrestricted & User-Directed)
 function planRealAgentActions(message: string): Array<{ toolName: string; args: Record<string, any>; reason: string }> {
   const cleanMsg = (message || '').trim();
@@ -3920,6 +3955,15 @@ function planRealAgentActions(message: string): Array<{ toolName: string; args: 
 
   // Extract destination address according to what the user explicitly requested
   const destination = extractUserDestinationUrl(cleanMsg);
+  const terminalCommand = extractExplicitTerminalCommand(cleanMsg);
+
+  if (terminalCommand) {
+    plan.push({
+      toolName: 'bash_exec',
+      args: { command: terminalCommand },
+      reason: `Executando no terminal o comando solicitado pelo usuário: ${terminalCommand.slice(0, 100)}`
+    });
+  }
 
   // 4. Detect click request (e.g. "clique em X", "clique no link Y", "clique no botão Z")
   const clickMatch = cleanMsg.match(/(?:cliqu(?:e|ar)|aperte|pressione|selecion(?:e|ar)|click on|click)\s+(?:no|na|no link|no botão|em|o|a)?\s*["']?([^"'\n\r,.]+)["']?/i);
@@ -4834,7 +4878,38 @@ app.post('/api/agent/chat/stream', async (req, res) => {
       let toolResult;
       {
         // Map browser actions to agentToolExecutor
-        if (action.toolName === 'browser.navigate') {
+        if (action.toolName === 'bash_exec') {
+          const command = String(action.args.command || '').trim();
+          const result = await agentToolExecutor.executeTool('bash_exec', action.args, (progress) => {
+            sendEvent('terminal_output', {
+              toolName: 'bash_exec',
+              command,
+              stream: progress.stream,
+              chunk: progress.chunk,
+              exitCode: progress.exitCode,
+              done: progress.done,
+              live: true
+            });
+          });
+          const output = [result.result?.stdout, result.result?.stderr ? `[stderr]\n${result.result.stderr}` : '']
+            .filter(Boolean)
+            .join('\n');
+          toolResult = {
+            id: `terminal_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            toolName: 'bash_exec',
+            server: 'bash_sandbox',
+            arguments: { command },
+            result: JSON.stringify(result.result || { error: result.error }),
+            timestamp: new Date().toLocaleTimeString(),
+            status: result.success ? 'success' : 'error',
+            actionType: 'terminal',
+            screenData: {
+              command,
+              terminalOutput: output || result.error || '',
+              actionDescription: result.actionDescription || `Comando Bash concluído com exit code ${result.result?.exitCode ?? 1}`
+            }
+          };
+        } else if (action.toolName === 'browser.navigate') {
           const res = await agentToolExecutor.executeTool('browser_navigate', { url: action.args.url });
           toolResult = {
             id: `tool_${Date.now()}`,

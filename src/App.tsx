@@ -90,7 +90,7 @@ export default function App() {
       setToolCalls(prev => {
         if (
           prev.length === state.toolCalls!.length &&
-          prev.every((t, i) => t.id === state.toolCalls![i].id && t.status === state.toolCalls![i].status)
+          prev.every((t, i) => t === state.toolCalls![i])
         ) {
           return prev;
         }

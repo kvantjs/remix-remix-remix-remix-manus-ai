@@ -48,8 +48,7 @@ export function TerminalView({
 
     for (const trace of rawTerminalTraces) {
       const rawCmd = trace.screenData?.command || trace.arguments?.command || trace.toolName || 'bash_exec';
-      // Force command to lowercase
-      const command = String(rawCmd).toLowerCase().trim();
+      const command = String(rawCmd).trim();
       const toolName = String(trace.toolName || 'bash_exec').toLowerCase().trim();
       
       let rawOutput = '';
@@ -106,7 +105,7 @@ export function TerminalView({
   }, [liveToolCalls, cleared]);
 
   const lastBlock = blocks[blocks.length - 1];
-  const lastCommand = lastBlock ? lastBlock.command.toLowerCase() : 'aguardando comando...';
+  const lastCommand = lastBlock ? lastBlock.command : 'aguardando comando...';
 
   useEffect(() => {
     if (cleared && liveToolCalls.length > 0) {
@@ -161,7 +160,7 @@ export function TerminalView({
                 <span className="text-white/50">:</span>
                 <span className="text-[#58a6ff] font-bold">~</span>
                 <span className="text-white/50">$</span>
-                <span className="text-white font-bold font-mono break-all">{block.command.toLowerCase()}</span>
+                <span className="text-white font-bold font-mono break-all">{block.command}</span>
               </div>
               <div className="flex items-center gap-1.5 text-[10px] text-white/40 font-mono">
                 {block.status === 'running' && (
