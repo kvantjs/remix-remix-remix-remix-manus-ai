@@ -45,7 +45,7 @@ export default function App() {
   );
   const [agentIntent, setAgentIntent] = useState<any>(null);
   const [browserStatus, setBrowserStatus] = useState<'loading' | 'interactive' | 'error' | 'blocked'>('interactive');
-  const [activeTaskTitle, setActiveTaskTitle] = useState<string>('Testar o conector Nao e resumir suas capacidades');
+  const [activeTaskTitle, setActiveTaskTitle] = useState<string>('Nova tarefa');
 
   const handleFileUpdate = useCallback((files: Array<{ path: string; code: string; lang?: string }>) => {
     setCustomFiles(prev => {

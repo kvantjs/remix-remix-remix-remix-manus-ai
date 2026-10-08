@@ -689,7 +689,9 @@ function generateAutonomousRuleEnforcedFallback(
     'aplicação', 'aplicacao', 'aplicativo', 'app', 'react', 'typescript', 'página', 'pagina',
     'tela', 'portal', 'plataforma', 'componente', 'sistema', 'portfolio', 'portfólio'
   ];
-  const hasAppCreation = appCreationTerms.some(term => lower.includes(term));
+  const hasResearchIntent = /\b(pesquise|pesquisar|pesquisa|busque|buscar|procure|procurar|investigue|investigar)\b/.test(lower)
+    && /\b(web|internet|google|github|documenta(?:ção|cao)|site|url|página|pagina)\b/.test(lower);
+  const hasAppCreation = !hasResearchIntent && appCreationTerms.some(term => lower.includes(term));
 
   // 0. Context Gathering Questionnaire Trigger (@reui/c-questionnaire-1)
   const hasExplicitContextTag = lower.includes('[contexto') || lower.includes('contexto definido') || lower.includes('contexto selecionado');
@@ -844,7 +846,7 @@ function generateAutonomousRuleEnforcedFallback(
   }
 
   // 0. Specialized Multi-Step Web & API Deep Exploration (e.g. GitHub API, Docs, Endpoints)
-  const isGitHubApiRequest = lower.includes('github') && (lower.includes('api') || lower.includes('inspecionar') || lower.includes('docs') || lower.includes('pesquisar') || lower.includes('navegador') || lower.includes('endpoints'));
+  const isGitHubApiRequest = lower.includes('github') && (lower.includes('api') || lower.includes('inspecionar') || lower.includes('docs') || lower.includes('pesquisar') || lower.includes('pesquise') || lower.includes('documentação') || lower.includes('documentacao') || lower.includes('navegador') || lower.includes('endpoints'));
 
   if (isGitHubApiRequest) {
     const gitHubAppCode = `import React, { useState } from 'react';
@@ -2556,27 +2558,30 @@ class PlaywrightBrowserManager {
   }
 
   async searchGoogle(query: string, maxResults = 8) {
-    return this.searchDedicatedEngine(query, maxResults);
+    return this.searchDedicatedEngine(query, maxResults, true);
   }
 
-  async searchDedicatedEngine(query: string, _maxResults = 1) {
+  async searchDedicatedEngine(query: string, _maxResults = 1, searchMode = false) {
     const input = (query || '').trim();
-    if (!input) throw new Error('Informe uma URL ou domínio para navegação direta.');
+    if (!input) throw new Error(searchMode ? 'Informe uma consulta para pesquisar na web.' : 'Informe uma URL ou domínio para navegação direta.');
 
-    const directUrl = /^https?:\/\//i.test(input) ? input : `https://${input}`;
-    const safety = isSafeUrl(directUrl);
+    const looksLikeUrl = /^https?:\/\//i.test(input) || /^(?:www\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)+(?:\/.*)?$/i.test(input);
+    const targetUrl = searchMode && !looksLikeUrl
+      ? `https://www.google.com/search?q=${encodeURIComponent(input)}`
+      : (/^https?:\/\//i.test(input) ? input : `https://${input}`);
+    const safety = isSafeUrl(targetUrl);
     if (!safety.isSafe) {
       throw new Error(`URL recusada: ${safety.reason || 'endereço não permitido'}.`);
     }
 
     let parsed: URL;
     try {
-      parsed = new URL(directUrl);
+      parsed = new URL(targetUrl);
     } catch {
-      throw new Error(`Endereço inválido: "${input}". Informe uma URL HTTP ou HTTPS.`);
+      throw new Error(searchMode ? `Consulta inválida: "${input}".` : `Endereço inválido: "${input}". Informe uma URL HTTP ou HTTPS.`);
     }
     if (!parsed.hostname || !parsed.hostname.includes('.')) {
-      throw new Error('Informe um domínio completo, por exemplo: https://exemplo.com.');
+      throw new Error(searchMode ? 'O mecanismo de busca não possui um domínio válido.' : 'Informe um domínio completo, por exemplo: https://exemplo.com.');
     }
 
     const navRes = await this.navigate(parsed.toString());
@@ -3956,6 +3961,11 @@ function planRealAgentActions(message: string): Array<{ toolName: string; args: 
   // Extract destination address according to what the user explicitly requested
   const destination = extractUserDestinationUrl(cleanMsg);
   const terminalCommand = extractExplicitTerminalCommand(cleanMsg);
+  const naturalSearchMatch = cleanMsg.match(/\b(?:pesquis(?:e|ar)|busqu(?:e|ar)|procur(?:e|ar)|search(?:\s+for)?)\b(?:\s+(?:na|no|em)\s+(?:web|internet|google))?\s+(?:por|sobre)?\s*([\s\S]+)$/i);
+  const naturalSearchQuery = naturalSearchMatch?.[1]
+    ?.replace(/\s+(?:e\s+)?(?:mostre|exiba|retorne|informe|deixe|faça|faca|abra|acesse|leia|role)\b[\s\S]*$/i, '')
+    .replace(/[.!?]+$/, '')
+    .trim();
 
   if (terminalCommand) {
     plan.push({
@@ -4004,11 +4014,16 @@ function planRealAgentActions(message: string): Array<{ toolName: string; args: 
   // EXECUTION ROUTING - MULTI-HOP EXPLORATION & DIRECT ACCESS
 
   // A. Navigation or Search & Access
-  if (destination.isExplicitSearch && destination.searchQuery) {
+  const searchQuery = destination.searchQuery || (
+    !destination.targetUrl && naturalSearchQuery && (intent.mode === 'web_research' || intent.mode === 'cloud_computer' || intent.mode === 'integrated')
+      ? naturalSearchQuery
+      : null
+  );
+  if (searchQuery) {
     plan.push({
       toolName: 'browser.search',
-      args: { query: destination.searchQuery },
-      reason: `Acessando diretamente o endereço solicitado: "${destination.searchQuery}"`
+      args: { query: searchQuery },
+      reason: `Pesquisando na web por "${searchQuery}" no navegador real`
     });
     plan.push({
       toolName: 'browser.scroll',

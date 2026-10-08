@@ -281,17 +281,9 @@ export function ChatArea({
 }: ChatAreaProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
-      id: '1',
+      id: 'welcome',
       role: 'assistant',
-      status: 'completed',
       isStreaming: false,
-      time: '15:43',
-      workingTime: '12s',
-      thought: 'Constituição de Design Ativa: O agente opera sob regras rigorosas de design de produção inspiradas em Linear, Stripe, Apple, Vercel e Airbnb para criar sites e aplicações do zero com identidade visual própria, cores exclusivas e alta interatividade dinâmica.',
-      logs: [
-        { id: 1, type: 'command', content: 'Diretrizes de Design de Produção carregadas e verificadas', time: '15:42' },
-        { id: 2, type: 'info', content: 'Regras de paleta exclusiva, hierarquia tipográfica e interatividade real ativas', time: '15:43' }
-      ],
       content: `Olá! Sou o **Agente Autônomo de Engenharia de Software e Design** do Kvant.
 
 Estou conectado a um **Runtime Próprio e Isolado em Nuvem Ubuntu 24.04 100% operacional**, onde opero via **MCP (Model Context Protocol)** e **Habilidades (SKILLs)** de ponta:
@@ -317,7 +309,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
     }
   ]);
 
-  const [streamedIds, setStreamedIds] = useState<Set<string>>(() => new Set(['1']));
+  const [streamedIds, setStreamedIds] = useState<Set<string>>(() => new Set(['welcome']));
   const [isAgentInBackground, setIsAgentInBackground] = useState(false);
   const [bgElapsedSeconds, setBgElapsedSeconds] = useState(0);
 
