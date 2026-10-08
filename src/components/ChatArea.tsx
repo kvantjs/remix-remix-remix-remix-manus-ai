@@ -819,7 +819,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                           ? 'terminal'
                           : 'browser',
                       screenData: {
-                        url: data.arguments?.url || 'about:blank',
+                        url: data.arguments?.url || '',
                         title: 'Acessando ao vivo...',
                         actionDescription: data.reason,
                         command: rawCommand ? String(rawCommand).toLowerCase().trim() : undefined,
@@ -1703,26 +1703,6 @@ function MessageItem({
       </div>
 
       <div className="pl-8 space-y-4">
-        {/* Execution Timeline (Ran Tools - Top, Collapsed) - Move to top as requested */}
-        {!isWaiting && (isAlreadyStreamed || !message.isStreaming) && message.executionSteps && message.executionSteps.length > 0 && (
-          <div className="animate-in fade-in slide-in-from-top-2 duration-500 fill-mode-both">
-            <ExecutionTimeline steps={message.executionSteps} completed />
-          </div>
-        )}
-
-        {/* Tool Chips da Resposta Final do Agente (Actions Only - Below Timeline, Expanded) */}
-        {!isWaiting && finalToolSteps.length > 0 && (
-          <div className="animate-in fade-in slide-in-from-top-1 duration-500 fill-mode-both">
-            <ToolChips
-              steps={finalToolSteps}
-              diffs={[]}
-              diffLines={{}}
-              initialOpen={!isAlreadyStreamed && !message.isStreaming === false}
-              labels={{ header: `${finalToolSteps.length} ferramenta(s) executada(s) pelo agente` }}
-            />
-          </div>
-        )}
-
         {/* Clean Executive Response Text with Streaming Text Animation */}
         <div className="text-[15px] leading-relaxed text-text-content-primary/90 font-sans">
           <StreamingText 
@@ -1741,6 +1721,26 @@ function MessageItem({
               onFinishQuestionnaire?.(answers, summaryText);
             }}
           />
+        )}
+
+        {/* Execution Timeline (Ran Tools - Collapsed) */}
+        {!isWaiting && (isAlreadyStreamed || !message.isStreaming) && message.executionSteps && message.executionSteps.length > 0 && (
+          <div className="animate-in fade-in slide-in-from-top-2 duration-500 fill-mode-both">
+            <ExecutionTimeline steps={message.executionSteps} completed />
+          </div>
+        )}
+
+        {/* Tool Chips da Resposta do Agente (Actions Only - Em baixo conforme solicitado) */}
+        {!isWaiting && finalToolSteps.length > 0 && (
+          <div className="animate-in fade-in slide-in-from-top-1 duration-500 fill-mode-both">
+            <ToolChips
+              steps={finalToolSteps}
+              diffs={[]}
+              diffLines={{}}
+              initialOpen={!isAlreadyStreamed && !message.isStreaming === false}
+              labels={{ header: `${finalToolSteps.length} ferramenta(s) executada(s) pelo agente` }}
+            />
+          </div>
         )}
 
         {/* Human Approval Required Gate */}
@@ -2261,7 +2261,6 @@ function LocalActiveThinkingState({
             <AgentProgressNotes
               notes={notes}
               inline
-              activeTool={isToolRunning && mappedRows.length > 0 ? mappedRows[0] : undefined}
               onHighlightNote={onHighlightNote}
             />
           ) : null}

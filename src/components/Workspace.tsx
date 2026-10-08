@@ -341,7 +341,7 @@ export function Workspace({
       {/* 4. Terminal Tab */}
       {activeTopTab === 'terminal_tab' && (
         <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg-canvas-main">
-          <TerminalView activeCode={activeCodeContent} liveToolCalls={toolCalls} />
+          <TerminalView activeCode={activeCodeContent} liveToolCalls={toolCalls} statusText={statusText} isWorking={isWorking} />
         </div>
       )}
 
@@ -581,7 +581,7 @@ export function Workspace({
               />
             )}
             {workspaceSubTab === 'terminal' && (
-              <TerminalView activeCode={activeCodeContent} liveToolCalls={toolCalls} />
+              <TerminalView activeCode={activeCodeContent} liveToolCalls={toolCalls} statusText={statusText} isWorking={isWorking} />
             )}
             {workspaceSubTab === 'automations' && <AutomationsView />}
             {workspaceSubTab === 'projects' && <ProjectsView />}

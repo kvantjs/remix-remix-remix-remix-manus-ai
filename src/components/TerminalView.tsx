@@ -20,7 +20,16 @@ interface ConsolidatedTerminalBlock {
   timestamp: string;
 }
 
-export function TerminalView({ liveToolCalls = [] }: { activeCode?: string; liveToolCalls?: ToolCallTrace[] }) {
+export function TerminalView({ 
+  liveToolCalls = [], 
+  statusText, 
+  isWorking 
+}: { 
+  activeCode?: string; 
+  liveToolCalls?: ToolCallTrace[];
+  statusText?: string;
+  isWorking?: boolean;
+}) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [cleared, setCleared] = useState(false);
 
@@ -212,12 +221,29 @@ export function TerminalView({ liveToolCalls = [] }: { activeCode?: string; live
           </div>
         )}
 
-        {/* Empty State */}
+        {/* Empty State / Live Starting State */}
         {blocks.length === 0 && (
-          <div className="text-zinc-500 text-[11px] italic py-8 text-center space-y-1">
-            <p>Nenhum comando de terminal executado ainda.</p>
-            <p className="text-[10px] text-zinc-600">Aguardando execuções de comandos do agente no terminal.</p>
-          </div>
+          isWorking ? (
+            <div className="space-y-2 py-2 animate-in fade-in duration-300">
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-[#3fb950] font-bold">ubuntu@sandbox</span>
+                <span className="text-white/50">:</span>
+                <span className="text-[#58a6ff] font-bold">~</span>
+                <span className="text-white/50">$</span>
+                <span className="text-white font-semibold">{statusText || 'bash'}</span>
+                <div className="w-2 h-4 bg-white/80 animate-pulse ml-1" />
+              </div>
+              <div className="text-zinc-400/80 font-mono text-[11px] flex items-center gap-2 py-1 pl-3">
+                <div className="size-2 rounded-full bg-amber-400 animate-ping" />
+                <span>Executando no container Ubuntu 24.04...</span>
+              </div>
+            </div>
+          ) : (
+            <div className="text-zinc-500 text-[11px] italic py-8 text-center space-y-1">
+              <p>Nenhum comando de terminal executado ainda.</p>
+              <p className="text-[10px] text-zinc-600">Aguardando execuções de comandos do agente no terminal.</p>
+            </div>
+          )
         )}
 
         <div ref={bottomRef} />

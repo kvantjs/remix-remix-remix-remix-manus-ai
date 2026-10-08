@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   SkipBack, 
   SkipForward, 
@@ -9,7 +9,9 @@ import {
   ShieldWarning,
   HandPointing,
   XCircle,
-  NavigationArrow
+  NavigationArrow,
+  Terminal,
+  FileCode
 } from '@phosphor-icons/react';
 import { ToolCallTrace } from '../types/project';
 import { DynamicRuntimeRunner } from './DynamicRuntimeRunner';
@@ -130,15 +132,39 @@ function inferCursorAnimation(status = '', isClicking = false): CursorAnimation 
 }
 
 function AgentCodeSurface({ toolCalls = [], customFiles = {}, onFileUpdate }: { toolCalls?: ToolCallTrace[]; customFiles?: Record<string, string>; onFileUpdate?: KvantComputerProps['onFileUpdate'] }) {
-  const latest = [...toolCalls].reverse().find(t => t.actionType === 'editor' || t.screenData?.fileContent || t.arguments?.content || t.arguments?.code);
-  const filePath = latest?.screenData?.filePath || latest?.arguments?.filePath || latest?.arguments?.path || 'client/src/App.tsx';
-  const incoming = String(latest?.screenData?.fileContent || latest?.arguments?.content || latest?.arguments?.code || customFiles[filePath] || customFiles['client/src/App.tsx'] || '');
+  const latest = [...toolCalls].reverse().find(t => 
+    t.actionType === 'editor' || 
+    t.screenData?.fileContent || 
+    t.arguments?.content || 
+    t.arguments?.code ||
+    t.toolName?.includes('write') ||
+    t.toolName?.includes('edit') ||
+    t.toolName?.includes('file') ||
+    t.toolName?.includes('fs.')
+  );
+  const rawPath = latest?.screenData?.filePath || latest?.arguments?.filePath || latest?.arguments?.path || latest?.arguments?.filename || 'client/src/App.tsx';
+  const filePath = String(rawPath).trim();
+  const cleanName = filePath.split('/').pop() || filePath;
+  const incoming = String(
+    latest?.screenData?.fileContent || 
+    latest?.arguments?.content || 
+    latest?.arguments?.code || 
+    customFiles[filePath] || 
+    customFiles[cleanName] || 
+    customFiles['client/src/App.tsx'] || 
+    customFiles['App.tsx'] || 
+    (customFiles && Object.keys(customFiles).length > 0 ? Object.values(customFiles)[0] : '') ||
+    '// Aguardando geração de código pelo agente...'
+  );
   const [value, setValue] = useState(incoming);
   useEffect(() => { if (incoming && incoming !== value) setValue(incoming); }, [incoming]);
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-[#1a1a1a] text-white select-text">
       <div className="h-9 shrink-0 flex items-center justify-between px-3 border-b border-white/10 bg-[#1a1a1a] font-mono text-[11px] select-none">
-        <span className="text-blue-300">{filePath}</span>
+        <div className="flex items-center gap-2">
+          <span className="size-2 rounded-full bg-blue-400 animate-pulse" />
+          <span className="text-blue-300 font-medium">{filePath}</span>
+        </div>
         <span className="text-amber-400 font-semibold px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/30">
           Apenas o agente pode editar e gerar código
         </span>
@@ -155,16 +181,19 @@ function sanitizeUrl(url: string): string {
     const parsed = new URL(url);
     if (parsed.hostname.startsWith('api.')) {
       // Hard block on api subdomains in the UI to match server policy
-      return 'about:blank';
+      return '';
     }
   } catch {}
+  if (!url || url.trim() === '' || url.toLowerCase() === 'about:blank' || url.toLowerCase().startsWith('about:')) {
+    return '';
+  }
   return url;
 }
 
 // Intelligent Web URL Parser - accurately extracts destination URLs requested by user
 export function resolveWebUrl(raw: string): string {
   let clean = (raw || '').trim();
-  if (!clean) return sanitizeUrl('about:blank');
+  if (!clean || clean.toLowerCase() === 'about:blank' || clean.toLowerCase().startsWith('about:')) return '';
 
   // 1. Direct explicit URL match (http/https, www, or domain with known TLDs or localhost/IP)
   const explicitUrlRegex = /(https?:\/\/[^\s"'<>]+|localhost(?::\d+)?(?:\/[^\s"'<>]*)?|127\.0\.0\.1(?::\d+)?(?:\/[^\s"'<>]*)?|www\.[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+(?::\d+)?(?:\/[^\s"'<>]*)?|[a-zA-Z0-9-]+\.(?:com|org|net|edu|gov|io|ai|tech|co|app|br|uk|de|fr|es|it|me|info|tv|xyz|dev|cloud|page|link|shop|store|online|site|space|top|club|pro|cc|to|is|gg|live|news|world|agency|studio|global|fm|social|blog|directory|guru|solutions|design|center|life)(?:\.[a-zA-]{2,3})*(?::\d+)?(?:\/[^\s"'<>]*)?)/i;
@@ -199,7 +228,7 @@ export function resolveWebUrl(raw: string): string {
   clean = clean.replace(/^[:\-–—\s"'`<([]+/, '').replace(/[>'"`\)\]]+$/, '').replace(/^(?:de|do|da|dos|das|o|a|os|as|um|uma)\s+/i, '').trim();
 
   if (!clean || /^(?:endereço|endereco|site|web|internet|computador|navegador|browser|página|pagina|portal|url|link)$/i.test(clean)) {
-    return sanitizeUrl('about:blank');
+    return '';
   }
 
   // 4. Known brand check
@@ -228,8 +257,8 @@ export function resolveWebUrl(raw: string): string {
     }
   }
 
-  // 8. Default to search portal
-  return sanitizeUrl('about:blank');
+  // 8. Default
+  return '';
 }
 
 interface NavHistoryItem {
@@ -251,7 +280,7 @@ export function KvantComputer({
   agentIntent,
   browserStatus: externalBrowserStatus
 }: KvantComputerProps) {
-  const [currentUrl, setCurrentUrl] = useState<string>('about:blank');
+  const [currentUrl, setCurrentUrl] = useState<string>('');
 
   // O navegador deve estar visível ao abrir a aba; a automação continua sendo
   // controlada exclusivamente pelos tool calls do agente.
@@ -268,13 +297,117 @@ export function KvantComputer({
   const [iframeReloadKey, setIframeReloadKey] = useState(0);
   const iframeLoadTimeoutRef = useRef<number | null>(null);
   const latestSurfaceTrace = [...(toolCalls || [])].reverse().find(trace => trace.actionType || trace.screenData?.terminalOutput || trace.screenData?.fileContent);
-  const activeSurface: 'browser' | 'terminal' | 'editor' = browserStatus === 'loading'
-    ? 'browser'
-    : latestSurfaceTrace?.actionType === 'terminal'
-      ? 'terminal'
-      : latestSurfaceTrace?.actionType === 'editor'
-        ? 'editor'
-        : 'browser';
+
+  // User can manually select surface or let it follow the agent live actions
+  const [userSelectedSurface, setUserSelectedSurface] = useState<'browser' | 'terminal' | 'editor' | null>(null);
+
+  const detectedSurface = useMemo<'browser' | 'terminal' | 'editor'>(() => {
+    // 1. Inspect most recent tool trace in toolCalls
+    const latestTrace = [...(toolCalls || [])].reverse().find(trace => {
+      const name = String(trace.toolName || '').toLowerCase();
+      const cmd = String(trace.screenData?.command || trace.arguments?.command || '').toLowerCase();
+      const action = trace.actionType;
+      return (
+        action === 'terminal' ||
+        action === 'editor' ||
+        action === 'browser' ||
+        Boolean(trace.screenData?.terminalOutput) ||
+        Boolean(trace.screenData?.fileContent) ||
+        Boolean(trace.arguments?.content) ||
+        Boolean(trace.arguments?.code) ||
+        name.includes('bash') ||
+        name.includes('terminal') ||
+        name.includes('shell') ||
+        name.includes('python') ||
+        name.includes('npm') ||
+        name.includes('run') ||
+        name.includes('exec') ||
+        name.includes('write') ||
+        name.includes('edit') ||
+        name.includes('file') ||
+        name.includes('fs.') ||
+        name.includes('browser') ||
+        name.includes('navigate') ||
+        name.includes('click') ||
+        name.includes('type') ||
+        name.includes('scroll') ||
+        cmd.length > 0
+      );
+    });
+
+    if (latestTrace) {
+      const name = String(latestTrace.toolName || '').toLowerCase();
+      const cmd = String(latestTrace.screenData?.command || latestTrace.arguments?.command || '').toLowerCase();
+      const isTerminal = 
+        latestTrace.actionType === 'terminal' ||
+        name.includes('bash') ||
+        name.includes('terminal') ||
+        name.includes('shell') ||
+        name.includes('python') ||
+        name.includes('npm') ||
+        Boolean(latestTrace.screenData?.terminalOutput) ||
+        cmd.length > 0;
+      
+      if (isTerminal) return 'terminal';
+
+      const isEditor = 
+        latestTrace.actionType === 'editor' ||
+        name.includes('write') ||
+        name.includes('edit') ||
+        name.includes('file') ||
+        name.includes('fs.') ||
+        Boolean(latestTrace.screenData?.fileContent) ||
+        Boolean(latestTrace.arguments?.content) ||
+        Boolean(latestTrace.arguments?.code);
+
+      if (isEditor) return 'editor';
+
+      if (latestTrace.actionType === 'browser' || name.includes('browser') || name.includes('navigate') || name.includes('click') || name.includes('type') || name.includes('scroll')) {
+        return 'browser';
+      }
+    }
+
+    // 2. Infer from statusText or contextText while agent is working
+    const st = String(statusText || '').toLowerCase();
+    const ct = String(contextText || '').toLowerCase();
+
+    if (
+      st.includes('terminal') || st.includes('bash') || st.includes('npm') || 
+      st.includes('execut') || st.includes('comando') || st.includes('shell') ||
+      ct.includes('terminal') || ct.includes('bash') || ct.includes('comando')
+    ) {
+      return 'terminal';
+    }
+
+    if (
+      st.includes('edit') || st.includes('escrev') || st.includes('código') || 
+      st.includes('codigo') || st.includes('arquivo') || st.includes('file') || 
+      st.includes('scaffold') || st.includes('gravando') ||
+      ct.includes('gravando') || ct.includes('arquivo') || ct.includes('código')
+    ) {
+      return 'editor';
+    }
+
+    if (
+      st.includes('naveg') || st.includes('browser') || st.includes('url') || 
+      st.includes('site') || st.includes('página') || ct.includes('naveg') || ct.includes('pesquis')
+    ) {
+      return 'browser';
+    }
+
+    return 'browser';
+  }, [toolCalls, statusText, contextText]);
+
+  // When detectedSurface changes as the agent progresses through tools, auto-update surface
+  const prevDetectedSurfaceRef = useRef(detectedSurface);
+  useEffect(() => {
+    if (detectedSurface !== prevDetectedSurfaceRef.current) {
+      setUserSelectedSurface(detectedSurface);
+      prevDetectedSurfaceRef.current = detectedSurface;
+    }
+  }, [detectedSurface]);
+
+  const activeSurface: 'browser' | 'terminal' | 'editor' = userSelectedSurface || detectedSurface;
 
   const handleTurnOnComputer = (targetUrlAfterBoot?: string) => {
     setIsComputerActive(true);
@@ -358,7 +491,7 @@ export function KvantComputer({
   // History stack for navigation & scrubber
   const [navHistory, setNavHistory] = useState<NavHistoryItem[]>([
     {
-      url: 'about:blank',
+      url: '',
       title: 'Navegador pronto',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       action: 'Inicialização'
@@ -420,7 +553,7 @@ export function KvantComputer({
 
   // Define if the computer is currently in an idle/finished state
   // CRITICAL: isIdle can NEVER be true while the agent is active or executing
-  const isBlankUrl = !currentUrl || currentUrl === 'about:blank';
+  const isBlankUrl = !currentUrl || currentUrl.trim() === '' || currentUrl.toLowerCase() === 'about:blank' || currentUrl.toLowerCase().startsWith('about:');
   const isIdle = isComputerActive && !isBooting && !isAgentActive && !userControlMode && (forceIdle || (!liveScreenshot && !customCode && isBlankUrl));
 
   // Reset forceIdle whenever the agent becomes active or starts a task
@@ -720,7 +853,7 @@ export function KvantComputer({
       if (lastTool.toolName.includes('navigate') || lastTool.toolName === 'browser') {
         const rawUrl = lastTool.screenData?.url || lastTool.arguments?.url || '';
         const clean = rawUrl ? resolveWebUrl(rawUrl) : '';
-        if (!clean || clean === 'about:blank') return;
+        if (!clean || clean.toLowerCase() === 'about:blank' || clean.toLowerCase().startsWith('about:')) return;
         setCurrentUrl(clean);
         setIsExternalWeb(true);
         if (!hasLiveProgress) {
@@ -757,7 +890,7 @@ export function KvantComputer({
         const rawUrl = lastTool.screenData?.url || lastTool.arguments?.url || '';
         if (!rawUrl) return;
         const clean = resolveWebUrl(rawUrl);
-        if (!clean || clean === 'about:blank') return;
+        if (!clean || clean.toLowerCase() === 'about:blank' || clean.toLowerCase().startsWith('about:')) return;
         setCurrentUrl(clean);
         setPageTitle(lastTool.screenData?.title || new URL(clean).hostname);
         setIsExternalWeb(true);
@@ -797,7 +930,7 @@ export function KvantComputer({
     }
   };
 
-  const proxySrc = `/api/browser/proxy?url=${encodeURIComponent(currentUrl)}`;
+  const proxySrc = !isBlankUrl ? `/api/browser/proxy?url=${encodeURIComponent(currentUrl)}` : '';
 
   useEffect(() => {
     if (!isComputerActive || isBlankUrl || liveScreenshot) return;
@@ -818,17 +951,65 @@ export function KvantComputer({
   return (
     <div className="flex-1 flex flex-col h-full bg-bg-canvas-main text-text-content-primary select-none overflow-hidden font-sans">
       
-      {/* 1. AGENT SUB-HEADER (Shown when active/working or when viewing history via scrubber) */}
-      {isComputerActive && (!isIdle || !isLive) && (
+      {/* 1. AGENT SUB-HEADER (Shown when computer is active) */}
+      {isComputerActive && (
         <div className="h-8 px-4 bg-bg-surface-panel border-b border-border-divider-subtle flex items-center justify-between text-xs shrink-0 select-none">
           <div className="flex items-center gap-2 overflow-hidden truncate">
             <span className="text-text-content-secondary font-normal text-[11.5px] tracking-tight">
-              {!isLive ? 'Histórico de Execução do Agente' : (isBooting ? 'Computador está iniciando...' : (isLoading ? 'Kopilot está interagindo...' : 'Kopilot está usando o Navegador'))}
+              {activeSurface === 'terminal' 
+                ? (isWorking ? 'Kopilot executando no Terminal Ubuntu' : 'Terminal Bash Ubuntu 24.04') 
+                : activeSurface === 'editor' 
+                  ? (isWorking ? 'Kopilot editando código do projeto' : 'Editor de Código do Agente')
+                  : (!isLive ? 'Histórico de Execução do Agente' : (isBooting ? 'Computador está iniciando...' : (isLoading ? 'Kopilot está interagindo...' : 'Kopilot está usando o Navegador')))}
             </span>
             <span className="text-border-divider-subtle text-xs">|</span>
             <span className="text-text-content-secondary/80 font-mono text-[11px] truncate tracking-tight">
-              {extractCleanDomain(currentUrl) || currentUrl}
+              {activeSurface === 'terminal' 
+                ? (statusText || 'Terminal Bash ativo') 
+                : activeSurface === 'editor' 
+                  ? (latestSurfaceTrace?.screenData?.filePath || latestSurfaceTrace?.arguments?.filePath || 'client/src/App.tsx')
+                  : (isBlankUrl ? 'Aguardando navegação' : (extractCleanDomain(currentUrl) || currentUrl))}
             </span>
+          </div>
+
+          {/* Quick Surface Switcher Tabs */}
+          <div className="flex items-center gap-1 shrink-0 ml-2">
+            <button
+              type="button"
+              onClick={() => setUserSelectedSurface('browser')}
+              className={`px-2 py-0.5 rounded text-[11px] font-medium flex items-center gap-1 transition-colors cursor-pointer ${
+                activeSurface === 'browser' ? 'bg-white/10 text-white border border-white/20' : 'text-text-content-secondary/70 hover:text-white'
+              }`}
+            >
+              <Globe size={12} />
+              <span className="hidden sm:inline">Navegador</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setUserSelectedSurface('terminal')}
+              className={`px-2 py-0.5 rounded text-[11px] font-medium flex items-center gap-1 transition-colors cursor-pointer ${
+                activeSurface === 'terminal' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'text-text-content-secondary/70 hover:text-white'
+              }`}
+            >
+              <Terminal size={12} />
+              <span className="hidden sm:inline">Terminal</span>
+              {toolCalls?.some(t => t.actionType === 'terminal' && t.status === 'running') && (
+                <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setUserSelectedSurface('editor')}
+              className={`px-2 py-0.5 rounded text-[11px] font-medium flex items-center gap-1 transition-colors cursor-pointer ${
+                activeSurface === 'editor' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' : 'text-text-content-secondary/70 hover:text-white'
+              }`}
+            >
+              <FileCode size={12} />
+              <span className="hidden sm:inline">Editor</span>
+              {toolCalls?.some(t => t.actionType === 'editor' && t.status === 'running') && (
+                <span className="size-1.5 rounded-full bg-blue-400 animate-pulse ml-0.5" />
+              )}
+            </button>
           </div>
         </div>
       )}
@@ -880,8 +1061,18 @@ export function KvantComputer({
               </p>
             </div>
           </div>
-        ) : (isIdle && isLive) ? (
-          /* ACTIVE BUT IDLE COMPUTER SCREEN (NOTHING TO SHOW) */
+        ) : activeSurface === 'terminal' ? (
+          /* LIVE TERMINAL INTERFACE */
+          <div className="flex-1 min-h-0 flex flex-col bg-[#1a1a1a] overflow-hidden">
+            <TerminalView activeCode={customCode} liveToolCalls={toolCalls} statusText={statusText} isWorking={isWorking} />
+          </div>
+        ) : activeSurface === 'editor' ? (
+          /* LIVE CODE EDITOR INTERFACE */
+          <div className="flex-1 min-h-0 flex flex-col bg-[#1a1a1a] overflow-hidden">
+            <AgentCodeSurface toolCalls={toolCalls} customFiles={customFiles} onFileUpdate={onFileUpdate} />
+          </div>
+        ) : ((isIdle && isLive) || (isBlankUrl && !liveScreenshot && !customCode && !isLoading && !isWorking)) ? (
+          /* ACTIVE BUT IDLE / WAITING COMPUTER SCREEN */
           <div className="flex-1 bg-bg-canvas-main flex flex-col items-center justify-center p-6 text-center select-none overflow-y-auto space-y-4 animate-in fade-in duration-500">
               <img 
                 src="https://imgdb.io/i/-E1nG20.png" 
@@ -911,10 +1102,8 @@ export function KvantComputer({
               </div>
             )}
 
-            {activeSurface === 'terminal' && <TerminalView activeCode={customCode} liveToolCalls={toolCalls} />}
-            {activeSurface === 'editor' && <AgentCodeSurface toolCalls={toolCalls} customFiles={customFiles} onFileUpdate={onFileUpdate} />}
             {/* Complete website rendered via proxy or dynamic runtime with decreased zoom (85% scale) in light mode */}
-            <div className={activeSurface === 'browser' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>
+            <div className="flex-1 min-h-0 flex flex-col">
             {isExternalWeb || !customCode ? (
               <div className="relative w-full h-full flex-1 overflow-hidden bg-white" style={{ colorScheme: 'light', backgroundColor: '#ffffff' }}>
                 <div 
@@ -954,7 +1143,7 @@ export function KvantComputer({
                         </div>
                       )}
                     </div>
-                  ) : (
+                  ) : !isBlankUrl ? (
                     <div className="relative w-full h-full bg-white" style={{ colorScheme: 'light', backgroundColor: '#ffffff' }}>
                       <iframe
                         key={iframeReloadKey}
@@ -1003,6 +1192,20 @@ export function KvantComputer({
                           </div>
                         </div>
                       )}
+                    </div>
+                  ) : (
+                    <div className="w-full h-full bg-bg-canvas-main flex flex-col items-center justify-center p-6 text-center select-none overflow-y-auto space-y-4 animate-in fade-in duration-300">
+                      <img 
+                        src="https://imgdb.io/i/-E1nG20.png" 
+                        alt="Navegador pronto" 
+                        className="w-56 sm:w-64 md:w-72 h-auto object-contain drop-shadow-md"
+                      />
+                      <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+                        Navegador pronto
+                      </h3>
+                      <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed max-w-sm">
+                        O computador está disponível e aguardando uma navegação real do agente. Nenhum site é aberto automaticamente.
+                      </p>
                     </div>
                   )}
                 </div>

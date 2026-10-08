@@ -12,7 +12,7 @@ import { existsSync, createReadStream } from 'fs';
 import { chromium as playwrightChromium } from 'playwright';
 
 function createMockPage() {
-  let currentUrl = 'about:blank';
+  let currentUrl = '';
   let currentTitle = 'Navegador do Agente';
   return {
     isClosed: () => false,
@@ -3359,16 +3359,12 @@ app.post('/api/agent/tool/execute', async (req, res) => {
 // Browser HTTP Endpoints (Powered by Real Playwright Chromium Automation & Live Web Proxy)
 app.get('/api/browser/proxy', async (req, res) => {
   const targetUrl = req.query.url as string;
-  if (!targetUrl || targetUrl.trim() === '' || targetUrl.trim() === 'about:blank') {
+  if (!targetUrl || targetUrl.trim() === '' || targetUrl.trim() === 'about:blank' || targetUrl.trim().startsWith('about:')) {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    return res.status(200).send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>about:blank</title></head><body style="background:#111;color:#666;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;"><div style="font-size:12px;letter-spacing:0.05em;">NAVEGADOR DO AGENTE · AGUARDANDO NAVEGAÇÃO</div></body></html>`);
+    return res.status(200).send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Navegador do Agente</title></head><body style="background:#1a1a1a;color:#777;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;"><div style="font-size:12px;letter-spacing:0.05em;text-transform:uppercase;">Navegador do Agente · Aguardando navegação</div></body></html>`);
   }
 
   let finalUrl = targetUrl.trim();
-  if (finalUrl.startsWith('about:')) {
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    return res.status(200).send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${finalUrl}</title></head><body style="background:#111;color:#666;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;"><div style="font-size:12px;letter-spacing:0.05em;">NAVEGADOR DO AGENTE</div></body></html>`);
-  }
 
   if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
     finalUrl = 'https://' + finalUrl;

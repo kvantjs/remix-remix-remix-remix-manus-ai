@@ -181,6 +181,7 @@ export default function ThinkingState({
   elapsedSeconds = 1,
   working: propWorking,
   livePhase,
+  notes,
 }: {
   variant?: string;
   onSettled?: () => void;
@@ -195,6 +196,8 @@ export default function ThinkingState({
   working?: boolean;
   /** live synchronized phase for the motion alternating text */
   livePhase?: "Pensando" | "Raciocinando" | "Trabalhando" | string;
+  /** notes and thinking content placed above the tool trace */
+  notes?: ReactNode;
 }) {
   const stage = useSequence(STAGES);
   const [manualExpanded, setManualExpanded] = useState<boolean | null>(null);
@@ -257,7 +260,12 @@ export default function ThinkingState({
 
       {/* expandable trace content */}
       {expanded && (
-        <div className="mt-2 w-full animate-in fade-in duration-300">
+        <div className="mt-2 w-full animate-in fade-in duration-300 flex flex-col gap-2">
+          {notes && (
+            <div className="w-full">
+              {notes}
+            </div>
+          )}
           {variant === "Reasoning" ? (
             /* Frameless Transparent AI Reasoning Trace - Left-aligned */
             v.rows.length > 0 && (
