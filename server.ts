@@ -4628,7 +4628,7 @@ app.post('/api/agent/chat/stream', async (req, res) => {
           await waitForExecutionPhase();
 
           const isTerminalCmd = toolName === 'bash_exec' || toolName === 'python_exec';
-          const normalizedCmd = isTerminalCmd ? String(args.command || args.code || '').toLowerCase().trim() : '';
+          const normalizedCmd = isTerminalCmd ? String(args.command || args.code || '').trim() : '';
 
           sendEvent('tool_start', {
             toolName,

@@ -47,3 +47,22 @@ test('tool declaration filtering follows the classified mixed scope', () => {
   const visible = filterToolDeclarations(intent, declarations).map((item: any) => item.name);
   assert.deepEqual(visible.sort(), ['browser_navigate', 'file_write']);
 });
+
+test('natural web research stays in the browser research mode', () => {
+  const intent = classifyAgentIntent(
+    'Estou pensando em instalar energia solar numa casa em São Paulo. Pesquise na web, usando fontes oficiais e confiáveis, quais são as etapas atuais para conectar um sistema residencial à rede elétrica.'
+  );
+  assert.equal(intent.mode, 'web_research');
+  assert.equal(intent.taskMode, 'research');
+  assert.equal(isToolAllowed(intent, 'web_search'), true);
+  assert.equal(isToolAllowed(intent, 'browser_navigate'), true);
+  assert.equal(isToolAllowed(intent, 'file_write'), false);
+});
+
+test('explicit terminal requests stay in the computer execution mode', () => {
+  const intent = classifyAgentIntent('Execute no terminal `printf "Hello World"` e mostre o resultado.');
+  assert.equal(intent.mode, 'cloud_computer');
+  assert.equal(intent.taskMode, 'computer_action');
+  assert.equal(isToolAllowed(intent, 'bash_exec'), true);
+  assert.equal(isToolAllowed(intent, 'file_write'), false);
+});
