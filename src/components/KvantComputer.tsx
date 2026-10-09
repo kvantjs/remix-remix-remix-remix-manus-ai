@@ -212,7 +212,7 @@ export function resolveWebUrl(raw: string): string {
   const lower = clean.toLowerCase();
   if (searchMatch && !lower.includes('endereço') && !lower.includes('endereco') && !lower.includes('acesse') && !lower.includes('abra o site')) {
     const query = searchMatch[1].trim().replace(/^(?:sobre|por)\s+/i, '').trim();
-    return sanitizeUrl(`https://www.google.com/search?q=${encodeURIComponent(query)}`);
+    return `kvant://search?q=${encodeURIComponent(query)}`;
   }
 
   // 3. Strip command prefixes and boilerplate
@@ -934,6 +934,111 @@ export function KvantComputer({
       setScrubberValue(Math.round((targetIdx / Math.max(1, navHistory.length - 1)) * 100));
     }
   };
+
+  const handleNavigateUrl = (targetUrl: string) => {
+    let clean = resolveWebUrl(targetUrl);
+    if (!clean) {
+      if (targetUrl.includes('.') && !targetUrl.includes(' ')) {
+        clean = targetUrl.startsWith('http') ? targetUrl : `https://${targetUrl}`;
+      } else {
+        clean = `kvant://search?q=${encodeURIComponent(targetUrl)}`;
+      }
+    }
+    setCurrentUrl(clean);
+    setIsLoading(true);
+    setIframeLoaded(false);
+    try {
+      setPageTitle(new URL(clean).hostname || clean);
+    } catch {
+      setPageTitle(clean);
+    }
+    setNavHistory(prev => [
+      ...prev,
+      {
+        url: clean,
+        title: clean,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        action: 'Navegação'
+      }
+    ]);
+    setHistoryIndex(prev => prev + 1);
+    setIsLive(true);
+
+    // Call server to navigate real Playwright Chromium browser and capture real screenshot
+    fetch('/api/browser/navigate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: clean })
+    })
+      .then(res => res.json())
+      .then(data => {
+        setIsLoading(false);
+        setBrowserStatus('interactive');
+        if (data.screenshot) {
+          setLiveScreenshot(data.screenshot);
+        }
+        if (data.title) {
+          setPageTitle(data.title);
+        }
+        if (data.url) {
+          setCurrentUrl(data.url);
+        }
+      })
+      .catch(err => {
+        console.warn('Falha na navegação remota:', err);
+        setIsLoading(false);
+      });
+  };
+
+  // Sync live browser state from server Playwright instance
+  useEffect(() => {
+    let isMounted = true;
+    const fetchLiveBrowserState = async () => {
+      try {
+        const res = await fetch('/api/browser/live-state');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!isMounted || !data.success) return;
+
+        if (data.screenshot) {
+          setLiveScreenshot(data.screenshot);
+        }
+        if (data.url && data.url !== 'about:blank') {
+          setCurrentUrl(data.url);
+        }
+        if (data.title) {
+          setPageTitle(data.title);
+        }
+        if (data.mouse && Number.isFinite(data.mouse.x) && Number.isFinite(data.mouse.y)) {
+          setAgentCursor(prev => ({
+            ...prev,
+            x: data.mouse.x,
+            y: data.mouse.y,
+            viewportWidth: data.mouse.viewportWidth || 1280,
+            viewportHeight: data.mouse.viewportHeight || 800,
+            visible: true
+          }));
+        }
+        if (data.browserStatus) {
+          setBrowserStatus(data.browserStatus);
+        }
+      } catch (err) {
+        console.warn('Erro ao sincronizar estado ao vivo do navegador:', err);
+      }
+    };
+
+    fetchLiveBrowserState();
+
+    let interval: NodeJS.Timeout | null = null;
+    if (isWorking || isComputerActive) {
+      interval = setInterval(fetchLiveBrowserState, isWorking ? 2500 : 8000);
+    }
+
+    return () => {
+      isMounted = false;
+      if (interval) clearInterval(interval);
+    };
+  }, [isWorking, isComputerActive]);
 
   const proxySrc = !isBlankUrl ? `/api/browser/proxy?url=${encodeURIComponent(currentUrl)}` : '';
 

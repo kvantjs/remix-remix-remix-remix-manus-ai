@@ -22,6 +22,7 @@ function createMockPage() {
     url: () => currentUrl,
     title: async () => currentTitle,
     content: async () => '<html><body><h1>Navegador do Agente</h1></body></html>',
+    setContent: async (html: string) => { currentUrl = 'kvant://search'; currentTitle = 'Kvant Browser'; return html; },
     goto: async (url: string) => {
       currentUrl = url;
       try {
@@ -113,8 +114,13 @@ import { executeSandboxCommand, getSandboxBackend } from './src/server/sandbox-e
 import { buildExecutableSkillsInstruction, executeSkill, listExecutableSkills, materializeSkillArtifacts } from './src/server/skill-runtime.js';
 import { buildCognitiveSystemInstruction, COGNITIVE_DELIBERATION_STAGES } from './src/server/agent-cognition.js';
 import { synthesizeBespokeInterface } from './src/server/bespoke-ui-synthesizer.js';
+import { customBrowserSearch, validateSearchResultUrls, type CustomSearchMode } from './src/server/custom-browser-search.js';
 
 const execAsync = promisify(exec);
+
+function escapeBrowserHtml(value: unknown) {
+  return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
 
 dotenv.config();
 
@@ -128,6 +134,21 @@ app.use(express.json({ limit: '10mb' }));
 
 app.get('/health', (_req, res) => {
   res.status(200).json({ ok: true, service: 'remix-kopilot-ai' });
+});
+
+app.get('/api/browser/search', async (req, res) => {
+  const query = String(req.query.q || req.query.query || '').trim();
+  const requestedMode = String(req.query.mode || 'all');
+  const mode: CustomSearchMode = ['all', 'images', 'videos', 'news', 'maps'].includes(requestedMode)
+    ? requestedMode as CustomSearchMode
+    : 'all';
+  if (!query) return res.status(400).json({ error: 'Informe q ou query para pesquisar.' });
+  try {
+    const result = await customBrowserSearch(query, mode, Number(req.query.limit) || 8);
+    res.json({ ...result, results: validateSearchResultUrls(result.results) });
+  } catch (error: any) {
+    res.status(502).json({ error: redactSecrets(error?.message || String(error)), provider: 'Kvant Custom Browser' });
+  }
 });
 
 app.get('/api/platform/config', async (_req, res) => {
@@ -2553,62 +2574,28 @@ class PlaywrightBrowserManager {
     }
   }
 
-  async searchCustomEngine(query: string, maxResults = 8) {
-    return this.searchDedicatedEngine(query, maxResults);
-  }
-
-  async searchGoogle(query: string, maxResults = 8) {
-    return this.searchDedicatedEngine(query, maxResults, true);
-  }
-
-  async searchDedicatedEngine(query: string, _maxResults = 1, searchMode = false) {
-    const input = (query || '').trim();
-    if (!input) throw new Error(searchMode ? 'Informe uma consulta para pesquisar na web.' : 'Informe uma URL ou domínio para navegação direta.');
-
-    const looksLikeUrl = /^https?:\/\//i.test(input) || /^(?:www\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)+(?:\/.*)?$/i.test(input);
-    const targetUrl = searchMode && !looksLikeUrl
-      ? `https://www.google.com/search?q=${encodeURIComponent(input)}`
-      : (/^https?:\/\//i.test(input) ? input : `https://${input}`);
-    const safety = isSafeUrl(targetUrl);
-    if (!safety.isSafe) {
-      throw new Error(`URL recusada: ${safety.reason || 'endereço não permitido'}.`);
-    }
-
-    let parsed: URL;
-    try {
-      parsed = new URL(targetUrl);
-    } catch {
-      throw new Error(searchMode ? `Consulta inválida: "${input}".` : `Endereço inválido: "${input}". Informe uma URL HTTP ou HTTPS.`);
-    }
-    if (!parsed.hostname || !parsed.hostname.includes('.')) {
-      throw new Error(searchMode ? 'O mecanismo de busca não possui um domínio válido.' : 'Informe um domínio completo, por exemplo: https://exemplo.com.');
-    }
-
-    const navRes = await this.navigate(parsed.toString());
-    const challenge = navRes.challenge || null;
+  async searchCustomEngine(query: string, maxResults = 8, mode: CustomSearchMode = 'all') {
+    const search = await customBrowserSearch(query, mode, maxResults);
+    const results = validateSearchResultUrls(search.results);
+    const page = await this.ensurePage();
+    const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Kvant Browser — ${escapeBrowserHtml(query)}</title><style>body{font-family:system-ui,sans-serif;max-width:920px;margin:40px auto;padding:0 24px;color:#18212f;background:#fff}h1{font-size:24px}p{color:#5c6878}.result{padding:18px 0;border-bottom:1px solid #e5eaf0}.result a{font-size:18px;color:#145bd7;text-decoration:none}.source{font-size:12px;color:#6b7788;margin:6px 0}.thumb{max-width:180px;max-height:110px;object-fit:cover;border-radius:8px;margin-top:8px}</style></head><body><h1>Kvant Browser</h1><p>Pesquisa própria · ${escapeBrowserHtml(search.provider)} · ${results.length} resultado(s)</p>${results.map((item) => `<article class="result"><a href="${escapeBrowserHtml(item.url)}">${escapeBrowserHtml(item.title)}</a><div class="source">${escapeBrowserHtml(item.source)}</div><p>${escapeBrowserHtml(item.snippet)}</p>${item.image ? `<img class="thumb" src="${escapeBrowserHtml(item.image)}" alt="">` : ''}</article>`).join('')}</body></html>`;
+    await page.setContent(html, { waitUntil: 'domcontentloaded' });
+    const domData = await this.extractDomData(page);
+    const screenshotBuf = await page.screenshot({ type: 'jpeg', quality: 75 }).catch(() => null);
     return {
-      query: input,
-      searchEngineUrl: navRes.url,
-      url: navRes.url,
-      title: navRes.title,
-      status: navRes.status || 200,
-      results: challenge ? [] : [{
-        title: navRes.title,
-        url: navRes.url,
-        snippet: navRes.textContent.slice(0, 400)
-      }],
-      textContent: navRes.textContent,
-      interactiveElements: navRes.interactiveElements as any,
-      links: navRes.links,
-      screenshot: navRes.screenshot,
-      challenge,
-      requiresUserAction: Boolean(challenge),
-      steps: [
-        { label: 'Navegação direta autorizada', detail: `Acessou "${navRes.url}" sem usar um mecanismo de busca.` },
-        { label: challenge ? 'Desafio detectado' : 'Conteúdo lido', detail: challenge
-          ? 'A navegação foi pausada e requer ação humana autorizada.'
-          : `Extraiu ${navRes.textContent.length} caracteres do conteúdo renderizado.` }
-      ]
+      ...search,
+      results,
+      searchEngineUrl: 'kvant://search',
+      url: 'kvant://search',
+      title: `Kvant Browser — ${query}`,
+      status: 200,
+      textContent: domData.bodyText,
+      interactiveElements: domData.interactive as any,
+      links: results.map((item) => ({ text: item.title, href: item.url })),
+      screenshot: screenshotBuf ? `data:image/jpeg;base64,${screenshotBuf.toString('base64')}` : undefined,
+      challenge: null,
+      requiresUserAction: false,
+      steps: [{ label: 'Índice próprio consultado', detail: `Pesquisa ${mode} concluída sem redirecionar para Google.` }, { label: 'Resultados renderizados', detail: 'O navegador próprio renderizou os resultados e deixou os links prontos para navegação.' }]
     };
   }
   async openFirstSearchResult() {
@@ -3028,21 +3015,6 @@ async function executeHttpNavigate(rawUrl: string) {
   }
 }
 
-// Dedicated Search URL builder using news and open tech portals
-function buildGoogleSearchUrl(query: string) {
-  return 'https://news.ycombinator.com';
-}
-
-function normaliseGoogleResultUrl(raw: string, baseUrl: string) {
-  try {
-    const url = new URL(raw, baseUrl);
-    if (url.hostname.endsWith('google.com') && url.pathname === '/url') return url.searchParams.get('q') || '';
-    return url.href;
-  } catch {
-    return raw;
-  }
-}
-
 // 5. Unified Real Tool Execution Engine for the Agent (With Playwright Automation)
 async function runRealTool(toolName: string, args: Record<string, any>, emit?: (event: string, data: any) => void): Promise<any> {
   const now = new Date().toLocaleTimeString();
@@ -3153,14 +3125,15 @@ async function runRealTool(toolName: string, args: Record<string, any>, emit?: (
   // Browser Search: navegação direta por URL
   if (toolName === 'browser.search' || toolName === 'web.search' || toolName === 'search' || toolName === 'computer.search') {
     const query = String(args.query || args.q || '').trim();
-    const searchRes = await playwrightBrowser.searchGoogle(query, 8);
+    const mode = ['all', 'images', 'videos', 'news', 'maps'].includes(String(args.mode)) ? String(args.mode) as CustomSearchMode : 'all';
+    const searchRes = await playwrightBrowser.searchCustomEngine(query, 8, mode);
     const topSnippets = searchRes.results.map((item: any) => `• ${item.title}\n  URL: ${item.url}\n  ${item.snippet}`).join('\n\n');
     return {
       id,
       toolName: 'browser.search',
       server: 'playwright_chromium',
       arguments: { query, searchEngineUrl: searchRes.searchEngineUrl },
-      result: `Navegação direta concluída.\n\n${topSnippets || 'Nenhum conteúdo foi extraído da página informada.'}`,
+      result: `Pesquisa própria (${mode}) concluída no navegador sob medida.\n\n${topSnippets || 'Nenhum resultado foi extraído.'}`,
       timestamp: now,
       status: searchRes.challenge ? 'warning' : 'success',
       actionType: 'browser',
@@ -5352,7 +5325,7 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  app.listen(PORT, process.env.HOST || '0.0.0.0', () => {
     console.log(`[Kvant Server] Running on http://localhost:${PORT}`);
   });
 }

@@ -27,6 +27,11 @@ export const AGENT_TOOL_DECLARATIONS = [
         maxResults: {
           type: 'INTEGER',
           description: 'Número máximo de resultados a retornar (padrão: 5, máximo: 10).'
+        },
+        mode: {
+          type: 'STRING',
+          enum: ['all', 'images', 'videos', 'news', 'maps'],
+          description: 'Tipo de resultado: web geral, imagens, vídeos, notícias ou mapas.'
         }
       },
       required: ['query']
@@ -446,11 +451,12 @@ export class AgentToolExecutor {
           const queryText = String(args.query || '').trim();
           if (!queryText) throw new Error('Parâmetro query é obrigatório.');
           const limit = Math.min(10, Math.max(1, Number(args.maxResults) || 5));
-          const search = await this.browserManager.searchCustomEngine(queryText, limit);
+          const mode = ['all', 'images', 'videos', 'news', 'maps'].includes(String(args.mode)) ? String(args.mode) : 'all';
+          const search = await this.browserManager.searchCustomEngine(queryText, limit, mode);
           return {
             success: true,
-            result: { ...search, browserStatus: 'interactive', browserUsed: true, provider: 'OpenSearchEngine', sources: search.results },
-            actionDescription: `Pesquisa no mecanismo autônomo concluída (${search.results.length} resultados indexados)`,
+            result: { ...search, browserStatus: 'interactive', browserUsed: true, provider: search.provider, sources: search.results },
+            actionDescription: `Pesquisa própria (${mode}) concluída no navegador sob medida (${search.results.length} resultados)`,
             requiresApproval: false
           };
         }
