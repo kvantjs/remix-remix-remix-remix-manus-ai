@@ -115,6 +115,7 @@ import { buildExecutableSkillsInstruction, executeSkill, listExecutableSkills, m
 import { buildCognitiveSystemInstruction, COGNITIVE_DELIBERATION_STAGES } from './src/server/agent-cognition.js';
 import { synthesizeBespokeInterface } from './src/server/bespoke-ui-synthesizer.js';
 import { customBrowserSearch, validateSearchResultUrls, type CustomSearchMode } from './src/server/custom-browser-search.js';
+import { runOpenManus } from './src/server/openmanus-runtime.js';
 
 const execAsync = promisify(exec);
 
@@ -4372,7 +4373,51 @@ async function runDeepDeliberation(
   }
 }
 
-// 7. Streaming Agent Chat Endpoint (Server-Sent Events) with Real Function Calling
+// 7. OpenManus-backed streaming agent. The UI contract remains unchanged;
+// only the execution engine behind it is replaced by the open-source Manus agent.
+app.post('/api/agent/chat/stream', async (req, res, next) => {
+  if (String(process.env.OPENMANUS_ENABLED || 'true').toLowerCase() === 'false') return next();
+  const { message, history, currentFiles } = req.body || {};
+  if (!message) return res.status(400).json({ error: 'Message is required' });
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.setHeader('Content-Encoding', 'identity');
+  res.flushHeaders?.();
+  res.socket?.setNoDelay(true);
+  let closed = false;
+  const toolCalls: any[] = [];
+  const heartbeat = setInterval(() => { if (!closed && !res.writableEnded) res.write(`: heartbeat ${Date.now()}\n\n`); }, 8000);
+  const send = (event: string, data: any) => {
+    if (closed || res.writableEnded) return;
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    (res as any).flush?.();
+  };
+  res.on('close', () => { closed = true; clearInterval(heartbeat); });
+  try {
+    send('computer_starting', { text: 'Inicializando o runtime OpenManus...' });
+    send('stage_note', { label: 'OpenManus', text: 'O agente Manus está assumindo o ciclo ReAct e as ferramentas do backend.' });
+    await runOpenManus({ message, history: Array.isArray(history) ? history : [], currentFiles: currentFiles || {} }, (event) => {
+      if (event.event === 'tool_finish' && event.toolCall) toolCalls.push(event.toolCall);
+      if (event.event === 'complete') {
+        send('complete', { ...event, toolCalls: toolCalls.length ? toolCalls : (event.toolCalls || []) });
+      } else if (event.event === 'error') {
+        send('error', { message: event.message || 'Falha no runtime OpenManus', provider: 'OpenManus' });
+      } else {
+        const { event: name, ...data } = event;
+        send(name, data);
+      }
+    }, (req as any).signal);
+    if (!closed) res.end();
+  } catch (error: any) {
+    if (!closed) { send('error', { message: redactSecrets(error?.message || String(error)), provider: 'OpenManus' }); res.end(); }
+  } finally {
+    clearInterval(heartbeat);
+  }
+});
+
+// Legacy route kept below as an explicit opt-out fallback for local recovery.
 app.post('/api/agent/chat/stream', async (req, res) => {
   const { message, history, currentFiles } = req.body;
   if (!message) {

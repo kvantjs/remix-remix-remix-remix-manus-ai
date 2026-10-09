@@ -8,3 +8,7 @@ workspace/
 *.log
 .env*
 !.env.example
+
+.openmanus-venv/
+openmanus/__pycache__/
+openmanus/**/*.pyc
