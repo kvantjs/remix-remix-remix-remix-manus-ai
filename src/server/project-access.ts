@@ -42,7 +42,7 @@ export function hasProjectRole(actual: ProjectRole | null, required: ProjectRole
 
 export async function listProjectMembers(projectId: string) {
   if (databaseAvailable()) {
-    const rows = await query<any[]>(`SELECT project_id, open_id, name, email, role, created_at, updated_at FROM project_members WHERE project_id = ? ORDER BY FIELD(role, 'owner', 'editor', 'viewer'), name`, [projectId]);
+    const rows = await query<any[]>(`SELECT project_id, open_id, name, email, role, created_at, updated_at FROM project_members WHERE project_id = ? ORDER BY CASE role WHEN 'owner' THEN 0 WHEN 'editor' THEN 1 ELSE 2 END, name`, [projectId]);
     return rows.map(toMember);
   }
   return (await readLocal()).filter((item) => item.projectId === projectId);
@@ -51,7 +51,7 @@ export async function listProjectMembers(projectId: string) {
 export async function upsertProjectMember(projectId: string, user: { openId: string; name: string; email?: string }, role: ProjectRole) {
   const now = new Date().toISOString();
   if (databaseAvailable()) {
-    await query(`INSERT INTO project_members (project_id, open_id, name, email, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE name = VALUES(name), email = VALUES(email), role = VALUES(role), updated_at = VALUES(updated_at)`, [projectId, user.openId, user.name || user.openId, user.email || null, role, now.slice(0, 19).replace('T', ' '), now.slice(0, 19).replace('T', ' ')]);
+    await query(`INSERT INTO project_members (project_id, open_id, name, email, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (project_id, open_id) DO UPDATE SET name = EXCLUDED.name, email = EXCLUDED.email, role = EXCLUDED.role, updated_at = EXCLUDED.updated_at`, [projectId, user.openId, user.name || user.openId, user.email || null, role, now.slice(0, 19).replace('T', ' '), now.slice(0, 19).replace('T', ' ')]);
   } else {
     const members = await readLocal();
     const existing = members.find((item) => item.projectId === projectId && item.openId === user.openId);
@@ -88,7 +88,7 @@ export async function auditProjectAction(projectId: string, user: AuthenticatedU
 export async function listProjectAudit(projectId: string, limit = 100) {
   const safeLimit = Math.min(200, Math.max(1, Number(limit) || 100));
   if (databaseAvailable()) {
-    return query<any[]>(`SELECT audit_id AS auditId, project_id AS projectId, open_id AS openId, action, target_path AS targetPath, metadata_json AS metadata, created_at AS createdAt FROM project_audit_log WHERE project_id = ? ORDER BY created_at DESC LIMIT ${safeLimit}`, [projectId]);
+    return query<any[]>(`SELECT audit_id AS "auditId", project_id AS "projectId", open_id AS "openId", action, target_path AS "targetPath", metadata_json AS metadata, created_at AS "createdAt" FROM project_audit_log WHERE project_id = ? ORDER BY created_at DESC LIMIT ${safeLimit}`, [projectId]);
   }
   try {
     const lines = (await fs.readFile(path.join(root, '.kvant', 'project-audit.jsonl'), 'utf8')).trim().split('\n').filter(Boolean).map((line) => JSON.parse(line)).filter((item) => item.projectId === projectId);

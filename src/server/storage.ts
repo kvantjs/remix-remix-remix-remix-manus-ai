@@ -35,7 +35,7 @@ export async function createUpload(user: AuthenticatedUser, requestedKey: string
     await query(
       `INSERT INTO storage_objects (object_id, open_id, object_key, stable_url, original_name, mime_type, size_bytes)
        VALUES (?, ?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE open_id = VALUES(open_id), original_name = VALUES(original_name), mime_type = VALUES(mime_type), size_bytes = VALUES(size_bytes), status = 'active', deleted_at = NULL`,
+       ON CONFLICT (object_key) DO UPDATE SET object_id = EXCLUDED.object_id, open_id = EXCLUDED.open_id, original_name = EXCLUDED.original_name, mime_type = EXCLUDED.mime_type, size_bytes = EXCLUDED.size_bytes, status = 'active', deleted_at = NULL`,
       [objectId, user.openId, key, stableUrl, metadata.name || null, metadata.mimeType || null, metadata.sizeBytes || null]
     );
   }
@@ -50,11 +50,11 @@ export async function createDownloadUrl(requestedKey: string) {
 export async function listObjects(user: AuthenticatedUser) {
   if (!databaseAvailable()) return [];
   const rows: any[] = await query(
-    `SELECT object_id AS objectId, object_key AS objectKey, stable_url AS stableUrl, original_name AS originalName, mime_type AS mimeType, size_bytes AS sizeBytes, status, created_at AS createdAt
+    `SELECT object_id AS "objectId", object_key AS "objectKey", stable_url AS "stableUrl", original_name AS "originalName", mime_type AS "mimeType", size_bytes AS "sizeBytes", status, created_at AS "createdAt"
      FROM storage_objects WHERE open_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 200`,
     [user.openId]
   );
-  return rows;
+  return rows.map((row) => ({ ...row, sizeBytes: row.sizeBytes == null ? null : Number(row.sizeBytes) }));
 }
 
 export async function softDeleteObject(user: AuthenticatedUser, objectId: string) {

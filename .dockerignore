@@ -1,0 +1,11 @@
+.git
+node_modules
+dist
+coverage
+.openmanus-venv
+.openmanus-runtime-venv
+workspace
+.env
+.env.*
+!.env.example
+*.log

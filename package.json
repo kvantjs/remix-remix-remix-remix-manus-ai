@@ -7,7 +7,7 @@
     "dev": "tsx server.ts",
     "build": "vite build",
     "start": "tsx server.ts",
-    "test": "tsx --test src/server/intent-router.test.ts",
+    "test": "tsx --test src/server/intent-router.test.ts src/server/database.test.ts",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit"
@@ -37,34 +37,36 @@
     "glimm": "^0.3.1",
     "lucide-react": "^1.52.0",
     "motion": "^12.23.24",
-    "mysql2": "^3.24.5",
     "playwright": "^1.63.0",
+    "pg": "^8.16.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-syntax-highlighter": "^16.1.1",
-    "shadcn": "^4.21.1",
     "shiki": "^4.5.0",
     "styled-components": "^6.5.3",
     "tailwind-merge": "^3.7.0",
+    "tsx": "^4.21.0",
     "tw-animate-css": "^1.4.0",
     "vgpu": "^0.5.0",
     "vite": "^8.3.0"
   },
   "overrides": {
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "dompurify": "3.4.16"
   },
   "devDependencies": {
     "@types/babel__standalone": "^7.1.9",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
+    "@types/pg": "^8.15.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/styled-components": "^5.1.36",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.28.2",
+    "shadcn": "^4.21.1",
     "tailwindcss": "^4.3.3",
-    "tsx": "^4.21.0",
     "typescript": "^7.0.2"
   }
 }
