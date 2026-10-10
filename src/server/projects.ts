@@ -85,14 +85,26 @@ async function writeRegistry(projects: ProjectRecord[]) {
   await fs.writeFile(registryFile, JSON.stringify(projects, null, 2) + '\n', 'utf8');
 }
 
+async function readProjectsFromDatabase(): Promise<ProjectRecord[]> {
+  const rows: any[] = await query(
+    `SELECT project_id AS id, name, slug, project_path AS path, repo_url AS "repoUrl", branch, active, created_at AS "createdAt", updated_at AS "updatedAt"
+     FROM project_registry ORDER BY active DESC, updated_at DESC`
+  );
+  return rows.map((row) => ({
+    id: String(row.id), name: String(row.name), slug: String(row.slug), path: String(row.path),
+    repoUrl: row.repoUrl ? String(row.repoUrl) : undefined, branch: String(row.branch || 'main'), active: Boolean(row.active),
+    createdAt: new Date(row.createdAt).toISOString(), updatedAt: new Date(row.updatedAt).toISOString(),
+  }));
+}
+
 async function mirrorToDatabase(project: ProjectRecord) {
   if (!databaseAvailable()) return;
   try {
     await query(
       `INSERT INTO project_registry (project_id, name, slug, project_path, repo_url, branch, active, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE name = VALUES(name), repo_url = VALUES(repo_url), branch = VALUES(branch), active = VALUES(active), updated_at = VALUES(updated_at)`,
-      [project.id, project.name, project.slug, project.path, project.repoUrl || null, project.branch, project.active ? 1 : 0, project.createdAt.slice(0, 19).replace('T', ' '), project.updatedAt.slice(0, 19).replace('T', ' ')]
+       ON CONFLICT (project_id) DO UPDATE SET name = EXCLUDED.name, repo_url = EXCLUDED.repo_url, branch = EXCLUDED.branch, active = EXCLUDED.active, updated_at = EXCLUDED.updated_at`,
+      [project.id, project.name, project.slug, project.path, project.repoUrl || null, project.branch, Boolean(project.active), project.createdAt.slice(0, 19).replace('T', ' '), project.updatedAt.slice(0, 19).replace('T', ' ')]
     );
   } catch (error) {
     console.warn('[Projects] Falha ao sincronizar projeto no banco:', error);
@@ -100,8 +112,19 @@ async function mirrorToDatabase(project: ProjectRecord) {
 }
 
 export async function listProjects() {
+  if (databaseAvailable()) {
+    try {
+      const persisted = await readProjectsFromDatabase();
+      if (persisted.length) {
+        await writeRegistry(persisted);
+        return persisted;
+      }
+    } catch (error: any) {
+      console.warn('[Projects] Falha ao carregar projetos do banco:', redactSecrets(error?.message || String(error)));
+    }
+  }
   const projects = await readRegistry();
-  for (const project of projects) void mirrorToDatabase(project);
+  if (databaseAvailable()) await Promise.all(projects.map(mirrorToDatabase));
   return projects;
 }
 
@@ -125,7 +148,7 @@ export async function createProject(name: string, repoUrl?: string) {
   const now = new Date().toISOString();
   const project: ProjectRecord = { id: randomUUID(), name, slug, path: projectPath, repoUrl, branch: 'main', active: false, createdAt: now, updatedAt: now };
   await writeRegistry([...projects.map((item) => ({ ...item, active: false })), project]);
-  void mirrorToDatabase(project);
+  await mirrorToDatabase(project);
   return project;
 }
 
@@ -151,14 +174,14 @@ export async function projectVersions(project: ProjectRecord, limit = 50) {
     return { sha, shortSha, author, date, message };
   });
   if (databaseAvailable()) {
-    for (const version of versions) {
-      void query(
+    await Promise.all(versions.map((version) =>
+      query(
         `INSERT INTO project_versions (version_id, project_id, short_sha, author, message, committed_at)
          VALUES (?, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE short_sha = VALUES(short_sha), author = VALUES(author), message = VALUES(message), committed_at = VALUES(committed_at)`,
+         ON CONFLICT (version_id) DO UPDATE SET short_sha = EXCLUDED.short_sha, author = EXCLUDED.author, message = EXCLUDED.message, committed_at = EXCLUDED.committed_at`,
         [version.sha, project.id, version.shortSha, version.author, version.message, version.date.slice(0, 19).replace('T', ' ')]
-      ).catch((error) => console.warn('[Projects] Falha ao sincronizar versão:', error));
-    }
+      ).catch((error) => console.warn('[Projects] Falha ao sincronizar versão:', redactSecrets(error?.message || String(error))))
+    ));
   }
   return versions;
 }

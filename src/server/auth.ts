@@ -92,7 +92,7 @@ async function storeUser(user: AuthenticatedUser & { platforms?: unknown }) {
   await query(
     `INSERT INTO platform_users (open_id, name, email, platforms_json)
      VALUES (?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE name = VALUES(name), email = VALUES(email), platforms_json = VALUES(platforms_json)`,
+     ON CONFLICT (open_id) DO UPDATE SET name = EXCLUDED.name, email = EXCLUDED.email, platforms_json = EXCLUDED.platforms_json, updated_at = NOW()`,
     [user.openId, user.name || user.openId, user.email || null, JSON.stringify(user.platforms || null)]
   );
 }

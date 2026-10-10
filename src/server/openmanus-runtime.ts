@@ -11,10 +11,12 @@ const bridge = path.join(repoRoot, 'openmanus', 'ui_bridge.py');
 export function runOpenManus(payload: Record<string, unknown>, onEvent: (event: OpenManusEvent) => void, signal?: AbortSignal): Promise<number> {
   return new Promise((resolve, reject) => {
     const python = process.env.OPENMANUS_PYTHON || path.join(repoRoot, '.openmanus-venv/bin/python');
+    const pythonBinDir = path.isAbsolute(python) ? path.dirname(python) : '';
     const child = spawn(python, [bridge], {
       cwd: repoRoot,
       env: {
         ...process.env,
+        ...(pythonBinDir ? { PATH: [pythonBinDir, process.env.PATH].filter(Boolean).join(path.delimiter) } : {}),
         PYTHONPATH: path.join(repoRoot, 'openmanus'),
         OPENMANUS_WORKSPACE_ROOT: process.env.OPENMANUS_WORKSPACE_ROOT || repoRoot,
       },

@@ -91,7 +91,7 @@ class JobsManager {
         await query(
           `INSERT INTO job_records (job_id, title, type, status, payload_json, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?)
-           ON DUPLICATE KEY UPDATE title = VALUES(title), type = VALUES(type), status = VALUES(status), payload_json = VALUES(payload_json), updated_at = VALUES(updated_at)`,
+           ON CONFLICT (job_id) DO UPDATE SET title = EXCLUDED.title, type = EXCLUDED.type, status = EXCLUDED.status, payload_json = EXCLUDED.payload_json, updated_at = EXCLUDED.updated_at`,
           [job.id, job.title, job.type, job.status, payload, createdAt, updatedAt]
         );
       } catch (error) {

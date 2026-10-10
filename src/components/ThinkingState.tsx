@@ -17,18 +17,6 @@ import { WorkingDot } from "./WorkingLoader";
  * The trace runs once, settles, and remains expandable.
  * ───────────────────────────────────────────────────────── */
 
-const STAGES = [1600, 2000, 2400, 2800, 2000];
-
-function useSequence(steps: number[]) {
-  const [stage, setStage] = useState(0);
-  useEffect(() => {
-    if (stage >= steps.length - 1) return;
-    const t = setTimeout(() => setStage((s) => s + 1), steps[stage]);
-    return () => clearTimeout(t);
-  }, [stage, steps]);
-  return stage;
-}
-
 export type ThinkingPhase = "Pensando" | "Raciocinando" | "Trabalhando";
 
 export function AnimatedThinkingStatus({
@@ -63,17 +51,7 @@ export function AnimatedThinkingStatus({
     }
   }, [livePhase]);
 
-  // Smooth cadence alternation with motion animation during live thinking
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentPhase((prev) => {
-        if (prev === "Pensando") return "Raciocinando";
-        if (prev === "Raciocinando") return "Trabalhando";
-        return "Pensando";
-      });
-    }, 2800);
-    return () => clearInterval(timer);
-  }, [livePhase]);
+
 
   return (
     <span className={`inline-flex items-center gap-1 whitespace-nowrap overflow-hidden text-ellipsis ${className}`}>
@@ -106,65 +84,13 @@ type Row = {
   icon?: string;
 };
 
-const VARIANTS: Record<
-  string,
-  { active: string; done: string; rows: Row[]; query?: string }
-> = {
-  Steps: {
-    active: "Processando",
-    done: "Processamento concluído",
-    rows: [
-      { primary: "Analisando solicitação e contexto do projeto" },
-      { primary: "Mapeando arquivos e estrutura de código" },
-      { primary: "Avaliando estratégia de execução e regras" },
-      { primary: "Preparando plano de ação do agente" },
-    ],
-  },
-  Planning: {
-    active: "Planejando",
-    done: "Plano estruturado",
-    rows: [
-      { primary: "Definindo fluxo de engenharia de ponta" },
-      { primary: "Mapeando dependências e ferramentas MCP" },
-      { primary: "Estruturando componentes e lógica de estado" },
-    ],
-  },
-  Reasoning: {
-    active: "Raciocinando",
-    done: "Raciocínio concluído",
-    rows: [
-      { primary: "Avaliando dependências do sistema e verificando regras no ambiente..." },
-      { primary: "Garantindo compatibilidade de código e otimizando a solução antes da execução." },
-    ],
-  },
-  Verification: {
-    active: "Verificando",
-    done: "Verificação concluída",
-    rows: [
-      { primary: "Validando integridade do código gerado" },
-      { primary: "Checando conformidade com as diretrizes de design" },
-      { primary: "Testando fluxos de interatividade e estados" },
-    ],
-  },
-  Search: {
-    active: "Pesquisando na web",
-    done: "Pesquisa na web concluída",
-    query: "consultando fontes na web",
-    rows: [
-      { primary: "Navegação direta", secondary: "URL solicitada pelo usuário" },
-      { primary: "Documentação Oficial", secondary: "docs.dev", href: "https://github.com" },
-      { primary: "Repositório de Código", secondary: "github.com", href: "https://github.com" },
-    ],
-  },
-  Coding: {
-    active: "Executando ferramentas",
-    done: "Ferramentas executadas",
-    rows: [
-      { primary: "Ler", secondary: "App.tsx", mono: true },
-      { primary: "Editar", secondary: "server.ts", mono: true, add: 24, del: 8 },
-      { primary: "Executar", secondary: "npm run check", mono: true },
-    ],
-  },
+const VARIANTS: Record<string, { active: string; done: string; rows: Row[]; query?: string }> = {
+  Steps: { active: "Em andamento", done: "Etapa concluída", rows: [] },
+  Planning: { active: "Planejando", done: "Plano registrado", rows: [] },
+  Reasoning: { active: "Analisando", done: "Etapa concluída", rows: [] },
+  Verification: { active: "Verificando", done: "Verificação registrada", rows: [] },
+  Search: { active: "Pesquisando na web", done: "Pesquisa registrada", rows: [] },
+  Coding: { active: "Executando ferramentas", done: "Etapas registradas", rows: [] },
 };
 
 export function ThinkingStateGroup({ children }: { children: ReactNode }) {
@@ -199,7 +125,6 @@ export default function ThinkingState({
   /** notes and thinking content placed above the tool trace */
   notes?: ReactNode;
 }) {
-  const stage = useSequence(STAGES);
   const [manualExpanded, setManualExpanded] = useState<boolean | null>(null);
   const base = VARIANTS[variant] ?? VARIANTS.Coding ?? VARIANTS.Steps;
   const v = {
@@ -209,7 +134,7 @@ export default function ThinkingState({
     done: done ?? base.done,
   };
   const expanded = manualExpanded ?? true;
-  const working = propWorking !== undefined ? propWorking : stage < 3;
+  const working = propWorking ?? false;
 
   /* let embedders sequence content after the trace settles */
   const settledRef = useRef(false);
@@ -364,7 +289,7 @@ export default function ThinkingState({
 
                   return (
                     <div key={`step_${row.primary}_${i}`} className="min-w-0 w-full flex items-center gap-2.5 py-1 text-xs text-text-content-primary/80 transition-colors whitespace-nowrap overflow-hidden">
-                      <span className="flex size-5 shrink-0 items-center justify-center rounded-[7px] bg-white/5 border border-white/10 shadow-xs" style={{ backgroundImage: `url('https://imgdb.io/i/z2ZOrTk.png')` }}>
+                      <span className="flex size-5 shrink-0 items-center justify-center rounded-[7px] bg-white/5 border border-white/10 shadow-xs">
                         {getContextualToolIcon(row.icon || cleanPrimary, cleanPrimary, cleanSecondary || '')}
                       </span>
                       <div className="min-w-0 flex-1 flex items-center justify-between gap-2 overflow-hidden whitespace-nowrap">

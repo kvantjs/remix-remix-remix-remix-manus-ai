@@ -12,7 +12,7 @@ if not os.getenv("OPENMANUS_API_KEY"):
     os.environ["OPENMANUS_API_KEY"] = os.getenv("OPENAI_API_KEY") or os.getenv("GEMINI_API_KEY", "")
 if not os.getenv("OPENMANUS_BASE_URL"):
     os.environ["OPENMANUS_BASE_URL"] = os.getenv("OPENAI_API_BASE") or "https://generativelanguage.googleapis.com/v1beta/openai/"
-os.environ.setdefault("OPENMANUS_MODEL", "gemini-2.5-flash")
+os.environ.setdefault("OPENMANUS_MODEL", "gemini-3-flash-preview")
 os.environ.setdefault("OPENMANUS_WORKSPACE_ROOT", str(Path.cwd()))
 
 from app.agent.manus import Manus

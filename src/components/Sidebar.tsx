@@ -1,178 +1,192 @@
-import { 
-  MagnifyingGlass, 
-  Plus, 
-  Desktop, 
-  Users, 
-  FolderSimple, 
-  Sparkle, 
-  Lightning, 
-  PuzzlePiece, 
-  DotsThree,
-  CaretRight,
+import { useEffect, useRef, useState } from 'react';
+import {
+  MagnifyingGlass,
+  Plus,
+  Desktop,
+  Users,
+  FolderSimple,
+  Sparkle,
+  Lightning,
+  PuzzlePiece,
   ChatCircleText,
-  Globe,
   Gear,
-  X,
   Sun,
-  Moon
+  Moon,
+  X,
 } from '@phosphor-icons/react';
 import Loader from './Loader';
+import ManusMark from './ManusMark';
 
-export function Sidebar({ 
-  theme, 
+export type SidebarRoute = 'chat' | 'computer' | 'projects' | 'preview' | 'automations' | 'settings';
+
+const NAV_ITEMS: Array<{ label: string; route: SidebarRoute; icon: typeof Desktop }> = [
+  { label: 'Computadores', route: 'computer', icon: Desktop },
+  { label: 'Agente', route: 'chat', icon: Users },
+  { label: 'Biblioteca', route: 'projects', icon: FolderSimple },
+  { label: 'Criações', route: 'preview', icon: Sparkle },
+  { label: 'Automações', route: 'automations', icon: Lightning },
+  { label: 'Integrações', route: 'settings', icon: PuzzlePiece },
+];
+
+export function Sidebar({
+  theme,
   toggleTheme,
   isWorking = false,
-  activeTaskLabel
-}: { 
-  theme: 'light' | 'dark'; 
+  activeRoute = 'chat',
+  activeTaskLabel,
+  onNewTask,
+  onNavigate,
+  mobileOpen = false,
+  onClose,
+}: {
+  theme: 'light' | 'dark';
   toggleTheme: () => void;
   isWorking?: boolean;
-  activeTaskLabel?: string;
+  activeRoute?: SidebarRoute;
+  activeTaskLabel?: string | null;
+  onNewTask?: () => void;
+  onNavigate?: (route: SidebarRoute) => void;
+  mobileOpen?: boolean;
+  onClose?: () => void;
 }) {
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setSearchOpen(true);
+      }
+      if (event.key === 'Escape') {
+        setSearchOpen(false);
+        setSearch('');
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  useEffect(() => {
+    if (searchOpen) searchRef.current?.focus();
+  }, [searchOpen]);
+
+  const openRoute = (route: SidebarRoute) => {
+    setSearchOpen(false);
+    setSearch('');
+    onNavigate?.(route);
+    onClose?.();
+  };
+
+  const handleNewTask = () => {
+    onNewTask?.();
+    onClose?.();
+  };
+
+  const filteredItems = NAV_ITEMS.filter((item) => item.label.toLowerCase().includes(search.trim().toLowerCase()));
+
   return (
-    <aside className="hidden lg:flex w-[292px] bg-[#1f1f1f] border-r border-border-divider-subtle flex-col h-full shrink-0">
-      {/* Header */}
-      <div className="p-4 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <img 
-            src="https://imgdb.io/i/civJWXo.png" 
-            alt="Logotipo da Aplicação" 
-            className="size-6 object-contain rounded-md" 
-          />
-          <span className="font-semibold text-sm tracking-tight text-text-content-primary">kvant</span>
-        </div>
-        <div className="flex gap-2 text-text-content-secondary/40">
-          <MagnifyingGlass size={16} className="cursor-pointer hover:text-text-content-primary transition-colors" />
-          <Desktop size={16} className="cursor-pointer hover:text-text-content-primary transition-colors" />
+    <>
+    {mobileOpen && <button type="button" aria-label="Fechar navegação" onClick={onClose} className="fixed inset-0 z-40 bg-black/55 backdrop-blur-[1px] lg:hidden" />}
+    <aside className={`${mobileOpen ? 'fixed inset-y-0 left-0 z-50 flex w-[264px] shadow-2xl lg:static lg:z-auto lg:shadow-none' : 'hidden lg:flex w-[264px]'} bg-[#1d1d1d] border-r border-white/[0.07] flex-col h-full shrink-0`}>
+      <div className="h-14 px-4 flex items-center justify-between shrink-0">
+        <button type="button" onClick={handleNewTask} className="flex items-center gap-2.5 rounded-lg text-left" aria-label="Ir para nova tarefa">
+          <ManusMark className="size-6 rounded-md" />
+          <span className="font-semibold text-[14px] tracking-tight text-white/90">manus</span>
+        </button>
+        <div className="flex items-center gap-1 text-white/45">
+          <button type="button" onClick={() => setSearchOpen((open) => !open)} aria-label="Pesquisar navegação" title="Pesquisar (⌘K)" className="flex size-8 items-center justify-center rounded-lg hover:bg-white/[0.06] hover:text-white/90 transition-colors">
+            {searchOpen ? <X size={17} /> : <MagnifyingGlass size={17} />}
+          </button>
+          <button type="button" onClick={() => openRoute('computer')} aria-label="Abrir computador do agente" title="Computador do agente" className="flex size-8 items-center justify-center rounded-lg hover:bg-white/[0.06] hover:text-white/90 transition-colors">
+            <Desktop size={17} />
+          </button>
         </div>
       </div>
 
-      {/* Main Nav */}
-      <nav aria-label="Navegação principal" className="flex-1 overflow-y-auto px-3 py-2 space-y-1 custom-scrollbar">
-        <button className="w-full flex items-center gap-3 px-3 py-2 text-sm text-text-content-primary/90 hover:bg-bg-action-hover rounded-lg transition-colors group">
-          <Plus size={18} className="text-text-content-primary/40 group-hover:text-text-content-primary" />
+      {searchOpen && (
+        <div className="px-3 pb-2">
+          <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#252525] px-2.5">
+            <MagnifyingGlass size={15} className="shrink-0 text-white/40" />
+            <input ref={searchRef} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Pesquisar" aria-label="Pesquisar seções" className="h-9 min-w-0 flex-1 bg-transparent text-xs text-white outline-none placeholder:text-white/35" />
+            <kbd className="rounded border border-white/10 px-1 text-[9px] text-white/35">ESC</kbd>
+          </div>
+          <div className="mt-1 rounded-lg bg-[#252525] p-1">
+            {filteredItems.length ? filteredItems.map((item) => {
+              const Icon = item.icon;
+              return <button key={item.label} type="button" onClick={() => openRoute(item.route)} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-xs text-white/70 hover:bg-white/[0.07] hover:text-white"><Icon size={15} />{item.label}</button>;
+            }) : <p className="px-2 py-2 text-[11px] text-white/40">Nenhuma seção encontrada.</p>}
+          </div>
+        </div>
+      )}
+
+      <nav aria-label="Navegação principal" className="flex-1 overflow-y-auto px-3 py-2 custom-scrollbar">
+        <button type="button" onClick={handleNewTask} disabled={isWorking} title={isWorking ? 'Interrompa a tarefa atual antes de iniciar outra' : 'Nova tarefa'} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-white/90 hover:bg-white/[0.06] rounded-lg transition-colors group disabled:cursor-not-allowed disabled:opacity-40">
+          <Plus size={18} className="text-white/55 group-hover:text-white" />
           <span>Nova tarefa</span>
         </button>
 
-        <div className="pt-2 pb-1">
-          <NavItem icon={<Desktop size={18} />} label="Computadores" color="#ffffff" />
-          <NavItem icon={<Users size={18} />} label="Agents" badge="Cue!" color="#ffffff" />
-          <NavItem icon={<FolderSimple size={18} />} label="Biblioteca" color="#d1d1d1" />
-          <NavItem icon={<Sparkle size={18} />} label="Criações" color="#f3f3f3" />
-          <NavItem icon={<Lightning size={18} />} label="Automações" color="#e2e2e2" />
-          <NavItem icon={<PuzzlePiece size={18} />} label="Plugins" color="#cccccc" />
-          <NavItem icon={<DotsThree size={18} />} label="Mais" color="#d6d6d6" />
+        <div className="pt-3 pb-1 space-y-0.5">
+          {NAV_ITEMS.map((item) => (
+            <NavItem key={item.label} icon={<item.icon size={18} />} label={item.label} active={activeRoute === item.route} onClick={() => openRoute(item.route)} />
+          ))}
         </div>
 
-        {/* Projects */}
         <div className="pt-6">
-          <div className="flex items-center justify-between px-3 pb-2 text-[10px] font-bold text-text-content-secondary uppercase tracking-wider">
+          <div className="flex items-center justify-between px-3 pb-2 text-[10px] font-semibold text-white/40 uppercase tracking-wider">
             <span>Projetos</span>
-            <div className="flex gap-1">
-              <DotsThree size={12} className="cursor-pointer hover:text-text-content-primary" />
-              <Plus size={12} className="cursor-pointer hover:text-text-content-primary" />
-            </div>
+            <button type="button" onClick={() => openRoute('projects')} aria-label="Abrir projetos" title="Abrir projetos" className="flex size-6 items-center justify-center rounded hover:bg-white/[0.06] hover:text-white/80"><Plus size={13} /></button>
           </div>
-          <button className="w-full flex items-center gap-3 px-3 py-2 text-sm text-text-content-primary/60 hover:bg-bg-action-hover rounded-lg transition-colors">
-            <div className="size-4 border border-border-divider-subtle rounded flex items-center justify-center">
-              <Plus size={10} />
-            </div>
+          <button type="button" onClick={() => openRoute('projects')} className="w-full flex items-center gap-3 px-3 py-2 text-sm text-white/55 hover:bg-white/[0.06] hover:text-white/85 rounded-lg transition-colors">
+            <span className="size-4 border border-white/20 rounded flex items-center justify-center"><Plus size={10} /></span>
             <span>Novo projeto</span>
           </button>
         </div>
 
-        {/* Tasks */}
         <div className="pt-6">
-          <div className="flex items-center justify-between px-3 pb-2 text-[10px] font-bold text-text-content-secondary uppercase tracking-wider">
+          <div className="flex items-center justify-between px-3 pb-2 text-[10px] font-semibold text-white/40 uppercase tracking-wider">
             <span>Tarefas</span>
-            <div className="flex gap-1">
-              <DotsThree size={12} className="cursor-pointer hover:text-text-content-primary" />
-              <MagnifyingGlass size={12} className="cursor-pointer hover:text-text-content-primary" />
-              <Plus size={12} className="cursor-pointer hover:text-text-content-primary" />
-            </div>
+            {activeTaskLabel && <ChatCircleText size={13} />}
           </div>
-          <TaskItem 
-            label={activeTaskLabel || "Testar o conector Nao e resumir suas capacidades"} 
-            active 
-            isWorking={isWorking} 
-          />
-          <TaskItem label="Converter o site para React + Vite e remover arquivos desnecessários" />
-          <TaskItem label="Aplicação completa na infraestrutura de teste" />
+          {activeTaskLabel ? (
+            <button type="button" onClick={() => openRoute('computer')} className="w-full flex items-center gap-3 px-3 py-2 text-xs text-left rounded-lg bg-white/[0.06] text-white/85 hover:bg-white/[0.09] transition-colors" title={activeTaskLabel}>
+              {isWorking ? <Loader size={14} className="shrink-0" /> : <ChatCircleText size={14} className="shrink-0 text-white/45" />}
+              <span className="truncate">{activeTaskLabel}</span>
+            </button>
+          ) : (
+            <p className="px-3 py-2 text-[11px] leading-relaxed text-white/35">Suas tarefas recentes aparecerão aqui.</p>
+          )}
         </div>
       </nav>
 
-      {/* Footer */}
-      <div className="p-3 mt-auto space-y-4">
-        {/* Explore Box */}
-        <div className="bg-bg-canvas-main/40 border border-border-divider-subtle rounded-xl p-3 relative overflow-hidden group">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-2">
-               <Sparkle size={14} className="text-blue-400/80" />
-               <span className="text-xs font-medium text-text-content-primary/80">Kvant (Versão de Desenvolvimento)</span>
+      <div className="mt-auto border-t border-white/[0.07] p-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-[10px] font-semibold text-white/75">M</div>
+            <div className="min-w-0">
+              <p className="truncate text-xs font-medium text-white/75">Manus</p>
+              <p className="text-[10px] text-white/35">Espaço de trabalho</p>
             </div>
-            <X size={14} className="text-text-content-secondary/20 cursor-pointer hover:text-text-content-primary" />
           </div>
-          <button className="mt-3 w-full bg-interactive-cta-bg text-bg-canvas-main py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 hover:opacity-90 transition-opacity">
-            Ver o que há de novo
-            <CaretRight size={14} />
-          </button>
-        </div>
-
-        {/* User Profile */}
-        <div className="flex items-center justify-between group cursor-pointer p-1 rounded-lg hover:bg-bg-action-hover transition-colors">
-          <div className="flex items-center gap-2">
-            <div className="size-7 bg-teal-600 rounded-full flex items-center justify-center text-[10px] font-bold text-white">L</div>
-            <span className="text-xs font-medium text-text-content-primary">levergucci XPTO</span>
-          </div>
-          <div className="flex items-center gap-1.5 text-text-content-secondary">
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleTheme();
-              }}
-              title={theme === 'dark' ? 'Alternar para Modo Claro' : 'Alternar para Modo Escuro'}
-              className="p-1 hover:bg-bg-action-hover hover:text-text-content-primary rounded transition-all cursor-pointer flex items-center justify-center"
-            >
-              {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+          <div className="flex items-center gap-1 text-white/45">
+            <button type="button" onClick={toggleTheme} aria-label={theme === 'dark' ? 'Alternar para modo claro' : 'Alternar para modo escuro'} title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'} className="flex size-8 items-center justify-center rounded-lg hover:bg-white/[0.06] hover:text-white/90 transition-colors">
+              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
             </button>
-            <Globe size={15} className="hover:text-text-content-primary transition-colors" />
-            <Gear size={15} className="hover:text-text-content-primary transition-colors" />
+            <button type="button" onClick={() => openRoute('settings')} aria-label="Abrir configurações" title="Configurações" className="flex size-8 items-center justify-center rounded-lg hover:bg-white/[0.06] hover:text-white/90 transition-colors"><Gear size={16} /></button>
           </div>
         </div>
       </div>
     </aside>
+    </>
   );
 }
 
-function NavItem({ icon, label, badge, color }: { icon: React.ReactNode; label: string; badge?: string; color?: string }) {
+function NavItem({ icon, label, active = false, onClick }: { icon: React.ReactNode; label: string; active?: boolean; onClick: () => void }) {
   return (
-    <button 
-      className="w-full flex items-center justify-between px-3 py-2 text-sm text-text-content-secondary hover:bg-bg-action-hover hover:text-text-content-primary rounded-lg transition-all group"
-      style={color ? { color } : undefined}
-    >
-      <div className="flex items-center gap-3">
-        <span className="text-text-content-secondary/40 group-hover:text-text-content-primary transition-colors" style={color ? { color } : undefined}>{icon}</span>
-        <span>{label}</span>
-      </div>
-      {badge && (
-        <span className="bg-white/5 text-[9px] px-1.5 py-0.5 rounded font-bold text-text-content-secondary">
-          {badge}
-        </span>
-      )}
-    </button>
-  );
-}
-
-function TaskItem({ label, active, isWorking }: { label: string; active?: boolean; isWorking?: boolean }) {
-  const displayLabel = label.length > 32 ? label.substring(0, 32) + '...' : label;
-  return (
-    <button className={`w-full flex items-center gap-3 px-3 py-2 text-xs text-left rounded-lg transition-colors ${active ? 'bg-bg-action-hover text-text-content-primary' : 'text-text-content-secondary hover:bg-bg-action-hover hover:text-text-content-primary/60'}`} title={label}>
-      {active && isWorking ? (
-        <Loader size={14} className="shrink-0" />
-      ) : (
-        <ChatCircleText size={14} className="shrink-0 opacity-40" />
-      )}
-      <span className="truncate">{displayLabel}</span>
+    <button type="button" onClick={onClick} aria-current={active ? 'page' : undefined} className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors group ${active ? 'bg-white/[0.07] text-white/90' : 'text-white/60 hover:bg-white/[0.06] hover:text-white/90'}`}>
+      <span className={`transition-colors ${active ? 'text-white/80' : 'text-white/40 group-hover:text-white/75'}`}>{icon}</span>
+      <span>{label}</span>
     </button>
   );
 }

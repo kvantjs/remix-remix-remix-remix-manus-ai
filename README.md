@@ -26,17 +26,18 @@ A interface React/Kvant permanece inalterada. O endpoint `POST /api/agent/chat/s
 ### Configuração
 
 - `OPENMANUS_ENABLED=true` ativa o runtime OpenManus; defina `false` somente para recuperação local pelo handler legado.
-- `OPENMANUS_API_KEY`, `OPENMANUS_BASE_URL` e `OPENMANUS_MODEL` configuram qualquer endpoint compatível com OpenAI. Na ausência dos três primeiros, o bridge tenta usar as credenciais já presentes em `OPENAI_API_KEY`/`GEMINI_API_KEY`.
+- `OPENMANUS_API_KEY`, `OPENMANUS_BASE_URL` e `OPENMANUS_MODEL` configuram qualquer endpoint compatível com OpenAI. O modelo padrão é `gemini-3-flash-preview`; na ausência de uma chave OpenManus, o bridge tenta usar credenciais já presentes em `OPENAI_API_KEY`/`GEMINI_API_KEY`.
 - `OPENMANUS_PYTHON` permite apontar para um interpretador específico; por padrão é usado `.openmanus-venv/bin/python`.
 - `OPENMANUS_WORKSPACE_ROOT` define o diretório que as ferramentas do OpenManus podem operar. Por padrão é a raiz do projeto.
+- `DATABASE_URL` deve ser a URL PostgreSQL oficial do provedor (TLS verificado, como `sslmode=verify-full` quando aplicável), guardada no gerenciador de secrets do deploy — nunca em commit ou mensagem. O servidor cria/aplica as tabelas e índices versionados em `src/server/migrations/` ao iniciar; readiness fica indisponível até a conexão e a migração funcionarem.
 
 ### Execução local
 
 ```bash
 uv venv --python 3.12 .openmanus-venv
-uv pip install --python .openmanus-venv/bin/python -r openmanus/requirements.txt
+uv pip install --python .openmanus-venv/bin/python -r openmanus/requirements-runtime.txt
 npm install
 npm run dev
 ```
 
-O backend continua expondo `/health`, e a UI não precisa de alteração para receber o runtime substituído.
+O `Dockerfile` também instala o ambiente virtual Python enxuto e o Chromium exigidos pelo runtime. A lista `openmanus/requirements-runtime.txt` exclui dependências de benchmark que puxavam Torch/CUDA, sem alterar as dependências completas usadas no desenvolvimento upstream do OpenManus.

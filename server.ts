@@ -486,7 +486,7 @@ app.post('/api/scheduled/agent', async (req, res) => {
     try {
       await query(`INSERT INTO scheduled_runs (run_id, task_uid, run_key, status) VALUES (?, ?, ?, 'accepted')`, [runId, identity.taskUid, runKey]);
     } catch (error: any) {
-      if (String(error?.code) === 'ER_DUP_ENTRY') return res.json({ ok: true, duplicate: true, taskUid: identity.taskUid, runKey });
+      if (String(error?.code) === '23505') return res.json({ ok: true, duplicate: true, taskUid: identity.taskUid, runKey });
       throw error;
     }
     const job = jobsManager.createJob(String(req.body?.title || 'Tarefa agendada do agente'), 'scheduled_agent');

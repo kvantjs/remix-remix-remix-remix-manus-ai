@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { lazy, Suspense, useMemo, useState } from 'react';
 import {
   Monitor,
   DeviceMobile,
@@ -11,7 +11,11 @@ import {
   NavigationArrow,
   PencilSimpleLine
 } from '@phosphor-icons/react';
-import { DynamicRuntimeRunner } from './DynamicRuntimeRunner';
+
+const DynamicRuntimeRunner = lazy(async () => {
+  const module = await import('./DynamicRuntimeRunner');
+  return { default: module.DynamicRuntimeRunner };
+});
 
 interface RuntimePreviewProps {
   activeCode?: string;
@@ -107,19 +111,21 @@ export function RuntimePreview({ activeCode, customFiles = {}, onSendPrompt, isW
                 <div className="sp-vortex-loader" />
               </div>
             ) : hasApp ? (
-              <DynamicRuntimeRunner key={refreshKey} code={runtimeCode} customFiles={customFiles} />
+              <Suspense fallback={<div role="status" className="flex h-full min-h-48 items-center justify-center bg-[#1a1a1a] text-xs text-white/45">Carregando prévia executável…</div>}>
+                <DynamicRuntimeRunner key={refreshKey} code={runtimeCode} customFiles={customFiles} />
+              </Suspense>
             ) : (
               <div 
                 className="w-full h-full min-h-[260px] flex flex-col items-center justify-center gap-6 p-8 text-center"
                 style={{ 
-                  backgroundImage: 'url(https://imgdb.io/i/bzXzFb0.png)',
+                  backgroundImage: 'url(/manus-assets/preview-background.png)',
                   backgroundSize: '110%',
                   backgroundPosition: 'center',
                   backgroundRepeat: 'no-repeat'
                 }}
               >
                 <div className="bg-[#1a1a1a] p-8 rounded-3xl border border-white/5 flex flex-col items-center gap-6 shadow-sm max-w-sm w-full">
-                  <img src="https://imgdb.io/i/uWdJOUg.png" alt="Espaço de trabalho vazio" className="w-36 h-36 rounded-2xl object-cover" />
+                  <img src="/manus-assets/preview-empty.png" alt="Espaço de trabalho vazio" className="w-36 h-36 rounded-2xl object-cover" />
                   <div className="space-y-2">
                     <span style={{ color: '#707070' }} className="text-lg font-bold">Espaço em branco</span>
                     <p style={{ color: '#6f6f6f' }} className="text-xs leading-relaxed">O runtime está esperando. Peça ao agente para criar uma nova aplicação.</p>

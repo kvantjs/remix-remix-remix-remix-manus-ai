@@ -55,8 +55,9 @@ import ToolChips, { getContextualToolIcon, getContextualFileIcon, ToolStep, Tool
 import StreamingText from './StreamingText';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { Favicon, extractCleanDomain } from '@/lib/favicon';
-import { sanitizeAndEnrichClientNote, AgentProgressNote, removeAllEmojis } from '@/lib/agentNotes';
+import { sanitizeProgressNote, AgentProgressNote, removeAllEmojis } from '@/lib/agentNotes';
 import PromptBar from './PromptBar';
+import ManusMark from './ManusMark';
 import { QuestionnaireQuestion, DEFAULT_APP_QUESTIONS } from './AgentContextQuestionnaire';
 import {
   Questionnaire,
@@ -112,6 +113,7 @@ interface ChatMessage {
   };
   artifacts?: Array<{ id: string; name: string; path: string; sizeBytes: number; downloadUrl: string }>;
   files?: Array<{ path: string; code: string; lang?: string }>;
+  attachmentContext?: string;
   updatedFile?: { filename: string; code: string };
   executionSteps?: ExecutionStep[];
 }
@@ -169,6 +171,15 @@ function describeToolExecution(toolName: string, args: Record<string, any> = {},
   return { label: 'Executando ação do agente', chip: safeFallback, detail: safeFallback };
 }
 
+function toUserFacingAgentText(value: unknown, fallback: string) {
+  const text = String(value ?? '').trim()
+    .replace(/\bOpenManus\b/gi, 'agente')
+    .replace(/\bKopilot\b/gi, 'Manus')
+    .replace(/\bKvant\b/gi, 'Manus')
+    .replace(/\bagente Manus\b/gi, 'agente');
+  return text || fallback;
+}
+
 interface ChatAreaProps {
   onFileUpdate?: (files: Array<{ path: string; code: string; lang?: string }>) => void;
   externalPrompt?: string | null;
@@ -178,97 +189,12 @@ interface ChatAreaProps {
     isWorking: boolean;
     statusText: string;
     contextText: string;
-    toolCalls: ToolCallTrace[];
+    toolCalls?: ToolCallTrace[];
     intent?: any;
     browserStatus?: 'loading' | 'interactive' | 'error' | 'blocked';
   }) => void;
   onInspectInComputer?: () => void;
-}
-
-function ensureDetailedAgentMessage(
-  rawContent: string,
-  toolCalls: ToolCallTrace[],
-  files: Array<{ path: string; code?: string }>,
-  promptText: string
-): string {
-  const trimmed = (rawContent || '').trim();
-  const lower = trimmed.toLowerCase();
-  
-  const isGeneric = 
-    !trimmed ||
-    trimmed.length < 80 ||
-    lower.includes('ação executada com sucesso') ||
-    lower.includes('acao executada com sucesso') ||
-    lower.includes('ação executada no workspace') ||
-    lower.includes('sucesso no workspace') ||
-    lower.includes('com sucesso no workspace') ||
-    lower.includes('operação concluída') ||
-    lower.includes('operacao concluida') ||
-    lower.includes('tarefa concluída') ||
-    lower.includes('tarefa concluida') ||
-    lower.includes('tarefa executada pelo agente') ||
-    lower.includes('implementação finalizada no workspace') ||
-    lower.includes('tarefa processada com sucesso');
-
-  if (!isGeneric && trimmed.length >= 120) {
-    return trimmed;
-  }
-
-  // Synthesize a structured, descriptive technical report
-  const sections: string[] = [];
-
-  if (files.length > 0) {
-    const fileList = files.map(f => {
-      const lineCount = (f.code || '').split('\n').length;
-      return `- **\`${f.path}\`** (${lineCount > 1 ? `${lineCount} linhas` : 'atualizado'}):\n  Código React/TypeScript estruturado e integrado ao projeto com estilização Tailwind CSS.`;
-    }).join('\n');
-    sections.push(`### Arquivos e Componentes Desenvolvidos\n${fileList}`);
-  }
-
-  if (toolCalls && toolCalls.length > 0) {
-    const webCalls = toolCalls.filter(t => t.toolName.includes('browser') || t.toolName.includes('web') || t.toolName.includes('search'));
-    if (webCalls.length > 0) {
-      const webList = webCalls.map(t => {
-        const url = t.screenData?.url || t.arguments?.url || t.arguments?.query || 'web';
-        const title = t.screenData?.title ? ` - "${t.screenData.title}"` : '';
-        const action = t.screenData?.actionDescription || t.toolName;
-        return `- **${t.toolName}**: ${action}${title} (\`${url}\`)`;
-      }).join('\n');
-      sections.push(`### Navegação e Pesquisa Web\n${webList}`);
-    }
-
-    const bashCalls = toolCalls.filter(t => t.toolName.includes('bash') || t.toolName.includes('exec') || t.toolName.includes('terminal'));
-    if (bashCalls.length > 0) {
-      const bashList = bashCalls.map(t => {
-        const cmd = t.arguments?.command || t.arguments?.code || t.toolName;
-        return `- **Comando:** \`${cmd}\` (${t.status || 'sucesso'})`;
-      }).join('\n');
-      sections.push(`### Comandos Shell Executados\n${bashList}`);
-    }
-
-    const fsCalls = toolCalls.filter(t => (t.toolName.includes('file') || t.toolName.includes('fs')) && !t.toolName.includes('write'));
-    if (fsCalls.length > 0) {
-      const fsList = fsCalls.map(t => {
-        const target = t.arguments?.filePath || t.arguments?.directoryPath || t.arguments?.path || 'workspace';
-        return `- **${t.toolName}**: ${t.screenData?.actionDescription || target}`;
-      }).join('\n');
-      sections.push(`### Operações de Sistema de Arquivos\n${fsList}`);
-    }
-  }
-
-  const promptTitle = promptText ? ` para **"${promptText.slice(0, 80)}"**` : '';
-  const header = `## Relatório de Ações do Agente\nProcessei e executei as tarefas solicitadas no ambiente${promptTitle}:\n\n`;
-  const footer = `\n\n*Todos os recursos foram sincronizados e estão disponíveis para inspeção e testes no Workspace e no Computador do Agente.*`;
-
-  if (sections.length > 0) {
-    return header + sections.join('\n\n') + footer;
-  }
-
-  if (trimmed && !lower.includes('com sucesso') && !lower.includes('ação executada') && !lower.includes('tarefa executada')) {
-    return `${header}${trimmed}${footer}`;
-  }
-
-  return `${header}Analisei a solicitação técnica, executei as instruções e sincronizei o ambiente de desenvolvimento. O workspace está pronto com todas as dependências e arquivos disponíveis.${footer}`;
+  onToggleSidebar?: () => void;
 }
 
 export function ChatArea({ 
@@ -277,34 +203,20 @@ export function ChatArea({
   onClearExternalPrompt, 
   currentFiles,
   onAgentStateChange,
-  onInspectInComputer
+  onInspectInComputer,
+  onToggleSidebar
 }: ChatAreaProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
       role: 'assistant',
       isStreaming: false,
-      content: `Olá! Sou o **Agente Autônomo de Engenharia de Software e Design** do Kvant.
-
-Estou conectado a um **Runtime Próprio e Isolado em Nuvem Ubuntu 24.04 100% operacional**, onde opero via **MCP (Model Context Protocol)** e **Habilidades (SKILLs)** de ponta:
-
-### Ferramentas MCP Integradas:
-1. **Computer MCP**: Abro o navegador real para navegar em URLs, pesquisar no Google, rolar páginas e interagir com sites ao vivo.
-2. **WebDev MCP**: Acesso total ao workspace para criar, editar e excluir arquivos, gerenciar pacotes, e sincronizar com o preview em tempo real.
-3. **Terminal Bash MCP**: Execução de comandos shell complexos, diagnósticos de rede e automação de scripts no container Ubuntu.
-
-### Habilidades de Engenharia e Design:
-- **Design-to-Code**: Tradução perfeita de referências visuais para UI de alta fidelidade.
-- **Arquitetura Autônoma**: Planejamento de sistemas SaaS e Fintech do zero.
-- **Depuração Recursiva**: Auto-correção de erros no runtime e terminal.
-- **Contexto Profundo**: Processamento de requisitos via questionários inteligentes.
-
-Assista às minhas ações em tempo real na aba **Computador do Agente** enquanto eu construo seu projeto!`,
+      content: `Olá! Sou o Manus. O que vamos fazer hoje?`,
       suggestions: [
-        'Pesquisar na web e inspecionar a API do GitHub no navegador do agente',
-        'Executar diagnósticos de rede com curl e checar o terminal bash',
-        'Criar uma plataforma de investimentos com simulador dinâmico de juros',
-        'Pesquisar especificações de design de ponta e criar um dashboard'
+        'Pesquise na web sobre um tema e resuma as fontes',
+        'Crie uma página de apresentação para meu projeto',
+        'Revise estes arquivos e sugira melhorias',
+        'Explique como você pode ajudar nesta tarefa'
       ]
     }
   ]);
@@ -312,6 +224,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
   const [streamedIds, setStreamedIds] = useState<Set<string>>(() => new Set(['welcome']));
   const [isAgentInBackground, setIsAgentInBackground] = useState(false);
   const [bgElapsedSeconds, setBgElapsedSeconds] = useState(0);
+  const [shareFeedback, setShareFeedback] = useState('');
 
   // Background elapsed timer
   useEffect(() => {
@@ -361,7 +274,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
   };
 
   const highlightProgressNote = (label: string, text: string, status: AgentProgressNote['status'] = 'complete') => {
-    const { cleanLabel, cleanText } = sanitizeAndEnrichClientNote(label, text);
+    const { cleanLabel, cleanText } = sanitizeProgressNote(label, text);
     const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     setProgressNotes((previous) => {
       const persistentId = `destaque_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
@@ -393,7 +306,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
       highlightProgressNote(label, text, status);
       return;
     }
-    const { cleanLabel, cleanText } = sanitizeAndEnrichClientNote(label, text);
+    const { cleanLabel, cleanText } = sanitizeProgressNote(label, text);
     const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     setProgressNotes((previous) => {
       const existingPersistent = previous.filter((n) => n.isPersistent);
@@ -423,13 +336,8 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
   };
 
   const addOpeningProgressNote = (prompt: string) => {
-    const cleanPrompt = prompt.replace(/\s+/g, ' ').trim();
-    const isCreation = /crie|criar|site|aplicaç|aplicac|dashboard|landing|loja|app/i.test(cleanPrompt);
-    const openingText = isCreation
-      ? `Compreendi a **especificação completa** para a criação da sua aplicação a partir do pedido: _“${cleanPrompt.slice(0, 220)}${cleanPrompt.length > 220 ? '…' : ''}”_. O plano arquitetural foi estruturado com foco em ==componentes modulares==, fluxo de dados consistente e design de alto padrão. Vamos iniciar a construção e validar cada funcionalidade diretamente no ambiente.`
-      : `Compreendi com **precisão técnica** o escopo da sua solicitação: _“${cleanPrompt.slice(0, 240)}${cleanPrompt.length > 240 ? '…' : ''}”_. A execução foi organizada em etapas estruturadas e ==critérios verificáveis==, garantindo estabilidade e alta fidelidade visual.`;
-
-    highlightProgressNote('Entendimento da solicitação', openingText, 'complete');
+    void prompt;
+    highlightProgressNote('Tarefa recebida', 'O pedido foi recebido. Vou iniciar a execução e mostrar as etapas relevantes aqui.', 'complete');
   };
 
   const beginExecutionStep = (label: string, detail: string) => {
@@ -502,58 +410,12 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
     let interval: NodeJS.Timeout;
     if (isThinking) {
       setElapsedSeconds(0);
-      const steps = [
-        'Regra 1: Promoter Tik (compreendendo objetivo e requisitos)...',
-        'Regra 2: Demanda (estruturando plano de engenharia de ponta)...',
-        'Regra 3: Treinamento (gerando arquivos, componentes e pastas)...',
-        'Regra 4: Funcionamento (validando compilação no runtime e preview)...',
-        'Regra 5: APIs e Chamadas Externas (executando ferramentas MCP)...'
-      ];
-      let stepIdx = 0;
-      setCurrentStep(steps[0]);
-
       interval = setInterval(() => {
-        setElapsedSeconds(prev => {
-          const next = prev + 1;
-          if (next % 3 === 0 && stepIdx < steps.length - 1) {
-            stepIdx++;
-            setCurrentStep(steps[stepIdx]);
-          }
-          return next;
-        });
+        setElapsedSeconds(prev => prev + 1);
       }, 1000);
     }
     return () => clearInterval(interval);
   }, [isThinking]);
-
-  const isThinkingPrev = useRef(isThinking);
-  const onAgentStateChangeRef = useRef(onAgentStateChange);
-  useEffect(() => {
-    onAgentStateChangeRef.current = onAgentStateChange;
-  }, [onAgentStateChange]);
-
-  useEffect(() => {
-    if (isThinkingPrev.current && !isThinking) {
-      if (isAgentInBackground) {
-        // Keep agent active in background state
-        return;
-      }
-      const allToolCalls: ToolCallTrace[] = [];
-      messages.forEach(m => {
-        if (m.toolCalls && m.toolCalls.length > 0) {
-          allToolCalls.push(...m.toolCalls);
-        }
-      });
-
-      onAgentStateChangeRef.current?.({
-        isWorking: false,
-        statusText: 'Computador do Agente Ativo',
-        contextText: 'Instância Ubuntu 24.04 x86_64 ativa. Agente autônomo com navegador Chromium.',
-        toolCalls: allToolCalls
-      });
-    }
-    isThinkingPrev.current = isThinking;
-  }, [isThinking, messages, isAgentInBackground]);
 
   const handleResumeFromBackground = (summaryText: string) => {
     setIsAgentInBackground(false);
@@ -577,11 +439,11 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
     }
   }, [externalPrompt]);
 
-  const handleSendMessage = async (userPrompt: string, isSilentContext: boolean = false) => {
-    if (!userPrompt.trim() || isThinking) return;
+  const handleSendMessage = async (userPrompt: string, isSilentContext: boolean = false, attachments: File[] = []) => {
+    if ((!userPrompt.trim() && attachments.length === 0) || isThinking) return;
     const requestStartTime = Date.now();
 
-    if (!isSilentContext && (userPrompt.trim().toLowerCase() === '/context' || userPrompt.trim().toLowerCase() === 'context')) {
+    if (!isSilentContext && attachments.length === 0 && (userPrompt.trim().toLowerCase() === '/context' || userPrompt.trim().toLowerCase() === 'context')) {
       const contextMsg: ChatMessage = {
         id: Date.now().toString(),
         role: 'assistant',
@@ -599,11 +461,42 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
       return;
     }
 
+    let attachmentContext = '';
+    if (attachments.length > 0) {
+      try {
+        let totalBytes = 0;
+        const fileContents: string[] = [];
+        for (const file of attachments) {
+          totalBytes += file.size;
+          if (file.size > 512 * 1024 || totalBytes > 1024 * 1024) {
+            throw new Error('Os anexos devem ter até 512 KB cada e 1 MB no total.');
+          }
+          const text = await file.text();
+          if (text.length > 100_000) throw new Error(`O arquivo ${file.name} excede o limite de texto processável.`);
+          fileContents.push(`--- ${file.name} ---\n${text}`);
+        }
+        attachmentContext = `\n\nConteúdo dos arquivos enviados pelo usuário:\n${fileContents.join('\n\n')}`;
+      } catch (error: any) {
+        setMessages((previous) => [...previous, {
+          id: `attachment_error_${Date.now()}`,
+          role: 'assistant',
+          status: 'failed',
+          content: error?.message || 'Não foi possível ler os arquivos anexados.'
+        }]);
+        return;
+      }
+    }
+    const normalizedPrompt = userPrompt.trim() || 'Analise os arquivos anexados.';
+    const backendPrompt = `${normalizedPrompt}${attachmentContext}`;
+
     if (!isSilentContext) {
       const userMsg: ChatMessage = {
         id: Date.now().toString(),
         role: 'user',
-        content: userPrompt
+        content: attachments.length
+          ? `${normalizedPrompt}\n\nArquivos anexados: ${attachments.map((file) => file.name).join(', ')}`
+          : normalizedPrompt,
+        attachmentContext
       };
       setMessages(prev => [...prev, userMsg]);
     }
@@ -645,9 +538,9 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
     try {
       abortControllerRef.current = new AbortController();
 
-      const historyPayload = messages.map(m => ({
+      const historyPayload = messages.filter((m) => m.id !== 'welcome').map(m => ({
         role: m.role,
-        content: m.content
+        content: `${m.content}${m.attachmentContext || ''}`
       }));
 
       let payload: any = null;
@@ -658,7 +551,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            message: userPrompt,
+            message: backendPrompt,
             history: historyPayload,
             currentFiles: currentFiles || {}
           }),
@@ -687,27 +580,27 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                   const data = JSON.parse(line.replace('data: ', '').trim());
                   if (currentEvent === 'computer_starting') {
                     setAgentLivePhase('Trabalhando');
-                    updateProgressNote('Ambiente operacional', 'O ambiente de execução seguro está iniciando. Todos os recursos necessários estão sendo carregados para viabilizar as ações com rastreabilidade e integridade.', 'running');
-                    setCurrentStep(data.text || 'Inicializando o ambiente seguro do agente...');
+                    updateProgressNote('Preparando o computador', 'Inicializando o ambiente necessário para a tarefa.', 'running');
+                    setCurrentStep('Preparando o computador do agente…');
                     beginExecutionStep('Inicializando ambiente do agente', 'Preparando ambiente seguro e ferramentas de execução.');
                     if (onAgentStateChange) {
                       onAgentStateChange({
                         isWorking: true,
-                        statusText: data.text || 'Inicializando o ambiente do agente...',
-                        contextText: 'O ambiente seguro está carregando os módulos necessários para as ações planejadas.',
+                        statusText: 'Preparando o computador do agente…',
+                        contextText: 'O ambiente necessário para a tarefa está sendo preparado.',
                         toolCalls: [...liveToolCalls],
                         browserStatus: 'loading'
                       });
                     }
                   } else if (currentEvent === 'computer_ready') {
                     setAgentLivePhase('Raciocinando');
-                    highlightProgressNote('Ambiente operacional pronto', '**Ambiente operacional inicializado**. Todos os serviços essenciais estão ativos e liberados para a execução com ==alto rigor técnico e estabilidade==.', 'complete');
-                    completeExecutionStep('Inicializando ambiente do agente', data.text || 'Ambiente seguro pronto para execução.');
-                    setCurrentStep(data.text || 'Ambiente do agente pronto para ações.');
+                    highlightProgressNote('Computador pronto', 'O computador do agente está pronto para a próxima ação.', 'complete');
+                    completeExecutionStep('Inicializando ambiente do agente', 'Computador do agente pronto.');
+                    setCurrentStep('Computador do agente pronto.');
                     if (onAgentStateChange) {
                       onAgentStateChange({
                         isWorking: true,
-                        statusText: data.text || 'Computador do agente pronto.',
+                        statusText: 'Computador do agente pronto.',
                         contextText: 'Boot concluído. O agente pode iniciar ações autorizadas.',
                         toolCalls: [...liveToolCalls],
                         browserStatus: 'interactive'
@@ -715,32 +608,32 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                     }
                   } else if (currentEvent === 'stage_note') {
                     setAgentLivePhase('Pensando');
-                    const stageLabel = data.label || 'Etapa do desenvolvimento';
+                    const stageLabel = toUserFacingAgentText(data.label, 'Etapa da tarefa');
                     if (data.highlight || data.persistent) {
-                      highlightProgressNote(stageLabel, `**Marco de desenvolvimento**: ${data.text || 'Etapa técnica consolidada pelo agente com sucesso.'}`, 'complete');
+                      highlightProgressNote(stageLabel, 'Etapa concluída.', 'complete');
                     } else {
-                      updateProgressNote(stageLabel, data.text || 'Etapa registrada pelo agente.', 'running');
+                      updateProgressNote(stageLabel, 'Etapa em andamento.', 'running');
                     }
-                    setCurrentStep(data.text || stageLabel);
+                    setCurrentStep(stageLabel);
                   } else if (currentEvent === 'execution_gate') {
                     setAgentLivePhase('Pensando');
-                    updateProgressNote('Transição para execução', data.text || 'Pensamento concluído; preparando a próxima ação.', 'running');
-                    setCurrentStep(data.text || 'Preparando a próxima ação...');
+                    updateProgressNote('Próxima etapa', 'Preparando a próxima ação.', 'running');
+                    setCurrentStep('Preparando a próxima ação…');
                   } else if (currentEvent === 'deliberation') {
                     setAgentLivePhase('Raciocinando');
-                    const deliberationLabel = data.label || 'Planejamento Arquitetural';
-                    const deliberationText = data.text || 'Avaliando critérios técnicos e diretrizes de projeto.';
+                    const deliberationLabel = toUserFacingAgentText(data.label, 'Plano de execução');
+                    const deliberationText = data.complete ? 'Plano de execução definido.' : 'Organizando as etapas da tarefa.';
                     if (data.complete) {
                       highlightProgressNote(
                         deliberationLabel,
-                        `**Decisão arquitetural validada**: ${deliberationText}. Os critérios de aceite foram estabelecidos e a implementação seguirá com ==alta estabilidade e precisão técnica==.`,
+                        deliberationText,
                         'complete'
                       );
                       restartExecutionAnimation();
                     } else {
                       updateProgressNote(deliberationLabel, deliberationText, 'running');
                     }
-                    setCurrentStep(data.text || data.label || 'Planejamento e análise em andamento');
+                    setCurrentStep(deliberationText);
                     beginExecutionStep(deliberationLabel, deliberationText);
                     if (data.complete) {
                       completeExecutionStep(deliberationLabel, `${deliberationText} Etapa validada.`);
@@ -748,35 +641,38 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                     if (onAgentStateChange) {
                       onAgentStateChange({
                         isWorking: true,
-                        statusText: data.text || data.label || 'Deliberação profunda em andamento',
-                        contextText: data.text || 'Planejamento, crítica e verificação independentes.',
+                        statusText: data.complete ? 'Plano definido' : 'Planejando a tarefa',
+                        contextText: deliberationText,
                         toolCalls: [...liveToolCalls]
                       });
                     }
                   } else if (currentEvent === 'status') {
-                    setAgentLivePhase(data.text?.toLowerCase().includes('racioc') || data.text?.toLowerCase().includes('analis') ? 'Raciocinando' : 'Pensando');
-                    updateProgressNote('Raciocínio e coordenação', data.text || 'Coordenando a próxima ação do agente.', 'running');
-                    setCurrentStep(data.text);
-                    beginExecutionStep('Raciocinando sobre a próxima ação', data.text);
+                    const statusText = 'Preparando a próxima ação.';
+                    setAgentLivePhase('Pensando');
+                    updateProgressNote('Próxima etapa', statusText, 'running');
+                    setCurrentStep(statusText);
+                    beginExecutionStep('Próxima etapa', statusText);
                     if (onAgentStateChange) {
                       onAgentStateChange({
                         isWorking: true,
-                        statusText: data.text,
-                        contextText: data.text,
+                        statusText,
+                        contextText: statusText,
                         toolCalls: [...liveToolCalls],
                         intent: data.intent
                       });
                     }
                   } else if (currentEvent === 'step') {
                     setAgentLivePhase('Trabalhando');
-                    updateProgressNote(data.toolName || 'Etapa de execução', data.text || 'Executando a próxima etapa do plano.', 'running');
-                    setCurrentStep(data.text);
-                    beginExecutionStep('Executando etapa do plano', data.text);
+                    const stepLabel = toUserFacingAgentText(data.toolName, 'Etapa de execução');
+                    const stepText = `Executando: ${stepLabel}.`;
+                    updateProgressNote(stepLabel, stepText, 'running');
+                    setCurrentStep(stepText);
+                    beginExecutionStep(stepLabel, stepText);
                     if (onAgentStateChange) {
                       onAgentStateChange({
                         isWorking: true,
-                        statusText: data.text,
-                        contextText: data.text,
+                        statusText: stepText,
+                        contextText: stepText,
                         toolCalls: [...liveToolCalls]
                       });
                     }
@@ -790,7 +686,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                     const presentation = describeToolExecution(data.toolName, data.arguments || {}, data.reason || '');
                     const startedFilePath = String(data.arguments?.filePath || data.arguments?.path || data.arguments?.filename || '').trim();
                     const presentationLabel = startedFilePath ? `${presentation.label} · ${startedFilePath}` : presentation.label;
-                    updateProgressNote(presentationLabel, `Executando a operação: ${presentation.detail || presentation.chip}. O agente está aplicando as alterações com precisão técnica para certificar que o fluxo permaneça consistente e validado.`, 'running');
+                    updateProgressNote(presentationLabel, `${presentation.detail || presentation.chip}.`, 'running');
                     setCurrentStep(`${presentation.label}: ${presentation.chip}`);
                     beginExecutionStep(presentation.label, presentation.detail);
                     const activeTrace: ToolCallTrace = {
@@ -832,7 +728,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                       onAgentStateChange({
                         isWorking: true,
                         statusText: `Agente chamando ${activeTrace.server}`,
-                        contextText: data.reason,
+                        contextText: 'Executando a ferramenta necessária para esta etapa.',
                         toolCalls: [...liveToolCalls],
                         browserStatus: data.toolName.includes('browser') || data.toolName.includes('navigate') ? 'loading' : undefined
                       });
@@ -946,7 +842,11 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                     const finishedPresentation = describeToolExecution(toolCall.toolName, toolCall.arguments || {}, toolCall.screenData?.actionDescription || '');
                     const finishedFilePath = String(toolCall.arguments?.filePath || toolCall.arguments?.path || toolCall.arguments?.filename || '').trim();
                     const finishedLabel = finishedFilePath ? `${finishedPresentation.label} · ${finishedFilePath}` : finishedPresentation.label;
-                    updateProgressNote(finishedLabel, `Operação concluída com sucesso: ${finishedPresentation.detail || 'as atualizações foram incorporadas e validadas no projeto.'}`, toolCall.status === 'error' ? 'warning' : 'complete');
+                    const actionSucceeded = toolCall.status !== 'error' && toolCall.status !== 'warning';
+                    const resultSummary = actionSucceeded
+                      ? `${finishedPresentation.detail || 'A ferramenta concluiu a operação.'}.`
+                      : `A ferramenta retornou ${toolCall.status === 'error' ? 'um erro' : 'um aviso'}; confira o resultado antes de continuar.`;
+                    updateProgressNote(finishedLabel, resultSummary, actionSucceeded ? 'complete' : 'warning');
                     
                     // Replace active trace if present, otherwise push
                     let runningIndex = -1;
@@ -1001,7 +901,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                     if (onAgentStateChange) {
                       onAgentStateChange({
                         isWorking: true,
-                        statusText: `Agente concluiu ação no ${toolCall.server || 'MCP'}`,
+                        statusText: 'Resultado da ferramenta recebido',
                         contextText: toolCall.screenData?.actionDescription || toolCall.toolName,
                         toolCalls: [...liveToolCalls],
                         browserStatus: bStatus
@@ -1012,6 +912,16 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
                     setCurrentStep(`Aguardando autorização: ${data.approval?.reason || 'Ação destrutiva'}`);
                     beginExecutionStep('Aguardando sua autorização', data.approval?.reason || 'O agente pausou antes de uma ação sensível.');
                     completeExecutionStep('Aguardando sua autorização', data.approval?.reason || 'Ação pausada até sua decisão.', 'warning');
+                  } else if (currentEvent === 'error') {
+                    const rawError = String(data.message || 'O serviço de execução retornou um erro.');
+                    const safeError = /\b(?:OpenManus|Manus)\b/i.test(rawError)
+                      ? 'O serviço de execução retornou um erro.'
+                      : rawError;
+                    payload = { status: 'failed', response: `Não foi possível concluir a execução: ${safeError}` };
+                    setShowExecutionAnimation(false);
+                    setInitialThoughtComplete(false);
+                    setFinalResponseReceived(true);
+                    setCurrentStep('Execução interrompida.');
                   } else if (currentEvent === 'complete') {
                     setAgentLivePhase('Pensando');
                     setShowExecutionAnimation(false);
@@ -1058,104 +968,44 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
         });
       }
 
-      // Format a verified rich technical report, guaranteeing no generic fallback text
+      // Preserve the agent response; do not synthesize unverified work results.
       const finalToolCalls = Array.isArray(payload.toolCalls) && payload.toolCalls.length > 0 ? payload.toolCalls : liveToolCalls;
-      const rawText = payload.explanation || payload.response || '';
-      const assistantContent = ensureDetailedAgentMessage(
-        rawText,
-        finalToolCalls,
-        generatedFilesList,
-        userPrompt
-      );
-      if (generatedFilesList.length === 0 && assistantContent.includes('```')) {
-        const codeBlockRegex = /```(tsx|typescript|jsx|javascript|html|css|json)\s*\n([\s\S]*?)```/gi;
-        let match;
-        while ((match = codeBlockRegex.exec(assistantContent)) !== null) {
-          const lang = match[1].toLowerCase();
-          const code = match[2].trim();
-          
-          // Only extract if it looks like a component or config
-          if (code.length > 50) {
-            let filename = 'client/src/App.tsx';
-            if (lang === 'json') {
-              filename = 'package.json';
-            } else if (lang === 'css') {
-              filename = 'client/src/index.css';
-            } else {
-              const fnMatch = code.match(/export\s+default\s+function\s+([A-Za-z0-9_$]+)/);
-              if (fnMatch && fnMatch[1] && fnMatch[1] !== 'App') {
-                filename = `client/src/components/${fnMatch[1]}.tsx`;
-              } else {
-                filename = 'client/src/App.tsx';
-              }
-            }
-
-            generatedFilesList.push({
-              path: filename,
-              code,
-              lang
-            });
-
-            // Simulate the tool call for the UI if it wasn't there
-            if (!liveToolCalls.some(tc => tc.toolName.includes('write') || tc.toolName.includes('file'))) {
-              liveToolCalls.push({
-                id: `auto_extract_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-                toolName: 'webdev.write_file',
-                server: 'WebDev MCP',
-                arguments: { path: filename, content: code },
-                result: 'Código extraído e sincronizado com o workspace.',
-                timestamp: new Date().toLocaleTimeString(),
-                status: 'success',
-                screenData: { actionDescription: `Sincronizando ${filename} no workspace` }
-              });
-            }
-          }
-        }
-      }
-
+      const rawText = payload.explanation || payload.response || payload.content || payload.message || '';
+      const assistantContent = String(rawText).trim() || 'O agente não retornou uma resposta final.';
       const isBg = Boolean(payload.questionnaire) || payload.status === 'in_background';
       const assistantMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         isStreaming: true,
-        status: isBg ? 'in_background' : payload.approval ? 'waiting_for_approval' : 'completed',
+        status: isBg ? 'in_background' : payload.approval ? 'waiting_for_approval' : payload.status === 'failed' ? 'failed' : 'completed',
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         workingTime: payload.workingTime || `${Math.max(elapsedSeconds, Math.round((Date.now() - requestStartTime) / 1000), 5)}s`,
-        thought: payload.thought,
         sources: payload.sources || [],
         approval: payload.approval,
         artifacts: payload.artifacts || [],
-        logs: payload.logs || [
-          {
-            id: 1,
-            type: 'command',
-            content: isBg 
-              ? 'Agente esperando uma resposta com os parâmetros do usuário'
-              : `${finalToolCalls.length} ferramentas reais executadas no computador da nuvem`,
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }
-        ],
+        logs: Array.isArray(payload.logs) ? payload.logs : [],
         toolCalls: finalToolCalls,
         content: assistantContent,
-        suggestions: payload.suggestions || [
-          "Definir preferências no questionário",
-          "Continuar com arquitetura padrão",
-          "Inspecionar ações do agente no Computador"
-        ],
+        suggestions: Array.isArray(payload.suggestions) ? payload.suggestions : [],
         clarifications: payload.clarifications,
         questionnaire: payload.questionnaire,
         files: generatedFilesList,
         executionSteps: [
-          ...executionStepsRef.current.map((step) => step.status === 'running' ? { ...step, status: 'complete' as const } : step),
+          ...executionStepsRef.current.map((step) => step.status === 'running' && !isBg ? {
+            ...step,
+            status: payload.approval || payload.status === 'failed' ? 'warning' as const : 'complete' as const
+          } : step),
           {
             id: `summary_${Date.now()}`,
-            label: isBg ? 'Agente esperando uma resposta' : payload.approval ? 'Aguardando autorização' : 'Síntese final',
+            label: isBg ? 'Aguardando sua resposta' : payload.approval ? 'Aguardando autorização' : payload.status === 'failed' ? 'Execução interrompida' : 'Resposta recebida',
             detail: isBg 
-              ? 'O agente está aguardando sua resposta para prosseguir a criação.'
+              ? 'O agente está aguardando sua resposta para continuar.'
               : payload.approval 
                 ? 'A execução foi pausada para autorização.' 
-                : 'Resultados reunidos e resposta pronta para você.',
-            status: isBg ? 'running' : payload.approval ? 'warning' : 'complete',
+                : payload.status === 'failed'
+                  ? 'O serviço retornou um erro; a tarefa não foi concluída.'
+                  : 'Uma resposta foi recebida do agente.',
+            status: isBg ? 'running' : payload.approval || payload.status === 'failed' ? 'warning' : 'complete',
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
           }
         ]
@@ -1168,31 +1018,17 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
         if (onAgentStateChange) {
           onAgentStateChange({
             isWorking: true,
-            statusText: '⏳ Agente esperando uma resposta',
-            contextText: 'O agente está aguardando suas definições de opções no chat para prosseguir a criação.',
-            toolCalls: [
-              ...liveToolCalls,
-              {
-                id: `bg_wait_${Date.now()}`,
-                toolName: 'agent.waitingForResponse',
-                server: 'kvant_engine',
-                arguments: { mode: 'waiting_for_user_response', waitReason: 'user_questionnaire_options' },
-                result: 'Aguardando resposta do usuário.',
-                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                status: 'running',
-                screenData: {
-                  actionDescription: 'Agente aguardando resposta do usuário para continuar a execução'
-                }
-              }
-            ]
+            statusText: 'Aguardando sua resposta',
+            contextText: 'O agente está aguardando suas opções no chat para continuar.',
+            toolCalls: [...liveToolCalls]
           });
         }
       } else {
         setIsAgentInBackground(false);
         onAgentStateChange?.({
           isWorking: false,
-          statusText: payload.approval ? 'Execução pausada aguardando autorização.' : 'Execução concluída.',
-          contextText: payload.approval ? 'O computador permanece disponível, mas nenhuma nova ação será executada até a autorização.' : 'O ciclo terminou; o computador está pronto para a próxima instrução.',
+          statusText: payload.status === 'failed' ? 'Execução interrompida.' : payload.approval ? 'Execução pausada aguardando autorização.' : 'Execução concluída.',
+          contextText: payload.status === 'failed' ? 'A execução não foi concluída.' : payload.approval ? 'O computador permanece disponível, mas nenhuma nova ação será executada até a autorização.' : 'O ciclo terminou; o computador está pronto para a próxima instrução.',
           toolCalls: finalToolCalls,
           browserStatus: 'interactive'
         });
@@ -1214,10 +1050,18 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
           status: 'failed',
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           workingTime: `${elapsedSeconds}s`,
-          content: `Houve uma oscilação na execução remota: ${err.message || String(err)}. O agente local manterá o ambiente operando.`,
+          content: `Não foi possível concluir a execução: ${err.message || String(err)}. Você pode tentar novamente ou revisar a conexão.`,
           suggestions: ["Tentar novamente", "Verificar conexão com a API"]
         };
         setMessages(prev => [...prev, errorMsg]);
+        setShowExecutionAnimation(false);
+        setInitialThoughtComplete(false);
+        setCurrentStep('Execução interrompida por um erro.');
+        onAgentStateChange?.({
+          isWorking: false,
+          statusText: 'Execução interrompida por um erro.',
+          contextText: 'O serviço não concluiu a solicitação. Revise o erro antes de tentar novamente.'
+        });
       }
     } finally {
       setIsThinking(false);
@@ -1228,33 +1072,61 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
+    setShowExecutionAnimation(false);
+    setInitialThoughtComplete(false);
+    setCurrentStep('Execução interrompida pelo usuário.');
+    completeExecutionStep('Execução interrompida', 'A tarefa foi cancelada pelo usuário.', 'warning');
+    onAgentStateChange?.({
+      isWorking: false,
+      statusText: 'Execução interrompida pelo usuário.',
+      contextText: 'A tarefa foi cancelada pelo usuário.'
+    });
     setIsThinking(false);
   };
+
+  const handleShareConversation = async () => {
+    const transcript = messages
+      .filter((message) => message.id !== 'welcome')
+      .map((message) => `${message.role === 'user' ? 'Você' : 'Manus'}:\n${message.content}`)
+      .join('\n\n');
+    if (!transcript) {
+      setShareFeedback('Ainda não há mensagens para compartilhar');
+      window.setTimeout(() => setShareFeedback(''), 2200);
+      return;
+    }
+    try {
+      const nativeShare = (navigator as unknown as { share?: (data: { title: string; text: string }) => Promise<void> }).share;
+      if (nativeShare) await nativeShare.call(navigator, { title: 'Conversa no Manus', text: transcript });
+      else await navigator.clipboard.writeText(transcript);
+      setShareFeedback(nativeShare ? 'Conversa compartilhada' : 'Conversa copiada');
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      setShareFeedback('Não foi possível compartilhar');
+    }
+    window.setTimeout(() => setShareFeedback(''), 2200);
+  };
+
+  const isWelcomeOnly = messages.length === 1 && messages[0]?.id === 'welcome';
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-[#1a1a1a] relative">
       {/* Header */}
-      <header className="h-11 flex items-center justify-between px-6 border-b border-white/5 shrink-0 z-10 bg-[#1a1a1a]">
-        <div className="flex items-center gap-2.5 cursor-pointer hover:bg-white/5 px-2.5 py-1.5 rounded-lg transition-colors group">
-          <span className="text-sm font-medium text-[#dcdcdc]">Kopilot 1.0 Lite</span>
-          <CaretDown size={14} className="text-[#dcdcdc]/40 group-hover:text-[#dcdcdc]" />
-        </div>
-        <div className="flex items-center gap-4 text-[#dcdcdc]/40">
-          <button title="Histórico de Sessões" className="hover:text-[#dcdcdc] transition-colors cursor-pointer">
-            <Clock size={18} />
+      <header className="h-12 flex items-center justify-between px-3 sm:px-5 border-b border-white/[0.06] shrink-0 z-10 bg-[#1a1a1a]">
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={onToggleSidebar} aria-label="Abrir navegação" className="lg:hidden flex size-8 items-center justify-center rounded-lg text-white/55 hover:bg-white/[0.06] hover:text-white">
+            <ListBullets size={18} />
           </button>
-          <button title="Expandir Workspace" className="hover:text-[#dcdcdc] transition-colors cursor-pointer">
+          <span className="px-2.5 py-1 text-sm font-medium text-[#dcdcdc]/90">Manus</span>
+        </div>
+        <div className="flex items-center gap-1.5 sm:gap-3 text-[#dcdcdc]/45">
+          <button type="button" title="Abrir o computador do agente" aria-label="Abrir o computador do agente" onClick={onInspectInComputer} className="flex size-8 items-center justify-center rounded-lg hover:bg-white/[0.06] hover:text-[#dcdcdc] transition-colors">
             <ArrowsOut size={18} />
           </button>
-          <div className="h-4 w-px bg-white/10" />
-          <div className="flex items-center justify-center size-7 bg-[#1f2c39] text-[#2992f0] border border-[#1a1a1a] rounded-md" title="Ativo">
-             <ShieldStar size={14} className="text-[#2992f0]" weight="regular" />
+          <div className="flex size-8 items-center justify-center" title={isThinking ? 'Agente trabalhando' : 'Agente aguardando'} aria-label={isThinking ? 'Agente trabalhando' : 'Agente aguardando'}>
+            <span className={`size-2 rounded-full ${isThinking ? 'bg-blue-400 animate-pulse' : 'bg-white/25'}`} />
           </div>
-          <button title="Compartilhar" className="hover:text-[#dcdcdc] transition-colors cursor-pointer">
+          <button type="button" title={shareFeedback || 'Compartilhar conversa'} aria-label="Compartilhar conversa" onClick={handleShareConversation} className="flex size-8 items-center justify-center rounded-lg hover:bg-white/[0.06] hover:text-[#dcdcdc] transition-colors">
             <ShareNetwork size={18} />
-          </button>
-          <button className="hover:text-[#dcdcdc] transition-colors cursor-pointer">
-            <DotsThree size={18} />
           </button>
         </div>
       </header>
@@ -1264,8 +1136,28 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
         ref={scrollAreaRef}
         className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] flex flex-col items-center bg-[#1a1a1a]"
       >
+        {isWelcomeOnly ? (
+          <div className="flex min-h-full w-full max-w-3xl flex-col items-center justify-center px-5 pb-16 pt-8 text-center sm:px-8">
+            <div className="w-full max-w-xl">
+              <div className="mx-auto flex size-10 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.04] text-white/70">
+                <Sparkle size={19} weight="regular" />
+              </div>
+              <h1 className="mt-5 text-xl font-medium tracking-tight text-white/90 sm:text-2xl">O que você gostaria de fazer?</h1>
+              <p className="mx-auto mt-2 max-w-md text-xs leading-relaxed text-white/45 sm:text-sm">Descreva uma tarefa ou escolha um ponto de partida.</p>
+              <div className="mt-7 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {(messages[0]?.suggestions || []).map((suggestion) => (
+                  <button key={suggestion} type="button" onClick={() => handleSendMessage(suggestion)} className="group flex min-h-12 items-center gap-3 rounded-xl border border-white/[0.07] bg-white/[0.025] px-3.5 py-3 text-left text-xs leading-relaxed text-white/65 transition-colors hover:border-white/[0.14] hover:bg-white/[0.055] hover:text-white/90 sm:text-[13px]">
+                    <span className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-white/[0.05] text-white/45 group-hover:text-white/75"><Sparkle size={13} /></span>
+                    <span className="flex-1">{suggestion}</span>
+                    <ArrowRight size={14} className="shrink-0 text-white/25 opacity-0 transition-opacity group-hover:opacity-100" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : (
         <div className="w-full max-w-3xl px-6 py-8 space-y-10 messages-container bg-[#1a1a1a]">
-          {messages.map((msg) => (
+          {messages.filter((msg) => msg.id !== 'welcome').map((msg) => (
             <MessageItem 
               key={msg.id} 
               message={msg} 
@@ -1319,7 +1211,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
           {isAgentInBackground && !isThinking && !messages.some(m => m.isStreaming) && (
              <div className="flex items-center gap-3 pl-8 py-2 animate-in fade-in slide-in-from-left-2 duration-500">
                <div className="size-8 rounded-lg bg-bg-surface-panel border border-border-divider-subtle flex items-center justify-center relative">
-                 <img src="https://imgdb.io/i/6lwOlmk.png" className="size-5 object-contain" alt="" />
+                 <ManusMark className="size-5" />
                  <div className="absolute -bottom-0.5 -right-0.5 size-3 bg-[#1a1a1a] rounded-full flex items-center justify-center border border-white/5">
                    <div className="size-1.5 bg-zinc-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(161,161,170,0.5)]" />
                  </div>
@@ -1336,6 +1228,7 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
 
           <div ref={messagesEndRef} />
         </div>
+        )}
         <div className="h-28 shrink-0" />
       </div>
 
@@ -1344,14 +1237,14 @@ Assista às minhas ações em tempo real na aba **Computador do Agente** enquant
       {/* Floating Input Section */}
       <div className="absolute bottom-5 left-1/2 -translate-x-1/2 w-full max-w-2xl px-6 z-20">
         <PromptBar 
-          onSend={(text) => handleSendMessage(text)} 
+          onSend={(text, attachments) => handleSendMessage(text, false, attachments)}
           onStop={handleStop}
           isThinking={isThinking} 
-          placeholder="Mensagem para o agente Kopilot ou digite @ para fontes e / para comandos..."
+          placeholder="Pergunte ao Manus ou descreva o que você quer fazer..."
         />
         
         <p className="mt-2 text-center text-[10px] text-[#dcdcdc]/30">
-          Kopilot ativo: digite @ para fontes & arquivos, / para comandos rápidos e selecione o modelo de IA.
+          O Manus pode pesquisar na web, trabalhar com arquivos de texto e ajudar a criar no workspace.
         </p>
       </div>
 
@@ -1431,7 +1324,7 @@ function InlineChatQuestionnaire({
             <div className="size-5 rounded-full border border-white/20 flex items-center justify-center bg-[#1f1f1f]">
               <Question size={11} weight="bold" />
             </div>
-            <span className="text-[10px] font-bold uppercase tracking-widest opacity-50">O Kopilot tem uma pergunta</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest opacity-50">O agente tem uma pergunta</span>
           </div>
           <div className="text-[10px] font-mono text-white/20 bg-white/5 px-2 py-0.5 rounded-full">
             {showTextArea ? 'Final' : `${currentStep + 1} de ${questions.length}`}
@@ -1681,16 +1574,9 @@ function MessageItem({
     <div className="space-y-4 animate-in fade-in duration-300">
       {/* Assistant Brand Avatar */}
       <div className="flex items-center gap-2.5">
-        <img 
-          src="https://imgdb.io/i/6lwOlmk.png" 
-          alt="Logotipo do Agente" 
-          className="size-6 object-contain rounded-md shadow-xs bg-bg-surface-panel p-0.5" 
-          />
+        <ManusMark alt="Símbolo Manus" className="size-6 rounded-md shadow-xs bg-bg-surface-panel p-0.5" />
         <div className="flex items-center gap-2 text-xs font-medium">
-          <span className="text-text-content-primary">Kopilot</span>
-          <span className="font-mono px-1.5 py-0.5 border border-solid" style={{ borderRadius: '6px', backgroundColor: '#1a1a1a', borderColor: '#303030', borderWidth: '2.1507px', color: '#c0c0c0', fontSize: '9px' }}>
-            Lite
-          </span>
+          <span className="text-text-content-primary">Manus</span>
         </div>
       </div>
 
@@ -1718,7 +1604,7 @@ function MessageItem({
         {/* Execution Timeline (Ran Tools - Collapsed) */}
         {!isWaiting && (isAlreadyStreamed || !message.isStreaming) && message.executionSteps && message.executionSteps.length > 0 && (
           <div className="animate-in fade-in slide-in-from-top-2 duration-500 fill-mode-both">
-            <ExecutionTimeline steps={message.executionSteps} completed />
+            <ExecutionTimeline steps={message.executionSteps} completed={message.status !== 'in_background' && message.status !== 'waiting_for_approval'} />
           </div>
         )}
 
@@ -1857,9 +1743,7 @@ function MessageItem({
                   </button>
                 </div>
 
-                <span className="text-[11px] text-white/40 font-normal">
-                  {message.time || 'Hoje, 20:26'}
-                </span>
+                {message.time && <span className="text-[11px] text-white/40 font-normal">{message.time}</span>}
               </div>
 
               {/* Right: Como foi este resultado? + 5 Stars */}
@@ -1917,7 +1801,7 @@ function MessageItem({
                   <div className="size-3.5 border border-zinc-500/30 rounded-full flex items-center justify-center">
                     <div className="size-1.5 bg-zinc-400 rounded-full animate-pulse" />
                   </div>
-                  <span>Kopilot continuará após sua resposta</span>
+                  <span>O agente continuará após sua resposta</span>
                 </div>
                 <div className="flex items-center gap-1 text-text-content-secondary/40">
                   <button 
@@ -1983,7 +1867,7 @@ function AgentProgressNotes({
   const liveNotes = useMemo(() => notes.filter((n) => !n.isPersistent), [notes]);
 
   const [activeNoteIndex, setActiveNoteIndex] = useState(0);
-  const [liveIndex, setLiveIndex] = useState(0);
+  const liveIndex = 0;
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   // Sync index when new persistent notes are generated
@@ -1994,24 +1878,6 @@ function AgentProgressNotes({
       prevCountRef.current = persistentNotes.length;
     }
   }, [persistentNotes.length]);
-
-  // Motion alternation for persistent highlighted note: exactly 5s
-  useEffect(() => {
-    if (persistentNotes.length <= 1) return;
-    const timer = setInterval(() => {
-      setActiveNoteIndex((prev) => (prev + 1) % persistentNotes.length);
-    }, 5000);
-    return () => clearInterval(timer);
-  }, [persistentNotes.length]);
-
-  // Motion alternation for live progress notes: exactly 2s
-  useEffect(() => {
-    if (liveNotes.length <= 1) return;
-    const timer = setInterval(() => {
-      setLiveIndex((prev) => (prev + 1) % liveNotes.length);
-    }, 2000);
-    return () => clearInterval(timer);
-  }, [liveNotes.length]);
 
   const safePersistentIndex = Math.min(activeNoteIndex, Math.max(0, persistentNotes.length - 1));
   const currentHighlightedNote = persistentNotes[safePersistentIndex] || persistentNotes[0];
@@ -2273,29 +2139,17 @@ function ExecutionTimeline({
   elapsedSeconds?: number;
   completed?: boolean;
 }) {
-  const sequence = [800, 600, 1800, 2600, 1600];
-  const [stage, setStage] = useState(completed ? sequence.length - 1 : 0);
   const [manualExpanded, setManualExpanded] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    if (completed) {
-      setStage(sequence.length - 1);
-      return;
-    }
-    if (stage >= sequence.length - 1) return;
-    const timer = window.setTimeout(() => setStage((current) => current + 1), sequence[stage]);
-    return () => window.clearTimeout(timer);
-  }, [completed, stage]);
 
   const searchVariant = steps.some((step) => /search|pesquis|google/i.test(`${step.label} ${step.detail}`));
   const codingVariant = steps.some((step) => /edit|c[oó]digo|npm|terminal|arquivo/i.test(`${step.label} ${step.detail}`));
-  const working = !completed && stage < sequence.length - 1;
+  const working = !completed;
   const autoExpanded = false;
   const expanded = manualExpanded ?? autoExpanded;
   const visibleSteps = steps;
   const focusedStep = [...steps].reverse().find((step) => step.status === 'running') || steps.at(-1);
-  const activeLabel = searchVariant ? 'Searching the web' : codingVariant ? 'Running tools' : 'Thinking';
-  const doneLabel = searchVariant ? 'Searched the web' : codingVariant ? `Ran ${Math.max(1, steps.length)} tools` : 'Thought process settled';
+  const activeLabel = searchVariant ? 'Pesquisando na web' : codingVariant ? 'Executando ferramentas' : 'Pensando';
+  const doneLabel = 'Atividade encerrada';
 
   const renderStep = (step: ExecutionStep, index: number) => {
     const isRunning = step.status === 'running';
@@ -2318,7 +2172,7 @@ function ExecutionTimeline({
         ) : isRunning ? (
           <Spinner size={13} className="animate-spin text-text-content-secondary shrink-0" />
         ) : (
-          <span className="flex size-5 shrink-0 items-center justify-center rounded-[7px] bg-white/5 border border-white/10 shadow-xs" style={{ backgroundImage: `url('https://imgdb.io/i/z2ZOrTk.png')` }}>
+          <span className="flex size-5 shrink-0 items-center justify-center rounded-[7px] bg-white/5 border border-white/10 shadow-xs">
             {getContextualToolIcon(step.label, step.label, step.detail)}
           </span>
         )}
@@ -2347,7 +2201,7 @@ function ExecutionTimeline({
           <CaretDown size={13} className={`text-text-content-secondary/40 transition-transform duration-300 ml-0.5 ${expanded ? 'rotate-180' : ''}`} />
         </button>
       </div>
-      <p className="pl-6 text-[10px] text-text-content-secondary/60">{working ? (focusedStep?.detail || focusedStep?.label || activeStep || 'Preparing the next step...') : 'The trace settled and remains expandable.'}</p>
+          <p className="pl-6 text-[10px] text-text-content-secondary/60">{working ? (focusedStep?.detail || focusedStep?.label || activeStep || 'Aguardando a próxima etapa.') : 'Etapas registradas nesta tarefa.'}</p>
 
       <div className="grid transition-[grid-template-rows,opacity] duration-400" style={{ gridTemplateRows: expanded ? '1fr' : '0fr', opacity: expanded ? 1 : 0, transitionTimingFunction: 'cubic-bezier(0.23,1,0.32,1)' }}>
         <div className="overflow-hidden">
@@ -2361,7 +2215,7 @@ function ExecutionTimeline({
                 </div>
               )}
               {visibleSteps.map(renderStep)}
-              {visibleSteps.length === 0 && <div className="min-h-7 px-1.5 text-[11px] text-text-content-secondary/60">Preparing the first step...</div>}
+              {visibleSteps.length === 0 && <div className="min-h-7 px-1.5 text-[11px] text-text-content-secondary/60">Aguardando o primeiro evento.</div>}
             </div>
           </div>
         </div>
@@ -2379,7 +2233,7 @@ function ChatInput({ onSend, onStop, isThinking }: { onSend: (val: string) => vo
     <div className="relative group">
       <div className="bg-bg-surface-panel border border-border-divider-subtle rounded-2xl focus-within:border-border-control-active transition-all shadow-2xl overflow-hidden">
         <textarea 
-          placeholder="Mensagem para o agente Kopilot..."
+          placeholder="Mensagem para o agente..."
           value={value}
           onChange={(e) => setValue(e.target.value)}
           rows={1}
@@ -2408,12 +2262,7 @@ function ChatInput({ onSend, onStop, isThinking }: { onSend: (val: string) => vo
               >
                 <GithubLogo size={16} />
               </button>
-              <img 
-                src="https://imgdb.io/i/6lwOlmk.png" 
-                alt="Agente" 
-                className="size-5 object-contain rounded bg-bg-action-hover p-0.5" 
-                title="Agente Kopilot Conectado"
-              />
+              <ManusMark alt="Manus" className="size-5 rounded bg-bg-action-hover p-0.5" />
               <div className="h-4 w-px bg-border-divider-subtle mx-1" />
               <div className="flex items-center gap-1.5 px-2 py-1 hover:bg-bg-action-hover rounded-md text-text-content-secondary/40 hover:text-text-content-primary transition-colors cursor-pointer">
                 <Cloud size={14} />

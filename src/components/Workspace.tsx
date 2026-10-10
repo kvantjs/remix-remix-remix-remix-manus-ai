@@ -60,6 +60,7 @@ interface WorkspaceProps {
   statusText?: string;
   contextText?: string;
   initialTab?: string;
+  initialSubTab?: WorkspaceSubTab;
   agentIntent?: any;
   browserStatus?: 'loading' | 'interactive' | 'error' | 'blocked';
 }
@@ -81,6 +82,7 @@ export function Workspace({
   statusText,
   contextText,
   initialTab,
+  initialSubTab,
   agentIntent,
   browserStatus
 }: WorkspaceProps) {
@@ -99,6 +101,9 @@ export function Workspace({
       setActiveTopTab(initialTab as TopLevelTab);
     }
   }, [initialTab]);
+  useEffect(() => {
+    if (initialSubTab) setWorkspaceSubTab(initialSubTab);
+  }, [initialSubTab]);
   useEffect(() => {
     if (isWorking) setActiveTopTab('computer');
   }, [isWorking]);
@@ -710,9 +715,9 @@ function InteractiveCodeEditor({ activeFile, onFileChange, customFiles, onFileUp
       } else if (activeFile === 'client/src/index.css') {
         content = `@import "tailwindcss";\n\nbody {\n  @apply bg-[#080A0F] text-slate-100 antialiased;\n}`;
       } else if (activeFile === 'package.json') {
-        content = `{\n  "name": "kvant-webdev-app",\n  "private": true,\n  "version": "1.0.0",\n  "type": "module",\n  "dependencies": {\n    "react": "^19.0.0",\n    "react-dom": "^19.0.0",\n    "@phosphor-icons/react": "^2.1.10"\n  }\n}`;
+        content = `{\n  "name": "web-app",\n  "private": true,\n  "version": "1.0.0",\n  "type": "module",\n  "dependencies": {\n    "react": "^19.0.0",\n    "react-dom": "^19.0.0",\n    "@phosphor-icons/react": "^2.1.10"\n  }\n}`;
       } else if (activeFile === 'README.md') {
-        content = `# Projeto WebDev Kvant\n\nAplicação React construída e atualizada autonomamente pelo agente.`;
+        content = `# Projeto Web\n\nAplicação React construída e atualizada pelo agente.`;
       } else {
         content = `// Arquivo: ${activeFile}\nexport default {};\n`;
       }
