@@ -8,7 +8,7 @@
   --font-serif: "Libre Baskerville", "Noto Serif", "Noto Serif SC", "Noto Serif JP", "Noto Serif KR", serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   
-  /* Kopilot AI Base Palette */
+  /* Manus-inspired dark base palette */
   --color-base-black-deep: #1a1a1a;
   --color-base-black-elevated: #1a1a1a;
   --color-base-charcoal-light: #282828;
@@ -167,7 +167,7 @@ body {
   animation: spin-slow 3s linear infinite;
 }
 
-/* Kopilot specific selection */
+/* Subtle text selection */
 ::selection {
   background: rgba(52, 50, 45, 0.5);
   color: inherit;

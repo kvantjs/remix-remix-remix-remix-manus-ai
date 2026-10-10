@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useRef, useMemo } from 'react';
 import { 
   SkipBack, 
   SkipForward, 
@@ -14,7 +14,11 @@ import {
   FileCode
 } from '@phosphor-icons/react';
 import { ToolCallTrace } from '../types/project';
-import { DynamicRuntimeRunner } from './DynamicRuntimeRunner';
+
+const DynamicRuntimeRunner = lazy(async () => {
+  const module = await import('./DynamicRuntimeRunner');
+  return { default: module.DynamicRuntimeRunner };
+});
 import { TerminalView } from './TerminalView';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
@@ -489,15 +493,8 @@ export function KvantComputer({
   }, [isWorking, isComputerActive]);
 
   // History stack for navigation & scrubber
-  const [navHistory, setNavHistory] = useState<NavHistoryItem[]>([
-    {
-      url: '',
-      title: 'Navegador pronto',
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      action: 'Inicialização'
-    }
-  ]);
-  const [historyIndex, setHistoryIndex] = useState<number>(0);
+  const [navHistory, setNavHistory] = useState<NavHistoryItem[]>([]);
+  const [historyIndex, setHistoryIndex] = useState<number>(-1);
   
   // Timeline scrubber state
   const [scrubberValue, setScrubberValue] = useState<number>(100);
@@ -509,7 +506,7 @@ export function KvantComputer({
     y: 190,
     visible: true,
     isClicking: false,
-    label: 'Kopilot',
+    label: 'Manus',
     status: 'Agente no controle',
     animation: 'idle',
     viewportWidth: 1280,
@@ -642,7 +639,7 @@ export function KvantComputer({
         y: 45,
         visible: true,
         isClicking: false,
-        label: 'Kopilot',
+        label: 'Manus',
         status: `Acessando ${displayHostname}...`,
         animation: 'loading'
       });
@@ -679,7 +676,7 @@ export function KvantComputer({
           y: 200,
           visible: true,
           isClicking: false,
-          label: 'Kopilot',
+          label: 'Manus',
           status: `Interagindo em ${displayHostname}`,
           animation: 'moving'
         });
@@ -718,7 +715,7 @@ export function KvantComputer({
         y: 240,
         visible: true,
         isClicking: false,
-        label: 'Kopilot',
+        label: 'Manus',
         status: `Clicando em "${targetVal}"...`,
         animation: 'moving'
       });
@@ -742,7 +739,7 @@ export function KvantComputer({
         y: 260,
         visible: true,
         isClicking: false,
-        label: 'Kopilot',
+        label: 'Manus',
         status: 'Rolando a página...',
         animation: 'scrolling'
       });
@@ -768,7 +765,7 @@ export function KvantComputer({
         y: 160,
         visible: true,
         isClicking: true,
-        label: 'Kopilot',
+        label: 'Manus',
         status: `Digitando: "${targetVal}"`,
         animation: 'typing'
       });
@@ -1067,10 +1064,10 @@ export function KvantComputer({
           <div className="flex items-center gap-2 overflow-hidden truncate">
             <span className="text-text-content-secondary font-normal text-[11.5px] tracking-tight">
               {activeSurface === 'terminal' 
-                ? (isWorking ? 'Kopilot executando no Terminal Ubuntu' : 'Terminal Bash Ubuntu 24.04') 
+                ? (isWorking ? 'Manus executando no Terminal Ubuntu' : 'Terminal Bash Ubuntu 24.04')
                 : activeSurface === 'editor' 
-                  ? (isWorking ? 'Kopilot editando código do projeto' : 'Editor de Código do Agente')
-                  : (!isLive ? 'Histórico de Execução do Agente' : (isBooting ? 'Computador está iniciando...' : (isLoading ? 'Kopilot está interagindo...' : 'Kopilot está usando o Navegador')))}
+                  ? (isWorking ? 'Manus editando código do projeto' : 'Editor de Código do Agente')
+                : (!isLive ? 'Histórico de execução do agente' : (isBooting ? 'Computador está iniciando...' : (isLoading ? (isWorking ? 'Manus está carregando uma página...' : 'Carregando página...') : (isWorking ? (isBlankUrl ? 'Manus está trabalhando...' : 'Manus está usando o Navegador') : (isBlankUrl ? 'Computador do agente em espera' : 'Navegador do agente')))))}
             </span>
             <span className="text-border-divider-subtle text-xs">|</span>
             <span className="text-text-content-secondary/80 font-mono text-[11px] truncate tracking-tight">
@@ -1137,19 +1134,19 @@ export function KvantComputer({
           <div className="flex-1 bg-bg-canvas-main flex flex-col items-center justify-center p-6 text-center select-none overflow-y-auto space-y-4">
               {/* Image requested by user with no background container */}
               <img 
-                src="https://imgdb.io/i/kescF0A.png" 
-                alt="O computador do Kvant está inativo" 
-                className="w-56 sm:w-64 md:w-72 h-auto object-contain drop-shadow-md"
+                src="/manus-assets/computer-inactive.png"
+                alt="O computador do Manus está inativo"
+                className="w-56 sm:w-64 md:w-72 h-auto object-contain drop-shadow-md brightness-0 invert opacity-40"
               />
 
               {/* Title text */}
               <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight">
-                Computador Kopilot v1.0.1
+                Computador do Manus
               </h3>
 
               {/* Subtext */}
               <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed max-w-sm">
-                Envie uma instrução ao agente no chat para ligar o computador e iniciar as automações.
+                O computador aparecerá aqui quando o agente iniciar uma ação que o exija.
               </p>
           </div>
         ) : isBooting ? (
@@ -1164,7 +1161,7 @@ export function KvantComputer({
                 Inicializando computador do agente
               </div>
               <p className="text-sm font-medium text-white tracking-tight">
-                Ambiente Computer MCP em inicialização
+                Preparando o ambiente do computador
               </p>
               <p className="text-xs text-zinc-400 font-mono">
                 {bootSecondsRemaining}s restantes · Conectando ao container Ubuntu 24.04
@@ -1185,17 +1182,17 @@ export function KvantComputer({
           /* ACTIVE BUT IDLE / WAITING COMPUTER SCREEN */
           <div className="flex-1 bg-bg-canvas-main flex flex-col items-center justify-center p-6 text-center select-none overflow-y-auto space-y-4 animate-in fade-in duration-500">
               <img 
-                src="https://imgdb.io/i/-E1nG20.png" 
+                src="/manus-assets/computer-inactive.png"
                 alt="Nada para mostrar" 
-                className="w-56 sm:w-64 md:w-72 h-auto object-contain drop-shadow-md"
+                className="w-56 sm:w-64 md:w-72 h-auto object-contain drop-shadow-md brightness-0 invert opacity-40"
               />
 
               <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight">
-                Navegador pronto
+                Aguardando navegação
               </h3>
 
               <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed max-w-sm">
-                O computador está disponível e aguardando uma navegação real do agente. Nenhum site é aberto automaticamente.
+                A tela do computador será atualizada quando o agente iniciar uma navegação. Nenhum site é aberto automaticamente.
               </p>
           </div>
         ) : (
@@ -1306,15 +1303,15 @@ export function KvantComputer({
                   ) : (
                     <div className="w-full h-full bg-bg-canvas-main flex flex-col items-center justify-center p-6 text-center select-none overflow-y-auto space-y-4 animate-in fade-in duration-300">
                       <img 
-                        src="https://imgdb.io/i/-E1nG20.png" 
+                        src="/manus-assets/computer-inactive.png"
                         alt="Navegador pronto" 
-                        className="w-56 sm:w-64 md:w-72 h-auto object-contain drop-shadow-md"
+                        className="w-56 sm:w-64 md:w-72 h-auto object-contain drop-shadow-md brightness-0 invert opacity-40"
                       />
                       <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight">
-                        Navegador pronto
+                        Aguardando navegação
                       </h3>
                       <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed max-w-sm">
-                        O computador está disponível e aguardando uma navegação real do agente. Nenhum site é aberto automaticamente.
+                        A tela do computador será atualizada quando o agente iniciar uma navegação. Nenhum site é aberto automaticamente.
                       </p>
                     </div>
                   )}
@@ -1326,7 +1323,9 @@ export function KvantComputer({
                   className="origin-top-left transition-transform duration-200 overflow-auto w-full h-full bg-white" 
                   style={{ transform: 'scale(0.70)', width: '142.86%', height: '142.86%', colorScheme: 'light', backgroundColor: '#ffffff' }}
                 >
-                  <DynamicRuntimeRunner code={customCode} />
+                  <Suspense fallback={<div role="status" className="flex h-full items-center justify-center bg-[#1a1a1a] text-xs text-white/45">Carregando prévia executável…</div>}>
+                    <DynamicRuntimeRunner code={customCode} />
+                  </Suspense>
                 </div>
               </div>
             )}
@@ -1392,7 +1391,7 @@ export function KvantComputer({
       <div className="px-4 py-2 bg-[#1a1a1a] border-t border-[#252525] shrink-0 select-none space-y-1.5">
         
         {/* Scrubber Row - Shown only when computer is active */}
-        {isComputerActive && (
+        {isComputerActive && navHistory.length > 1 && (
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 text-zinc-400">
               <button 
@@ -1483,12 +1482,17 @@ export function KvantComputer({
         )}
 
         {/* Bottom Status Row */}
-        <div className="flex items-center justify-between text-xs pt-0.5">
+        <div role="status" aria-live="polite" className="flex items-center justify-between text-xs pt-0.5">
           <div className="flex items-center gap-1.5 font-medium text-[11.5px]">
             {!isComputerActive ? (
               <div className="flex items-center gap-2 text-zinc-400">
                 <span className="size-2 rounded-full bg-zinc-600" />
-                <span>O computador do Kvant está inativo</span>
+                <span>Computador inativo</span>
+              </div>
+            ) : /(?:aguardando|esperando).*?(?:resposta|autoriza[cç][aã]o)/i.test(statusText) ? (
+              <div className="flex items-center gap-2 text-amber-300/90">
+                <span className="size-2 rounded-full bg-amber-400" />
+                <span>Aguardando sua resposta</span>
               </div>
             ) : isWorking ? (
               <WorkingLoader />
@@ -1497,10 +1501,25 @@ export function KvantComputer({
                 <div className="size-2 rounded-full bg-cyan-400 animate-pulse" />
                 <span>Inicializando computador do agente · {bootSecondsRemaining}s restantes</span>
               </div>
-            ) : (
-              <div className="flex items-center gap-1.5" style={{ color: '#68ca3c' }}>
+            ) : /interromp|falha|erro|não foi possível/i.test(statusText) ? (
+              <div className="flex items-center gap-2 text-red-300/90">
+                <span className="size-2 rounded-full bg-red-400" />
+                <span>Execução interrompida</span>
+              </div>
+            ) : /execução conclu[ií]da/i.test(statusText) ? (
+              <div className="flex items-center gap-1.5 text-emerald-300/90">
                 <Check size={13} strokeWidth={2.5} />
-                <span>Tarefa Concluída</span>
+                <span>Tarefa concluída</span>
+              </div>
+            ) : /aguardando uma tarefa/i.test(statusText) ? (
+              <div className="flex items-center gap-2 text-zinc-400">
+                <span className="size-2 rounded-full bg-zinc-600" />
+                <span>Aguardando uma tarefa</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-zinc-400">
+                <span className="size-2 rounded-full bg-zinc-500" />
+                <span>Computador pronto</span>
               </div>
             )}
           </div>
