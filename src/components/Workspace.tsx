@@ -1,6 +1,8 @@
 import { 
   X, 
   ArrowsOut, 
+  ArrowsIn,
+  SidebarSimple,
   CaretRight, 
   Globe, 
   Code, 
@@ -97,6 +99,16 @@ export function Workspace({
   const [isMaximized, setIsMaximized] = useState(false);
 
   useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isMaximized) {
+        setIsMaximized(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isMaximized]);
+
+  useEffect(() => {
     if (initialTab && ['computer', 'workspace', 'code_tab', 'preview_tab', 'terminal_tab'].includes(initialTab)) {
       setActiveTopTab(initialTab as TopLevelTab);
     }
@@ -149,7 +161,7 @@ export function Workspace({
   };
 
   return (
-    <div className={`${isMaximized ? 'w-full absolute inset-0 z-30' : 'w-full lg:w-[56%] lg:min-w-[460px] min-w-0 h-[58%] min-h-[360px] lg:h-full shrink-0'} border-l-0 lg:border-l border-t lg:border-t-0 border-border-divider-subtle bg-bg-surface-panel flex flex-col animate-in duration-200 select-none`}>
+    <div className={`${isMaximized ? 'fixed inset-0 z-50 w-screen h-screen' : 'w-full h-full min-w-0 flex-1'} border-l-0 lg:border-l border-border-divider-subtle bg-bg-surface-panel flex flex-col select-none overflow-hidden`}>
       
       {/* Top Application Tab Bar */}
       <div className="h-11 flex items-center px-3 bg-bg-canvas-main/60 border-b border-border-divider-subtle shrink-0 relative select-none">
@@ -281,18 +293,18 @@ export function Workspace({
         <div className="flex-1" />
 
         {/* Top Right Window Controls: Fullscreen expand and Sidebar dock toggle */}
-        <div className="flex items-center gap-1.5 text-text-content-secondary">
+        <div className="flex items-center gap-1 text-text-content-secondary">
           <button 
             onClick={() => setIsMaximized(!isMaximized)}
-            title={isMaximized ? "Restaurar tamanho" : "Tela cheia"} 
-            className="cursor-pointer hover:text-text-content-primary transition-colors p-1"
+            title={isMaximized ? "Restaurar tamanho (Esc)" : "Expandir em tela cheia"} 
+            className="cursor-pointer hover:text-text-content-primary hover:bg-white/10 rounded transition-colors p-1.5"
           >
-            <ArrowsOut size={14} />
+            {isMaximized ? <ArrowsIn size={14} /> : <ArrowsOut size={14} />}
           </button>
           <button 
             onClick={onClose}
             title="Fechar painel lateral" 
-            className="cursor-pointer hover:text-text-content-primary transition-colors p-1"
+            className="cursor-pointer hover:text-text-content-primary hover:bg-white/10 rounded transition-colors p-1.5"
           >
             <X size={14} />
           </button>
@@ -705,6 +717,7 @@ function InteractiveCodeEditor({ activeFile, onFileChange, customFiles, onFileUp
   const [isNewFolderModalOpen, setIsNewFolderModalOpen] = useState(false);
   const [newFilePath, setNewFilePath] = useState('');
   const [newFolderName, setNewFolderName] = useState('');
+  const [isFilesSidebarOpen, setIsFilesSidebarOpen] = useState(true);
 
   // Load content when active file changes
   useEffect(() => {
@@ -822,67 +835,76 @@ function InteractiveCodeEditor({ activeFile, onFileChange, customFiles, onFileUp
   return (
     <div className="h-full flex bg-[#1a1a1a] text-slate-100 overflow-hidden relative">
       {/* Left Sidebar: Dynamic Workspace File Tree */}
-      <div className="w-56 border-r border-white/10 flex flex-col shrink-0 select-none" style={{ backgroundColor: '#1a1a1a' }}>
-        {/* Workspace Tree Header */}
-        <div className="h-9 px-3 border-b border-white/10 flex items-center justify-between shrink-0" style={{ backgroundColor: '#1a1a1a' }}>
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-white">
-            <Folder size={14} className="text-[#f5f5f5]" style={{ color: '#f5f5f5' }} />
-            <span style={{ color: '#f5f5f5' }}>Arquivos</span>
+      {isFilesSidebarOpen && (
+        <div className="w-56 border-r border-white/10 flex flex-col shrink-0 select-none animate-in fade-in duration-150" style={{ backgroundColor: '#1a1a1a' }}>
+          {/* Workspace Tree Header */}
+          <div className="h-9 px-3 border-b border-white/10 flex items-center justify-between shrink-0" style={{ backgroundColor: '#1a1a1a' }}>
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-white">
+              <Folder size={14} className="text-[#f5f5f5]" style={{ color: '#f5f5f5' }} />
+              <span style={{ color: '#f5f5f5' }}>Arquivos</span>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setIsNewFileModalOpen(true)}
+                className="p-1 hover:bg-white/10 rounded transition-colors cursor-pointer"
+                style={{ color: '#f5f5f5' }}
+                title="Novo Arquivo (+ File)"
+              >
+                <FilePlus size={14} style={{ color: '#f5f5f5' }} />
+              </button>
+              <button
+                onClick={() => setIsNewFolderModalOpen(true)}
+                className="p-1 hover:bg-white/10 rounded transition-colors cursor-pointer"
+                style={{ color: '#f5f5f5' }}
+                title="Nova Pasta (+ Folder)"
+              >
+                <FolderPlus size={14} style={{ color: '#f5f5f5' }} />
+              </button>
+            </div>
           </div>
 
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setIsNewFileModalOpen(true)}
-              className="p-1 hover:bg-white/10 rounded transition-colors cursor-pointer"
-              style={{ color: '#f5f5f5' }}
-              title="Novo Arquivo (+ File)"
-            >
-              <FilePlus size={14} style={{ color: '#f5f5f5' }} />
-            </button>
-            <button
-              onClick={() => setIsNewFolderModalOpen(true)}
-              className="p-1 hover:bg-white/10 rounded transition-colors cursor-pointer"
-              style={{ color: '#f5f5f5' }}
-              title="Nova Pasta (+ Folder)"
-            >
-              <FolderPlus size={14} style={{ color: '#f5f5f5' }} />
-            </button>
+          {/* Tree Nodes List */}
+          <div className="flex-1 overflow-y-auto p-2 space-y-0.5 custom-scrollbar text-xs" style={{ backgroundColor: '#1a1a1a' }}>
+            {fileTree.map((node) => (
+              <DynamicFileTreeNode 
+                key={node.path} 
+                node={node} 
+                level={0} 
+                activeFile={activeFile} 
+                onFileChange={onFileChange}
+                searchTerm={searchTerm}
+              />
+            ))}
+          </div>
+
+          {/* Workspace Footer Stats */}
+          <div className="p-2.5 border-t border-white/5 text-[10px] flex items-center justify-between font-mono" style={{ backgroundColor: '#1a1a1a', color: '#f5f5f5' }}>
+            <span style={{ color: '#f5f5f5' }}>{Object.keys(customFiles).length || 4} arquivos</span>
+            <span style={{ color: '#f5f5f5' }}>● Workspace Pronto</span>
           </div>
         </div>
-
-        {/* Tree Nodes List */}
-        <div className="flex-1 overflow-y-auto p-2 space-y-0.5 custom-scrollbar text-xs" style={{ backgroundColor: '#1a1a1a' }}>
-          {fileTree.map((node) => (
-            <DynamicFileTreeNode 
-              key={node.path} 
-              node={node} 
-              level={0} 
-              activeFile={activeFile} 
-              onFileChange={onFileChange}
-              searchTerm={searchTerm}
-            />
-          ))}
-        </div>
-
-        {/* Workspace Footer Stats */}
-        <div className="p-2.5 border-t border-white/5 text-[10px] flex items-center justify-between font-mono" style={{ backgroundColor: '#1a1a1a', color: '#f5f5f5' }}>
-          <span style={{ color: '#f5f5f5' }}>{Object.keys(customFiles).length || 4} arquivos</span>
-          <span style={{ color: '#f5f5f5' }}>● Workspace Pronto</span>
-        </div>
-      </div>
+      )}
 
       {/* Main Code Editor View */}
       <div className="flex-1 flex flex-col min-w-0 bg-[#1a1a1a] overflow-hidden" style={{ backgroundColor: '#1a1a1a' }}>
         {/* Editor Tab Bar & Actions */}
-        <div className="h-9 border-b border-white/10 px-4 flex items-center justify-between shrink-0" style={{ backgroundColor: '#1a1a1a', color: '#f5f5f5' }}>
-          <div className="flex items-center gap-2 font-mono text-xs truncate" style={{ color: '#f5f5f5' }}>
+        <div className="h-9 border-b border-white/10 px-3 flex items-center justify-between shrink-0 gap-2" style={{ backgroundColor: '#1a1a1a', color: '#f5f5f5' }}>
+          <div className="flex items-center gap-2 font-mono text-xs truncate min-w-0" style={{ color: '#f5f5f5' }}>
+            <button
+              onClick={() => setIsFilesSidebarOpen(prev => !prev)}
+              className="p-1 hover:bg-white/10 rounded transition-colors text-white/70 hover:text-white shrink-0 cursor-pointer"
+              title={isFilesSidebarOpen ? "Recolher arquivos" : "Mostrar arquivos"}
+            >
+              <SidebarSimple size={15} />
+            </button>
             <FileCode size={15} className="shrink-0" style={{ color: '#f5f5f5' }} />
-            <span className="font-semibold" style={{ color: '#f5f5f5' }}>{activeFile}</span>
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-amber-400 font-sans tracking-wide select-none">
+            <span className="font-semibold truncate max-w-[200px]" style={{ color: '#f5f5f5' }}>{activeFile}</span>
+            <span className="hidden xl:inline-block text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-amber-400 font-sans tracking-wide select-none truncate">
               Apenas o agente pode gerar, editar e executar código
             </span>
             {!isSaved && (
-              <span className="size-2 rounded-full bg-amber-400 animate-pulse" title="Alterações não salvas" />
+              <span className="size-2 rounded-full bg-amber-400 animate-pulse shrink-0" title="Alterações não salvas" />
             )}
           </div>
 

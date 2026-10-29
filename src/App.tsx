@@ -175,6 +175,54 @@ export default function App() {
     }
   }, []);
 
+  const [chatWidth, setChatWidth] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('kopilot-chat-width');
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed >= 320 && parsed <= 900) return parsed;
+      }
+      return Math.max(380, Math.min(480, Math.round(window.innerWidth * 0.36)));
+    }
+    return 440;
+  });
+  const [isResizing, setIsResizing] = useState(false);
+
+  const startResizing = useCallback((mouseDownEvent: React.MouseEvent) => {
+    mouseDownEvent.preventDefault();
+    setIsResizing(true);
+
+    const onPointerMove = (e: MouseEvent) => {
+      const sidebarWidth = window.innerWidth >= 1024 ? 264 : 0;
+      const minChat = 320;
+      const minWorkspace = 440;
+      const maxChat = Math.max(minChat, window.innerWidth - sidebarWidth - minWorkspace);
+      const newWidth = Math.min(Math.max(minChat, e.clientX - sidebarWidth), maxChat);
+      setChatWidth(newWidth);
+    };
+
+    const onPointerUp = () => {
+      setIsResizing(false);
+      window.removeEventListener('mousemove', onPointerMove);
+      window.removeEventListener('mouseup', onPointerUp);
+    };
+
+    window.addEventListener('mousemove', onPointerMove);
+    window.addEventListener('mouseup', onPointerUp);
+  }, []);
+
+  const resetResizing = useCallback(() => {
+    const defaultWidth = Math.max(380, Math.min(480, Math.round(window.innerWidth * 0.36)));
+    setChatWidth(defaultWidth);
+    localStorage.removeItem('kopilot-chat-width');
+  }, []);
+
+  useEffect(() => {
+    if (!isResizing) {
+      localStorage.setItem('kopilot-chat-width', String(chatWidth));
+    }
+  }, [chatWidth, isResizing]);
+
   return (
     <div className={`${theme} flex h-screen w-full flex-col lg:flex-row bg-[#1a1a1a] text-text-content-primary overflow-hidden font-sans selection:bg-blue-500/20`}>
       <h1 className="sr-only">Manus AI — espaço de trabalho do agente</h1>
@@ -189,8 +237,16 @@ export default function App() {
         mobileOpen={mobileSidebarOpen}
         onClose={() => setMobileSidebarOpen(false)}
       />
-      <main className="flex-1 min-h-0 min-w-0 flex flex-col lg:flex-row overflow-hidden relative bg-[#1a1a1a]">
-        <div className={`min-h-0 min-w-0 flex-col ${isWorkspaceOpen && activeSidebarRoute !== 'chat' ? 'hidden lg:flex lg:w-[44%] lg:flex-none' : 'flex w-full flex-1 lg:w-auto'}`}>
+      <main className={`flex-1 min-h-0 min-w-0 flex flex-col lg:flex-row overflow-hidden relative bg-[#1a1a1a] ${isResizing ? 'select-none cursor-col-resize' : ''}`}>
+        {/* Left Side: Chat Area */}
+        <div 
+          style={isWorkspaceOpen && typeof window !== 'undefined' && window.innerWidth >= 1024 ? { width: `${chatWidth}px` } : undefined}
+          className={`min-h-0 min-w-0 flex-col ${
+            isWorkspaceOpen 
+              ? `${activeSidebarRoute === 'chat' ? 'flex w-full lg:flex-none' : 'hidden lg:flex lg:flex-none'} h-full border-r border-border-divider-subtle` 
+              : 'flex w-full flex-1 h-full'
+          }`}
+        >
           <ChatArea
             key={chatSessionId}
             onFileUpdate={handleFileUpdate}
@@ -202,10 +258,24 @@ export default function App() {
             onToggleSidebar={handleOpenMobileSidebar}
           />
         </div>
+
+        {/* Desktop Draggable Divider between Chat and Workspace */}
         {isWorkspaceOpen && (
-          <div className={`min-h-0 min-w-0 flex-col ${activeSidebarRoute === 'chat' ? 'hidden lg:flex' : 'flex w-full flex-1 lg:w-auto'}`}>
+          <div
+            onMouseDown={startResizing}
+            onDoubleClick={resetResizing}
+            title="Arraste para redimensionar ou clique duas vezes para redefinir a largura"
+            className="hidden lg:flex w-2 -ml-1 cursor-col-resize items-center justify-center relative z-20 group hover:bg-blue-500/20 transition-colors select-none"
+          >
+            <div className={`w-0.5 h-10 rounded-full transition-colors ${isResizing ? 'bg-blue-400' : 'bg-white/20 group-hover:bg-blue-400'}`} />
+          </div>
+        )}
+
+        {/* Right Side: Workspace (Cloud Computer, Code Editor, Preview, Terminal) */}
+        {isWorkspaceOpen && (
+          <div className={`min-h-0 min-w-0 flex-1 flex flex-col h-full overflow-hidden ${activeSidebarRoute === 'chat' ? 'hidden lg:flex' : 'flex w-full'}`}>
             <Suspense fallback={
-              <div role="status" aria-live="polite" className="flex min-w-0 flex-1 flex-col border-l border-white/10 bg-[#1a1a1a]">
+              <div role="status" aria-live="polite" className="flex min-w-0 flex-1 h-full w-full flex-col border-l border-white/10 bg-[#1a1a1a]">
                 <div className="flex h-10 items-center gap-2 border-b border-white/[0.06] px-4">
                   <span className="h-3 w-28 animate-pulse rounded bg-white/[0.07]" />
                   <span className="h-3 w-24 animate-pulse rounded bg-white/[0.05]" />
@@ -218,21 +288,21 @@ export default function App() {
                 </div>
               </div>
             }>
-            <Workspace
-              onClose={handleCloseWorkspace}
-              customFiles={customFiles}
-              onFileUpdate={handleFileUpdate}
-              onSendPrompt={handleSendPrompt}
-              toolCalls={toolCalls}
-              isWorking={isWorking}
-              workingTime={workingTime}
-              statusText={statusText}
-              contextText={contextText}
-              agentIntent={agentIntent}
-              browserStatus={browserStatus}
-              initialTab={workspaceTab}
-              initialSubTab={workspaceSubTab}
-            />
+              <Workspace
+                onClose={handleCloseWorkspace}
+                customFiles={customFiles}
+                onFileUpdate={handleFileUpdate}
+                onSendPrompt={handleSendPrompt}
+                toolCalls={toolCalls}
+                isWorking={isWorking}
+                workingTime={workingTime}
+                statusText={statusText}
+                contextText={contextText}
+                agentIntent={agentIntent}
+                browserStatus={browserStatus}
+                initialTab={workspaceTab}
+                initialSubTab={workspaceSubTab}
+              />
             </Suspense>
           </div>
         )}
